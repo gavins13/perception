@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from capsule_functions import _squash
-# NB/ squash biases will probably start out as 0.1
+# NB/ squash biases init as 0.1
 
 
 
