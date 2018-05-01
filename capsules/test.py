@@ -1,8 +1,8 @@
 from operations.capsule_operations import *
 impor tensorflow as tf
-#input images = [batch, height,width]
 
 def architecture(input_images):
+    #input images = [batch, height,width]
     layer1 = init_conv_2d(input_images, 256, "Init", kernel-size=9)
     layer2 = convolutional_capsule_layer(layer1, 9,9,'ConvCaps',output_kernel_vec_dim=8,convolve_across_channels=True,    num_output_channels=32, kernel_is_vector=False)
     # layer2b = _routing(layer2, layer_dimensions=[batch, vec_dim, num_channels, height, width], squash_biases, num_routing)
