@@ -1,6 +1,7 @@
 import tensorflow as tf
 from routing import *
 import numpy as np
+import variables
 
 
 
@@ -58,7 +59,21 @@ def init_conv_2d(input_images, num_f_maps, scope_name, kernel_size=5):
         # a 256Dim vector
         output = tf.expand_dims(output, 2)
         # now: [batch, vec_dim=num_f_maps, num_chanels=1, height, width]
-        return output
+        output_tensor_shape = tf.shape(output)
+        with tf.variable_scope(scope_name):
+            bias_shape = output_tensor_shape[:]
+            bias_shape[0] = 1
+            bias_shape[-1] = 1
+            bias_shape[-2] = 1
+            # bias shape = [1,vec_dim,num_channel,1,1]
+            biases = variables.bias_variable(bias_shape)
+        retiled_bias_shape = output_tensor_shape[:]
+        retiled_bias_shape[1] = 1
+        retiled_bias_shape[2] = 1
+        biases = tf.tile(biases, retiled_bias_shape)
+        output = output + biases
+        output = tf.nn.relu(output)
+    return output
 
 
 
