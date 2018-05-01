@@ -1,20 +1,16 @@
 import tensorflow as tf
+import numpy as np
 
 # NB/ squash biases will probably start out as 0.1
 
 
-# when defining the network:
-# will write it out like this:
-# layer1 = 2d_conv(input_images, 256, kernel-size=5)
-# layer2 = 2d_conv_slim_capsule(layer1, channels=32, vec_dim=8) # produces a tensor of size [batch, vec_dim, num_channels, height, width] when given input_tensor (a scalar input_tensor, i.e. vec_dim =1 for this tensor)
-# layer2b = _routing(layer2, layer_dimensions=[batch, vec_dim, num_channels, height, width], squash_biases, num_routing)
-# layer3 = capsule_layer(layer2b, apply_weights=True)
-# layer3b = _routing(layer3, layer_dimensions=[batch, vec_dim=16, num_channels=10, height=1, width=1], squash_biases, num_routing)
-# layer4 = logistic_fc_neural_network(flatten(layer3b))
-# output = layer4
 
 
-def _patch_based_routing(input_tensor, output_dimensions=None, squash_biases=None, num_routing=3, patch_shape=[3,3], patch_stride=1):
+
+def _patch_based_routing(input_tensor, squash_biases=None,  num_routing=3, patch_shape=[1,5,5], patch_stride=[1,1,1],deconvolution_factors=None):
+    # patch_shape should take dimensions [num_channels, patch_width, patch_height]
+    # by default, we do not want cross-channel patching
+
     # This method will not work for patch-based routing!
 
     # input_tensor shape = [batch, vec_dim, num_channels, height, width]
@@ -37,36 +33,68 @@ def _patch_based_routing(input_tensor, output_dimensions=None, squash_biases=Non
 
     # End Config #
 
+    if(deconvolution_factors!==None && len(deconvolution_factors)==3): # None is the same as [0,0,0] ideally
+        input_tensor_shape = tf.shape(input_tensor)
+        new_input_tensor_shape = np.multiply(np.array(input_tensor_shape[2::]), np.array(deconvolution_factors)+1);
+        new_input_tensor_shape = new_input_tensor_shape + np.array(deconvolution_factors)
+
+        new_input_tensor_shape = input_tensor_shape[0:3] + new_input_tensor_shape[:]
+        new_input_tensor = np.zeros((*new_input_tensor_shape))
+
+        for i in range(input_tensor_shape[2]):
+            for j in range(input_tensor_shape[3]):
+                for k in range(input_tensor_shape[4]):
+                    this_slice_pos = np.multiply(np.array([i,j,k]), np.array(deconvolution_factors))
+                    this_slice_pos = input_tensor_shape[0:2] + list(this_slice_pos)
+                    new_input_tensor[*this_slice_pos] = input_tensor[3::]
+
+        del input_tensor
+        input_tensor = new_input_tensor
+
+    if(patch_shape==None):
+        patch_shape=[1, input_tensor_shape[-2], input_tensor_shape[-1]]
+
+
+    input_tensor_shape = tf.shape(input_tensor)
+    output_heightwise = np.floor((input_tensor_shape[-2] - patch_shape[1] + 1)/patch_stride[1])
+    output_widthwise = np.floor((input_tensor_shape[-1] - patch_shape[2] + 1)/patch_stride[2])
+    output_channelwise = np.floor((input_tensor_shape[2] - patch_shape[0] + 1)/patch_stride[0])
+    output_dimensions = [output_channelwise, output_heightwise, output_widthwise]
+
 
     # NEED TO RESHAPE THE INPUT_TENSOR:
     # Go From [batch, vec, num_channels, height, width]  ---->
-    # To  [batch, vec, num_channels, patch_number_heightwise, patch_number_widthwise, patch_height, patch_width]
-    input_tensor_shape = tf.shape(input_tensor)
-    patches_heightwise = np.floor((input_tensor_shape[-2] - patch_shape[0] + 1) / patch_stride)
-    patches_widthwise = np.floor((input_tensor_shape[-1] - patch_shape[2] + 1) / patch_stride)
+    # To  [batch, vec, patch_num_channels, patch_height, patch_width, output_num_channels, output_height, output_width]
 
-    input_patch_based_tensor_shape = input_tensor_shape[0:3] + [patches_heightwise, patches_widthwise] + patch_shape
+
+
+    input_patch_based_tensor_shape = input_tensor_shape[0:3] + patch_shape + output_dimensions
     input_patch_based_tensor = np.zeros(*input_patch_based_tensor_shape)
-    for i in range(patches_heightwise):
-        for j in range(patches_widthwise):
-            this_heightwise_position = (i * patch_stride)
-            this_widthwise_position = (j * patch_stride)
-            this_patch = input_tensor_shape[:,:,:,
-            this_heightwise_position:this_heightwise_position+patch_shape[0],
-            this_widthwise_position:this_widthwise_position+patch_shape[1]] # [batch, vec, num_channels, patch_shape[0], patch_shape[1]]
-            this_patch = np.expand_dims(this_patch, axis=3)
-            this_patch = np.expand_dims(this_patch, axis=3) # [batch, vec, num_channels, 1,1,patchshape[0], patchshape[1]]
-            input_patch_based_tensor[:,:,:,i,j,:,:] = this_patch
+    for i in range(output_heightwise):
+        for j in range(output_widthwise):
+            for k in range(output_channelwise):
+                ii = i*patch_stride[1]
+                jj = j*patch_stride[2]
+                kk = k*patch_stride[0]
+                this_patch = input_tensor_shape[:,:,kk:kk+patch_shape[0],ii:ii+patch_shape[1],jj:jj+patch_shape[2]]
+                # ^ [batch, vec, patch_shape[0](numchannels), patch_shape[1](width), patch_shape[2](height)]
+                this_patch = np.expand_dims(this_patch, axis=-1)
+                this_patch = np.expand_dims(this_patch, axis=-1)
+                this_patch = np.expand_dims(this_patch, axis=-1) # [batch, vec,patchshape[0], patchshape[1], patchshape[2],
+                                                                 # 1,1,1]
+                input_patch_based_tensor[:,:,:,:,:,i,j,k] = this_patch
     input_patch_based_tensor = tf.constant(input_patch_based_tensor, shape=input_patch_based_tensor_shape, verify_shape=True, name="Create patch based tensor")
+    # [batch, vec, patch_num_channels, patch_height, patch_width, output_num_channels, output_height, output_width]
 
 
 
+    logit_shape_input = input_patch_based_tensor[:] # [batch, vec, patch_num_channels, patch_height, patch_width, output_num_channels, output_height, output_width]
+    logit_shape_input[1] = 1 # [batch, 1, patch_num_channels, patch_height, patch_width, output_num_channels, output_height, output_width]
+    logit_shape = logit_shape_input[:]
+    # logit shape:  [batch, 1, patch_num_channels, patch_height, patch_width, output_num_channels, output_height, output_width]
 
-    logit_shape_input = input_patch_based_tensor[:] # [batch, vec, num_channels, patch_number_heightwise, patch_number_widthwise, patch_height, patch_width]
-    logit_shape_input[1] = 1
-    logit_shape = logit_shape_input[:] + output_dimensions
-    # logit shape:  [batch, vec, num_channels, patch_number_heightwise, patch_number_widthwise, patch_height, patch_width, num_channels_output, height_output, width_output]
-    reduced_logit_shape = logit_shape_input + [np.product(output_dimensions)]
+    reduced_logit_shape = logit_shape[:]
+    reduced_logit_shape = logit_shape[0:-3] + [np.prod(logit_shape[-3::])]
 
     vec_dim = input_tensor_shape[1]
 
@@ -74,65 +102,49 @@ def _patch_based_routing(input_tensor, output_dimensions=None, squash_biases=Non
         bias_dimensions = output_dimensions[:]
         if(bias_channel_sharing===True): # wish to share bias terms across all channels
             bias_dimensions[0] = 1
-            squash_biases = variables.new_bias_variable(shape=bias_dimensions)
+            squash_biases = variables.new_bias_variable(shape=bias_dimensions, init=0.1)
             tiling_term = [1] * tf.size(output_dimensions)
             tiling_term[0] = output_dimensions[0]
             squash_biases = tf.tile(squash_biases, tiling_term)
         else: # create a unique bias term for each output capsule across all channels (and width and height)
-            squash_biases = variables.new_bias_variable(shape=output_dimensions) # [num_channels, height, width]
+            squash_biases = variables.new_bias_variable(shape=[vec_dim]+output_dimensions, init=0.1) # [vec_dim, num_channels, height, width]
 
     def _algorithm(i, logits, voting_tensors):
         logits = tf.reshape(logits, shape=reduced_logit_shape)
         c_i = softmax(logits, dim=length(reduced_logit_shape-1))
-        # c_i = [batch, 1, num_channels, patch_height, patch_width, total_num_of_output capsules = product(num_channels_output, height_output, width_output)]
+        # c_i = [batch, 1, patch_num_channels, patch_height, patch_width, total_num_of_output capsules = product(num_channels_output, height_output, width_output)]
         #input_tensor shape = [batch, vec_dim, num_channels, height, width]
-
         c_i = tf.reshape(c_i, shape=logit_shape)
 
         tmp = [1]*len(reduced_logit_shape)
         tmp[1] = vec_dim
         c_i = tf.tile(c_i, tmp)
+        # c_i (retiled) = [batch, vec_dim, patch_num_channels, patch_height, patch_width, num_channels_output, height_output, width_output]
 
-
-        ## This ste pis important to redo ***********************************
-        tmp = [1]*len(input_tensor_shape)
-        tmp = tmp[:] + output_dimensions
-        tmp_tensor = tf.tile(input_tensor, tmp) # dimensoins: [batch, vec_dim, num_channels, height, width,,,, num_channels_output, height_output, width_output]
-
-        ## *****************************************
-
-        s_j = tf.multiply(c_i, tmp_tensor, name="Individual Voting")
+        s_j = tf.multiply(c_i, input_patch_based_tensor, name="Individual Voting")
         dim_to_sum = range(2, len(input_tensor_shape))
-        s_j = tf.reduce_sum(s_j, axis=dim_to_sum, name="Voting Results")
-        s_j = tf.add(s_j, tf.transpose(tf.tile(squash_biases, [1,1,1, batch, vec_dim]), [3,4,0,1,2])) # [] [unfinished] - the [1,1,1] needs to be done generically
-        v_j = _squash(s_j, name="Non-linearity of votes")
+        s_j = tf.reduce_sum(s_j, axis=dim_to_sum, name="Voting Results") # [batch, vec_dim, numcha_o, h_o, w_o]
+        s_j = tf.add(s_j, tf.transpose(tf.tile(squash_biases, [1,1,1,1, batch]), [4,0,1, 2, 3])) # [] [unfinished] - the [1,1,1] needs to be done generically
+        v_j = _squash(s_j, name="Non-linearity of votes") # provided: [batch, vec_dim, num_ch, h_o, w_o]; same out
         #v_j dimensions = [batch, vec_dim, num_channels_output, height_output, width_output]
 
+        # input patch based tensor:[batch, vec, patch_num_channels, patch_height, patch_width, output_num_channels, output_height, output_width]
 
-        tmp = [1]*len(input_tensor_shape)
-        tmp = tmp[:] + output_dimensions
-        tmp_input_tensor = tf.tile(input_tensor, tmp) # dimensoins: [batch, vec_dim, num_channels, height, width,,,, num_channels_output, height_output, width_output]
+        v_j_tiled = tf.expand_dims(v_j, 2)
+        v_j_tiled = tf.expand_dims(v_j, 2)
+        v_j_tiled = tf.expand_dims(v_j, 2)
+        # v_j_tiled = [batch, vec, 1, 1, 1 o_numch, o_h_o, o_w_o]
+        v_j_tiled = tf.tile(v_j_tiled, [1,1]+patch_shape+[1,1,1])
+        # v_j_tiled = [batch, vec, p_numch, p_h_o, p_w_o, o_numch, o_h_o, o_w_o]
 
-        tmp = [1] * len(tf.shape(v_j))
-        tmp = tmp[:] + input_tensor_shape[2::]
-        tmp_vj_tensor = tf.tile(v_j, tmp) # dimensions: [batch, vec_dim, num_channels_output, height_output, width_output, num_channels, height, width]
-        tmp_transpose_list = range(len(tf.shape(tmp_tensor2)))
-        tmp_last_elements = tmp_transpose_list[len(tf.shape(vj))::]
-        tmp_first_elements = tmp_transpose_list[2:len(tf.shape(vj))]
-        tmp_vj_transposer = tmp_last_elements[:] + tmp_first_elements[:]
-        tmp_vj_tensor = tf.transpose(tmp_tensor2, tmp_vj_transposer) # dimensoins: [batch, vec_dim, num_channels, height, width,,,, num_channels_output, height_output, width_output]
-
-        dot_product = tf.multiply(tmp_input_tensor, tmp_vj_tensor, name="'Cosine' dot product: multiply")
-        # dimensions of dot product: [batch, vec_dim, num_channels, height, width,,,, num_channels_output, height_output, width_output]
+        dot_product = tf.multiply(input_patch_based_tensor, v_j_tiled, name="'Cosine' dot product: multiply")
+        # dimensions of dot product: [batch, vec_dim, pnum_channels, pheight, pwidth,,,, onum_channels_output, oheight_output, owidth_output]
         dot_product = tf.reduced_sum(dot_product, axis=[1], keepdims=True,  name="'Cosine' dot product: sum")
-        # dimensions of dot product: [batch,    1   , num_channels, height, width,,,, num_channels_output, height_output, width_output]
+        # dimensions of dot product: [batch,    1   , pnum_channels, pheight, pwidth,,,, onum_channels_output, oheight_output, owidth_output]
 
 
-        # logit_shape = [batch, 1, num_channels, height, width,  num_channels_output, height_output, width_output]
+        # logit shape:  [batch, 1, patch_num_channels, patch_height, patch_width, output_num_channels, output_height, output_width]
         logits = tf.add(logits, dot_product, name="b_ij logit update")
-
-        # [] [unfinished] - algorithm only works when the output_dimensions has the same parameters as the input_tensors, i.e:
-        # no change in the num_channels, width or height. this is because of the 'dot product' step present in the algorithm
 
         voting_tensors.write(i, v_j)
 
@@ -147,7 +159,6 @@ def _patch_based_routing(input_tensor, output_dimensions=None, squash_biases=Non
         loop_vars = [i, logits, voting_tensors],
         swap_memory=gpu_cpu_swap
     )
-
     return voting_tensors.read(num_routing-1)
 
 
