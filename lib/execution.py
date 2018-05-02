@@ -5,6 +5,9 @@ import sys
 
 class execution(object):
   def __init__(self, project_path, model, data_strap, type='train', experiment_name=None):
+    self.__enter__(project_path, model, data_strap, type='train', experiment_name=None)
+
+  def __enter__(self, project_path, model, data_strap, type='train', experiment_name=None):
     # Set Saving Directories
     if(name===None):
       experiment_name = raw_input("Name of experiment: ")
@@ -25,8 +28,6 @@ class execution(object):
     else:
         raise Exception('experiment stage-type not valid')
 
-
-
     # Set up the retrieval of the results
     with tf.Graph().as_default():
     #   -->  Build model
@@ -43,5 +44,5 @@ class execution(object):
   def run_task(self, type, task_name, DataObject):
     self.experiment(load_training, summary_dir, writer, train_experiment, result,max_steps, save_step)
 
-  def exit(self):
+  def __exit__(self):
     self.writer.close()
