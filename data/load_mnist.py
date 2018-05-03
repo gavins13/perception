@@ -1,4 +1,4 @@
-import cPickle as cpk
+import pickle as cpk
 import numpy as np
 import random
 
