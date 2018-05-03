@@ -1,8 +1,3 @@
-import data.load_mnist.load_data
-
-train, train_labels, test, test_labels = load_data()
-
-
 from lib.multi_gpu_frame import mutli_gpu_model as resources_model
 from capsules.architectures import test as test_caps_architecture
 from datetime import datetime
