@@ -19,12 +19,15 @@ JoinedResult = collections.namedtuple('JoinedResult', ('summary', 'train_op',
 
 
 class multi_gpu_model(learning_core):
-  def __init__(self, ArchitectureObject=None):
+  def __init__(self, ArchitectureObject=None, cpu_only=False):
     self.ArchitectureObject = None
-    if(ArchitectureObject!==None):
+    self.cpu_only = cpu_only
+    if(ArchitectureObject is not None):
       self.strap_architecture(ArchitectureObject)
     else:
       print(" ... Time to load architecture ... ")
+
+
 
   def run_multi_gpu(self, DataObject, num_gpus=1):
     """Build the Graph and add the train ops on multiple GPUs.
@@ -43,17 +46,18 @@ class multi_gpu_model(learning_core):
     """
 
     DataObject.set_num_gpus(num_gpus)
-    print("Using %d GPUs" % num_gpus)
+    print(">>>Using %d GPUs" % num_gpus)
 
-    if(self.ArchitectureObject===None):
+    if(self.ArchitectureObject is None):
         raise Exception('problem with architecture: not loaded')
     almosts = []
     corrects = []
     tower_grads = []
     results = []
     with tf.variable_scope(tf.get_variable_scope()):
-      for i in xrange(num_gpus):
+      for i in range(num_gpus):
         input_data, input_labels = DataObject.get_data(gpu=i)
+        print('>>Assignment of data to tower/GPU %d' % i)
         tower_output = self._single_tower(i, input_data, input_labels)
         results.append(tower_output.result)
         almosts.append(tower_output.almost)
@@ -78,11 +82,17 @@ class multi_gpu_model(learning_core):
       A namedtuple TowerResult containing the inferred values like logits and
       reconstructions, gradients and evaluation metrics.
     """
-    if(self.ArchitectureObject===None):
+    if(self.ArchitectureObject is None):
         raise Exception('problem with architecture: not loaded')
 
-    with tf.device('/gpu:%d' % tower_ind):
+    if(self.cpu_only==True):
+        device_name_prefix = 'cpu'
+    else:
+        device_name_prefix = 'gpu'
+
+    with tf.device('/' + device_name_prefix + ':%d' % tower_ind):
       with tf.name_scope('tower_%d' % (tower_ind)) as scope:
+        print(">>>Building Architecture...")
         res = self.ArchitectureObject.build(input_data)
 
         losses, correct, almost = evaluate_classification(
@@ -93,7 +103,7 @@ class multi_gpu_model(learning_core):
             loss_type=self.ArchitectureObject.hparams.loss_type)
         tf.get_variable_scope().reuse_variables()
         grads = self._optimizer.compute_gradients(losses)
-  return TowerResult(res, almost, correct, grads)
+    return TowerResult(res, almost, correct, grads)
 
   def _summarize_towers(self, almosts, corrects, tower_grads):
       # []  need to go over and rewrite
