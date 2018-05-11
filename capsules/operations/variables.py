@@ -44,7 +44,7 @@ def weight_variable(shape, stddev=0.1, verbose=False):
           shape,
           initializer=tf.truncated_normal_initializer(
               stddev=stddev, dtype=tf.float32),
-          dtype=tf.float32)
+          dtype=tf.float32, trainable=True)
   variable_summaries(weights, verbose)
   return weights
 
@@ -65,7 +65,7 @@ def bias_variable(shape, verbose=False, init=0.1):
           'biases',
           shape,
           initializer=tf.constant_initializer(init),
-          dtype=tf.float32)
+          dtype=tf.float32, trainable=True)
   variable_summaries(biases, verbose)
   return biases
 

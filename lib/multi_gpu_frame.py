@@ -61,6 +61,7 @@ class multi_gpu_model(learning_core):
         print(np.shape(input_data))
         print(np.shape(input_labels))
         tower_output = self._single_tower(i, input_data, input_labels)
+        print(">>>Grad shapes")
         results.append(tower_output.result)
         almosts.append(tower_output.almost)
         corrects.append(tower_output.correct)
@@ -97,7 +98,8 @@ class multi_gpu_model(learning_core):
     with tf.device('/' + device_name_prefix + ':%d' % tower_ind):
       with tf.name_scope('tower_%d' % (tower_ind)) as scope:
         print(">>>Building Architecture for tower %d..." % tower_ind)
-        res = self.ArchitectureObject.build(input_data)
+        with tf.GradientTape() as tape:
+            res = self.ArchitectureObject.build(input_data)
         print(">>>Finished Building Architecture.")
         print(">>>Calculate classification results... (eval)")
         losses, correct, almost = self.evaluate_classification(
@@ -108,7 +110,34 @@ class multi_gpu_model(learning_core):
             loss_type=self.ArchitectureObject.hparams.loss_type)
         print(">>>Finsished Calculating classification results.")
         tf.get_variable_scope().reuse_variables()
-        grads = self._optimizer.compute_gradients(losses)
+        print(losses)
+        print(correct)
+        print(almost)
+        #print(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))
+        #print(tf.get_collection(tf.GraphKeys.TRAINABLE_RESOURCE_VARIABLES))
+        #print(ops.get_collection(ops.GraphKeys.TRAINABLE_RESOURCE_VARIABLES))
+        #losses_func = lambda : losses
+        def losses_func(margin=0.4, downweight=0.5):
+            labels= input_labels
+            raw_logits = res.output
+            print(">>>>> Subtract 0.5 from all classifications")
+            print(raw_logits.get_shape().as_list())
+            print(np.shape(labels))
+            logits = raw_logits - 0.5
+            print(">>>>> Find Positive Cost")
+            positive_cost = labels * tf.cast(tf.less(logits, margin),
+                                             tf.float32) * tf.pow(logits - margin, 2)
+            print(">>>>> Find Negative Cost")
+            negative_cost = (1 - labels) * tf.cast(
+                tf.greater(logits, -margin), tf.float32) * tf.pow(logits + margin, 2)
+            print(">>>>> Return loss")
+            class_loss= tf.add(tf.multiply( 0.5, positive_cost),  tf.multiply(tf.multiply(downweight,0.5), negative_cost))
+            batch_loss = tf.reduce_mean(class_loss)
+            return batch_loss
+        #grads = self._optimizer.compute_gradients(losses_func) # [] [unfinished] why
+        grad_function = tf.contrib.eager.implicit_value_and_gradients(self.loss)
+        grads = grad_function(input_labels, res.output)
+        print(grads)
     return TowerResult(res, almost, correct, grads)
 
   def _summarize_towers(self, almosts, corrects, tower_grads):
@@ -123,14 +152,22 @@ class multi_gpu_model(learning_core):
     Returns:
       A JoinedResult of evaluation results, the train op and the summary op.
     """
-
+    print("....")
     grads = self._average_gradients(tower_grads)
+    print("....")
     train_op = self._optimizer.apply_gradients(
         grads, global_step=self._global_step)
+    print("....")
     summaries = tf.get_collection(tf.GraphKeys.SUMMARIES)
+    print("....")
     summary = tf.summary.merge(summaries)
+    print("....")
     stacked_corrects = tf.stack(corrects)
+    print("....")
     stacked_almosts = tf.stack(almosts)
+    print("....")
     summed_corrects = tf.reduce_sum(stacked_corrects, 0)
+    print("....")
     summed_almosts = tf.reduce_sum(stacked_almosts, 0)
+    print("....")
     return JoinedResult(summary, train_op, summed_corrects, summed_almosts)

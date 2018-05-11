@@ -1,5 +1,5 @@
 import tensorflow as tf
-from losses import margin_loss
+from losses import margin_loss as main_loss_function
 import numpy as np
 
 
@@ -47,6 +47,24 @@ class learning_core(object):
     return average_grads
 
 
+  def loss(self,x,y,margin=0.4, downweight=0.5):
+      labels= x
+      raw_logits = y
+      print(">>>>> Subtract 0.5 from all classifications")
+      print(raw_logits.get_shape().as_list())
+      print(np.shape(labels))
+      logits = raw_logits - 0.5
+      print(">>>>> Find Positive Cost")
+      positive_cost = labels * tf.cast(tf.less(logits, margin),
+                                       tf.float32) * tf.pow(logits - margin, 2)
+      print(">>>>> Find Negative Cost")
+      negative_cost = (1 - labels) * tf.cast(
+          tf.greater(logits, -margin), tf.float32) * tf.pow(logits + margin, 2)
+      print(">>>>> Return loss")
+      class_loss= tf.add(tf.multiply( 0.5, positive_cost),  tf.multiply(tf.multiply(downweight,0.5), negative_cost))
+      batch_loss = tf.reduce_mean(class_loss)
+      return batch_loss
+
 
   def evaluate_classification(self,model_output, gt_output, this_tower_scope, num_targets=1, loss_type='margin'):
     # [] - would be good to rewrite this in the future [unfinished]
@@ -54,7 +72,7 @@ class learning_core(object):
     print(">>>> Find Margin Loss")
     with tf.name_scope('loss'):
         if loss_type == 'margin':
-          classification_loss = margin_loss(gt_output, model_output)
+          classification_loss = main_loss_function(gt_output, model_output)
         else:
           raise NotImplementedError('Not implemented')
 
@@ -66,8 +84,9 @@ class learning_core(object):
       print(">>>>>> Add to collection")
       tf.add_to_collection('losses', batch_classification_loss)
       print(">>>>>> Creating summary")
-      batch_classification_loss=tf.constant(batch_classification_loss)
+      #batch_classification_loss=tf.constant(batch_classification_loss)
       print(batch_classification_loss.get_shape().as_list())
+      print(batch_classification_loss)
       tmp=tf.contrib.summary.scalar(name='batch_classification_cost', tensor=batch_classification_loss)
 
     print(">>>> Add result to collection of loss results for this tower")
@@ -98,8 +117,8 @@ class learning_core(object):
             predictions = tf.expand_dims(predictions, 1)
             print(model_output.dtype)
             print(gt_output.dtype)
-            #targets = tf.cast(targets, tf.int8)
-            #predictions = tf.cast(predictions, tf.int8)
+            targets = tf.cast(targets, tf.float32)
+            predictions = tf.cast(predictions,  tf.float32)
             print(targets.dtype)
             print(predictions.dtype)
             print(targets.get_shape().as_list())
@@ -112,6 +131,7 @@ class learning_core(object):
             #gt_output_indx = tf.constant(gt_output_indx)
             #print(gt_output_indx)
             #print(np.shape(gt_output_indx))
+            #tmp=tf.subtract([[1,1],[3,4],[5,4]],[[2,7],[7,2],[8,5]])
             tmp=tf.subtract(targets, predictions)
             #tmp = tf.subtract([[1],[1],[1],[4],[5]],[[2],[1],[1],[3],[5]])
             '''tmp = tf.nn.in_top_k(model_output, gt_output_indx, num_targets)'''
@@ -119,7 +139,7 @@ class learning_core(object):
             #num_missed_targets = tf.sets.set_size(missed_targets)
             tmp=tf.abs(tmp)
             print(".")
-            tmp=tf.greater(tmp, 0)
+            tmp=tf.cast(tf.greater(tmp, 0), tf.float32)
             print(".")
             print(tmp.get_shape().as_list())
             num_missed_targets = tf.reduce_sum(tmp)
