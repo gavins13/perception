@@ -46,7 +46,9 @@ class execution(object):
 
   def __enter__(self):
       print(">Create TF FileWriter")
-      self.writer = tf.summary.FileWriter(self.summary_folder)
+      #self.writer = tf.summary.FileWriter(self.summary_folder)
+      self.writer = tf.contrib.summary.create_file_writer(self.summary_folder)
+      self.writer.set_as_default()
 
   def run_task(self, max_steps, save_step=1, max_steps_to_save=1000):
       # save_step defines the increment amount before saving a new checkpoint

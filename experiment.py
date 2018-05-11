@@ -2,7 +2,7 @@ from lib.multi_gpu_frame import multi_gpu_model as resources_model
 from capsules.architectures.test import architecture as test_caps_architecture
 from lib.data_frame import Data
 
-from data.load_mnist import load_data
+from data.load_mnist import load_data_light as load_data
 from lib.execution import execution
 
 import tensorflow as tf
@@ -10,7 +10,7 @@ import tensorflow as tf
 import os, sys
 ''' Config here '''
 project_path = '/vol/biomedic/users/kgs13/PhD/capsule_networks/first_model'
-cpu_only = True
+cpu_only = False
 num_gpus=1
 '''
 System is split into 3 objects:
