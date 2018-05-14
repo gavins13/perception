@@ -16,6 +16,8 @@ JoinedResult = collections.namedtuple('JoinedResult', ('summary', 'train_op',
                                                        'correct', 'almost'))
 
 
+class Namespace: pass
+
 
 class multi_gpu_model(learning_core):
   def __init__(self, ArchitectureObject=None, cpu_only=False):
@@ -97,28 +99,31 @@ class multi_gpu_model(learning_core):
 
     with tf.device('/' + device_name_prefix + ':%d' % tower_ind):
       with tf.name_scope('tower_%d' % (tower_ind)) as scope:
-        print(">>>Building Architecture for tower %d..." % tower_ind)
-        with tf.GradientTape() as tape:
-            res = self.ArchitectureObject.build(input_data)
-        print(">>>Finished Building Architecture.")
-        print(">>>Calculate classification results... (eval)")
-        losses, correct, almost = self.evaluate_classification(
-            model_output=res.output,
-            gt_output=input_labels,
-            num_targets=num_targets,
-            this_tower_scope=scope,
-            loss_type=self.ArchitectureObject.hparams.loss_type)
-        print(">>>Finsished Calculating classification results.")
+        #with tf.GradientTape() as tape:
         tf.get_variable_scope().reuse_variables()
-        print(losses)
-        print(correct)
-        print(almost)
-        #print(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))
-        #print(tf.get_collection(tf.GraphKeys.TRAINABLE_RESOURCE_VARIABLES))
-        #print(ops.get_collection(ops.GraphKeys.TRAINABLE_RESOURCE_VARIABLES))
-        #losses_func = lambda : losses
-        def losses_func(margin=0.4, downweight=0.5):
-            labels= input_labels
+        #main_res, main_almost, main_correct = [],[] , []
+        ns = Namespace()
+        def losses_func(the_model_object, input_images, the_target,  margin=0.4, downweight=0.5):
+
+            print(">>>Start Building Architecture.")
+            res = the_model_object.build(input_images)
+            print(">>>Finished Building Architecture.")
+
+
+
+            print(">>>Calculate classification results... (eval)")
+            losses, correct, almost = self.evaluate_classification(
+                model_output=res.output,
+                gt_output=the_target,
+                num_targets=num_targets,
+                this_tower_scope=scope,
+                loss_type=the_model_object.hparams.loss_type)
+            ns.res = res
+            ns.almost = almost
+            ns.correct = correct
+            print(">>>Finsished Calculating classification results.")
+
+            labels= the_target
             raw_logits = res.output
             print(">>>>> Subtract 0.5 from all classifications")
             print(raw_logits.get_shape().as_list())
@@ -135,10 +140,17 @@ class multi_gpu_model(learning_core):
             batch_loss = tf.reduce_mean(class_loss)
             return batch_loss
         #grads = self._optimizer.compute_gradients(losses_func) # [] [unfinished] why
-        grad_function = tf.contrib.eager.implicit_value_and_gradients(self.loss)
-        grads = grad_function(input_labels, res.output)
-        print(grads)
-    return TowerResult(res, almost, correct, grads)
+        grad_function = tf.contrib.eager.implicit_value_and_gradients(losses_func)
+        loss_value, grads_and_vars = grad_function(self.ArchitectureObject, input_data, input_labels)
+        print("-----grads and vars shape----")
+        print(np.shape(grads_and_vars))
+        '''grads = grads_and_vars
+        print(np.shape(grads))
+        print(np.shape(grads[0]))
+        print(grads[0])
+        print(np.shape(grads[1]))
+        print(grads[1][5])'''
+    return TowerResult(ns.res, ns.almost, ns.correct, grads_and_vars)
 
   def _summarize_towers(self, almosts, corrects, tower_grads):
       # []  need to go over and rewrite
