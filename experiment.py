@@ -12,6 +12,7 @@ import os, sys
 project_path = '/vol/biomedic/users/kgs13/PhD/capsule_networks/first_model'
 cpu_only = False
 num_gpus=1
+eager=False
 '''
 System is split into 3 objects:
  - An object which creates the capsule architecture and manages special operations.
@@ -22,19 +23,23 @@ NB/ in the future, the 'learning_core.py' might need to be rethought (as well as
 '''
 
 try:
-  tf.enable_eager_execution()
+  if eager==True:
+    tf.enable_eager_execution()
   DataModel = Data(load_data, num_gpus=num_gpus)
   print("Start resource manager...")
-  System = resources_model(cpu_only=cpu_only)
+  System = resources_model(cpu_only=cpu_only,eager=eager)
   print("Create Network Architecture...")
   CapsuleNetwork = test_caps_architecture()
   print("Strap Architecture to Resource Manager")
   System.strap_architecture(CapsuleNetwork)
 
   print("Strap Managed Architecture to a training scheme `Executer`")
-  with execution(project_path, System, DataModel, experiment_name="test") as Executer:
-      Executer.run_task(max_steps=1000, save_step=0)
-
+  #with execution(project_path, System, DataModel, experiment_name="test") as Executer:
+  #    Executer.run_task(max_steps=1000, save_step=0)
+  Executer = execution(project_path, System, DataModel, experiment_name="test", max_steps_to_save=1000)
+  Executer.__enter__()
+  Executer.run_task(max_steps=1000, save_step=0)
+  Executer.__exit__()
 
 
 
