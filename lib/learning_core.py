@@ -9,22 +9,21 @@ class learning_core(object):
 
   def strap_architecture(self, ArchitectureObject):
     self.ArchitectureObject = ArchitectureObject
-    hparams = ArchitectureObject.hparams
-
+    self.hparams = ArchitectureObject.hparams
+  def initialise_training(self):
     with tf.device('/cpu:0'):
-      self._global_step = tf.get_variable(
-          'global_step', [],
-          initializer=tf.constant_initializer(0),
-          trainable=False)
-
+      self._global_step = tf.get_variable('global_step', [], initializer=tf.constant_initializer(0), trainable=False) # [] [unfinished]
+      #self._global_step=np.array(0)
       learning_rate = tf.train.exponential_decay(
-          learning_rate=hparams.learning_rate,
+          learning_rate=self.hparams.learning_rate,
           global_step=self._global_step,
-          decay_steps=hparams.decay_steps,
-          decay_rate=hparams.decay_rate)
+          decay_steps=self.hparams.decay_steps,
+          decay_rate=self.hparams.decay_rate)
       learning_rate = tf.maximum(learning_rate, 1e-6)
 
+
       self._optimizer = tf.train.AdamOptimizer(learning_rate)
+
 
   def _average_gradients(self, tower_grads):
     """Calculate the average gradient for each variable across all towers.
@@ -100,22 +99,21 @@ class learning_core(object):
 
     print(">>>> Find Mean Loss")
     with tf.name_scope('total'):
-      print(">>>>>> Batch Loss")
-      print(classification_loss.get_shape().as_list())
-      batch_classification_loss = tf.reduce_mean(classification_loss)
-      print(">>>>>> Add to collection")
-      tf.add_to_collection('losses', batch_classification_loss)
-      print(">>>>>> Creating summary")
-      #batch_classification_loss=tf.constant(batch_classification_loss)
-      print(batch_classification_loss.get_shape().as_list())
-      print(batch_classification_loss)
-      tmp=tf.contrib.summary.scalar(name='batch_classification_cost', tensor=batch_classification_loss)
-
-    print(">>>> Add result to collection of loss results for this tower")
-    all_losses = tf.get_collection('losses') # [] , this_tower_scope) # list of tensors returned
-    total_loss = tf.add_n(all_losses, name='total_loss') # element-wise addition of the list of tensors
-    #print(total_loss.get_shape().as_list())
-    tf.contrib.summary.scalar('total_loss', total_loss)
+        print(">>>>>> Batch Loss")
+        print(classification_loss.get_shape().as_list())
+        batch_classification_loss = tf.reduce_mean(classification_loss, name="find_batch")
+        print(">>>>>> Add to collection")
+        tf.add_to_collection('losses', batch_classification_loss)
+        print(">>>>>> Creating summary")
+        #batch_classification_loss=tf.constant(batch_classification_loss)
+        #print(batch_classification_loss.get_shape().as_list())
+        #print(batch_classification_loss)
+        tf.summary.scalar(name='batch_classification_cost', tensor=batch_classification_loss)
+        print(">>>> Add result to collection of loss results for this tower")
+        all_losses = tf.get_collection('losses') # [] , this_tower_scope) # list of tensors returned
+        total_loss = tf.add_n(all_losses, name='total_loss') # element-wise addition of the list of tensors
+        #print(total_loss.get_shape().as_list())
+        tf.summary.scalar('total_loss', total_loss)
 
     print(">>>> Find Accuracy")
     #%model_output = tf.cast(model_output, np.float32)
@@ -174,8 +172,8 @@ class learning_core(object):
     print(">>>> Add results to output")
     with tf.name_scope('accuracy'):
         accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
-        tf.contrib.summary.scalar('accuracy', accuracy)
-        tf.contrib.summary.scalar('correct_prediction_batch', correct_sum)
-        tf.contrib.summary.scalar('almost_correct_batch', almost_correct_sum)
+        tf.summary.scalar('accuracy', accuracy)
+        tf.summary.scalar('correct_prediction_batch', correct_sum)
+        tf.summary.scalar('almost_correct_batch', almost_correct_sum)
     print(">>>> return results")
     return total_loss, correct_sum, almost_correct_sum
