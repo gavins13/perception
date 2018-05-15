@@ -49,7 +49,7 @@ def fc_capsule_layer(input_tensor,scope_name, apply_weights=True,    share_weigh
                 print(weights.get_shape().as_list())
                 print(input_tensor.get_shape().as_list())
                 print(">>>>>>>>>>> Do Multiply!")
-                input_tensor = tf.matmul(weights, input_tensor, name="Pose transformation") # [batch, num_ch, height, weight, vec_dim_output, 1]
+                input_tensor = tf.matmul(weights, input_tensor, name="posetransformation") # [batch, num_ch, height, weight, vec_dim_output, 1]
                 input_tensor = tf.squeeze(input_tensor, axis=-1) # [batch, num_ch, height, width, vec_dim_output]
                 print(input_tensor.get_shape().as_list())
                 print(">>>>>>>>>>> Undo Transpose")
@@ -81,23 +81,21 @@ def init_conv_2d(input_images, num_f_maps, scope_name, kernel_size=5):
         with tf.variable_scope(scope_name):
             kernel = variables.weight_variable(kernel_shape)
         print(">>>>>>> Convolve")
+        print(input_images.get_shape().as_list())
         output = tf.nn.conv2d(input_images, kernel, [1,1,1,1], "SAME", name="Init2DConv")
+        print(output.get_shape().as_list())
         # [batch, height, width, num_f_maps]
         output = tf.transpose(output, [0,3,1,2])
         # [batch, num_f_maps, height, width]
         # Now, expand_dims .t. each feature map is an atom i.e.
         # a 256Dim vector
-        output = tf.expand_dims(output, 2)
-        # now: [batch, vec_dim=num_f_maps, num_chanels=1, height, width]
+        output = tf.expand_dims(output, 1)
+        # now: [batch, vec_dim=1, num_chanels=num_f_maps, height, width]
         output_tensor_shape = output.get_shape().as_list()
+        
+        #[unfinished]
         print(">>>>>>> Create some bias terms for Conv")
         with tf.variable_scope(scope_name):
-            '''print(">>>>>>> Slice")
-            bias_shape_tmp = tf.slice(output_tensor_shape, [1], [2])
-            bias_shape_tmp = tf.reshape(bias_shape_tmp, [-1])
-            print(">>>>>>> Concat")
-            bias_shape = tf.concat([[1], bias_shape_tmp, [1], [1]], axis=0)
-            # bias shape = [1,vec_dim,num_channel,1,1]'''
             bias_shape = output_tensor_shape[:]
             bias_shape[0] = 1
             bias_shape[-1] = 1
@@ -105,22 +103,23 @@ def init_conv_2d(input_images, num_f_maps, scope_name, kernel_size=5):
             print(">>>>>>> Bias creation")
             print(output.get_shape().as_list()) # will output: 200, 256, 1, 28, 28 ater exe
             biases = variables.bias_variable(bias_shape)
-        retiled_bias_shape = output_tensor_shape[:] # [batch, vec, num_ch, h, w]
-        print(">>>>>>> Create retiling tensor (rank 1)")
-        ###shape_batch = tf.reshape(tf.slice(retiled_bias_shape, [0], [1]), [-1])
-        ###shape_h_w = tf.reshape(tf.slice(retiled_bias_shape, [3], [2]), [-1])
-        ###retiled_bias_shape = tf.concat([shape_batch, [1],[1], shape_h_w], axis=0)
-        retiled_bias_shape[1] = 1
-        retiled_bias_shape[2] = 1 # [batch, 1, 1, h, w]
-        biases = tf.tile(biases, retiled_bias_shape)
-        print(">>>>>>> Add bias and conv output")
-        output = tf.add(output, biases)
-        output = tf.nn.relu(output)
+            retiled_bias_shape = output_tensor_shape[:] # [batch, vec, num_ch, h, w]
+            print(">>>>>>> Create retiling tensor (rank 1)")
+            ###shape_batch = tf.reshape(tf.slice(retiled_bias_shape, [0], [1]), [-1])
+            ###shape_h_w = tf.reshape(tf.slice(retiled_bias_shape, [3], [2]), [-1])
+            ###retiled_bias_shape = tf.concat([shape_batch, [1],[1], shape_h_w], axis=0)
+            retiled_bias_shape[1] = 1
+            retiled_bias_shape[2] = 1 # [batch, 1, 1, h, w]
+            biases = tf.tile(biases, retiled_bias_shape)
+            print(">>>>>>> Add bias and conv output")
+            output = tf.add(output, biases)
+            output = tf.nn.relu(output)
+            print(output.get_shape().as_list())
     return output
 
 
 
-def convolutional_capsule_layer(input_tensor, kernel_height, kernel_width, scope_name,output_kernel_vec_dim=8, strides=[1, 1],
+def convolutional_capsule_layer_OLD(input_tensor, kernel_height, kernel_width, scope_name,output_kernel_vec_dim=8, strides=[1, 1],
 convolve_across_channels=False, num_output_channels=None,
 kernel_is_vector=False):
     with tf.name_scope(scope_name):
@@ -217,4 +216,111 @@ kernel_is_vector=False):
         output_tensor = tf.concat(output_tensors, axis=2)
 
 
+    return output_tensor
+
+
+
+
+
+
+
+
+
+def convolutional_capsule_layer(input_tensor, kernel_height, kernel_width, scope_name,output_kernel_vec_dim=8, strides=[1, 1],
+num_output_channels=None,
+kernel_is_vector=False):
+    with tf.name_scope(scope_name):
+        input_tensor_shape = input_tensor.get_shape().as_list()
+        print("input tensor shape")
+        print(input_tensor_shape)
+        # [batch, vec_dim, num_ch, h, w]
+        if(num_output_channels==None):
+            num_output_channels=input_tensor_shape[2]
+
+        def produce_tensor_Vl(channel_number):
+            stacked_slices = []
+            i_slices = range(0, input_tensor_shape[3]-kernel_height, strides[0])
+            j_slices = range(0, input_tensor_shape[4]-kernel_width, strides[1])
+            print("Start stack creation")
+            for i in i_slices:
+                for j in j_slices:
+                    begin = [0,0,channel_number,i,j]
+                    #end=list(np.array(input_tensor_shape[0:3])+1)+[i+kernel_height, j+kernel_width]
+                    this_size = input_tensor_shape[0:2]+[1, kernel_height, kernel_width]
+                    strided_slice = tf.slice(input_tensor,begin, this_size)
+                    stacked_slices.append(strided_slice)
+            stacked_slices = tf.stack(stacked_slices, axis=5)
+            print("End stack list creation")
+            print(stacked_slices.get_shape().as_list())
+            # [batch, vec_dim, 1, k_h, k_w, SLICES]
+            new_shape = input_tensor_shape[0:2] + [1,kernel_height, kernel_width, len(i_slices), len(j_slices)]
+            print(new_shape)
+            stacked_slices = tf.reshape(stacked_slices, shape=new_shape)
+            print(stacked_slices.get_shape().as_list())
+            stacked_slices = tf.transpose(stacked_slices, [0,5,6,2,1,3,4]) # [M, x', y',  1, vec_dim, k_h, k_w]
+            print(stacked_slices.get_shape().as_list())
+            new_shape = stacked_slices.get_shape().as_list()
+            new_shape = new_shape[0:5] + [new_shape[5]*new_shape[6]]
+            stacked_slices = tf.reshape(stacked_slices, shape=new_shape) # [M, x', y',  1, vec_dim, k_h*k_w]
+            print(stacked_slices.get_shape().as_list())
+            return stacked_slices
+
+        def produce_matrix_Ml(stacked_tensor_shape):
+            matrix_weights_shape = [num_output_channels, output_kernel_vec_dim, stacked_tensor_shape[4]]
+            with tf.variable_scope(scope_name):
+                with tf.variable_scope('chan'+str(channel_number)):
+                    matrix = variables.weight_variable(matrix_weights_shape)
+            matrix = tf.expand_dims(matrix, axis=0)
+            matrix = tf.expand_dims(matrix, axis=0)
+            matrix = tf.expand_dims(matrix, axis=0)
+            matrix = tf.tile(matrix, stacked_tensor_shape[0:3] + [1, 1, 1]) # [M, x', y',  num_out_ch, output_vec_dim, vec_dim]
+            return matrix
+        def prerouting(stacked_slices, matrix):
+            stacked_slices = tf.tile(stacked_slices, [1,1,1,num_output_channels, 1, 1])
+            output = tf.matmul(matrix, stacked_slices) # [M, x', y', num_out_ch, output_vec_dim, k_h*k_w]
+            output = tf.transpose(output, [0,4,3,1,2,5]) # M, v_d^l+1, |T^l+1|, x', y', k_h*k_w
+            return output
+        prerouted_output = []
+        for channel_number in list(range(input_tensor_shape[2])):
+            print(">>>>>>> Produce tensor stack")
+            this_channel_tensor = produce_tensor_Vl(channel_number)
+            print(">>>>>>> Produce matrix")
+            this_matrix_multiplier = produce_matrix_Ml(this_channel_tensor.get_shape().as_list())
+            print(">>>>>>> Perform multiplication")
+            prerouted_output.append(prerouting(this_channel_tensor, this_matrix_multiplier))
+            print(">>>>>>> Next channel")
+        print(">>>>>Finished channel extraction")
+        prerouted_output = tf.stack(prerouted_output, axis=6)
+        prerouted_output_shape = prerouted_output.get_shape().as_list()
+        prerouted_output_shape = prerouted_output_shape[0:5] + [prerouted_output_shape[5]*prerouted_output_shape[6]]
+        prerouted_output = tf.reshape(prerouted_output, shape=prerouted_output_shape)
+        # M, v_d^l+1, |T^l+1|, x', y', k_h*k_w*|T^l|
+        prerouted_output_shape2 = prerouted_output.get_shape().as_list()
+        prerouted_output_shape2 = prerouted_output_shape2[0:3] + [prerouted_output_shape2[3]*prerouted_output_shape2[4], prerouted_output_shape2[5]]
+        prerouted_output = tf.reshape(prerouted_output, shape=prerouted_output_shape2)
+        # M, v_d^l+1, |T^l+1|, x'*y', k_h*k_w*|T^l|
+
+        # squash biases
+        print(">>>>>Create squash terms")
+        squash_bias_shape = prerouted_output_shape2[1:3] + [1, 1] # [ v_d^l+1, |T^l+1|, 1, 1]
+        print(squash_bias_shape)
+        with tf.variable_scope(scope_name):
+            with tf.variable_scope('squash'):
+                squash_biases = variables.bias_variable(squash_bias_shape)
+        print([1, 1, prerouted_output_shape2[3], 1])
+        squash_biases = tf.tile(squash_biases, [1, 1, prerouted_output_shape2[3], 1])
+        # [v_d^l+1, |T^l+1|, x'*y', 1]
+
+
+
+        print(">>>>> Perform routing")
+        patch_shape=[1,1,prerouted_output_shape[-1]]
+        routed_output = patch_based_routing(prerouted_output, scope_name+'/routing', squash_biases=squash_biases,  num_routing=3, patch_shape=patch_shape, patch_stride=[1,1,1],deconvolution_factors=None, bias_channel_sharing=False)
+        # M, v_d^l+1, |T^l+1|, x'*y', 1
+        print(">>>>> Finished Routing")
+        routed_output = tf.squeeze(routed_output)
+         # M, v_d^l+1, |T^l+1|, x'*y'
+        routed_output_shape = routed_output.get_shape().as_list()
+        output_tensor = tf.reshape(routed_output, routed_output_shape[0:3] + [prerouted_output_shape[3], prerouted_output_shape[4]])
+        # M, v_d^l+1, |T^l+1|, x', y'
     return output_tensor
