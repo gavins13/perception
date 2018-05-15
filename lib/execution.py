@@ -19,8 +19,8 @@ class execution(object):
     self.summary_folder = self.foldername_full + '/' +type + '/'
 
     print(">Create TF FileWriter")
-    #self.writer = tf.summary.FileWriter(self.summary_folder)
-    self.writer = tf.contrib.summary.create_file_writer(self.summary_folder)
+    self.writer = tf.summary.FileWriter(self.summary_folder)
+    #self.writer = tf.contrib.summary.create_file_writer(self.summary_folder)
     self.writer.set_as_default()
     tf.contrib.summary.always_record_summaries()
 
