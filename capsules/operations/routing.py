@@ -74,7 +74,7 @@ def patch_based_routing(input_tensor, scope_name, squash_biases=None,  num_routi
                 # ^ [batch, vec, patch_shape[0](numchannels), patch_shape[1](width), patch_shape[2](height)]
                 #this_patch = np.expand_dims(this_patch, axis=-1)
                 #this_patch = np.expand_dims(this_patch, axis=-1)
-                this_patch = np.expand_dims(this_patch, axis=-1) # [batch, vec,patchshape[0], patchshape[1], patchshape[2],
+                this_patch = tf.expand_dims(this_patch, axis=-1) # [batch, vec,patchshape[0], patchshape[1], patchshape[2],
                                                                  # 1]
                 #sys.stdout.write(">>>>>>>>>>>>> Assignment")
                 #input_patch_based_tensor[:,:,:,:,:,i,j,k] = this_patch
@@ -89,7 +89,7 @@ def patch_based_routing(input_tensor, scope_name, squash_biases=None,  num_routi
 
     with tf.name_scope(scope_name):
         print(">>>>>>>>> TF Input tensor Initialisation")
-        input_patch_based_tensor = tf.constant(input_patch_based_tensor, shape=input_patch_based_tensor_shape, verify_shape=True, name="InitPatchTensor")
+        #input_patch_based_tensor = tf.constant(input_patch_based_tensor, shape=input_patch_based_tensor_shape, verify_shape=True, name="InitPatchTensor")
         # [batch, vec, patch_num_channels, patch_height, patch_width, output_num_channels, output_height, output_width]
 
 
@@ -117,7 +117,8 @@ def patch_based_routing(input_tensor, scope_name, squash_biases=None,  num_routi
                     squash_biases = variables.bias_variable(shape=[vec_dim]+output_dimensions, init=0.1) # [vec_dim, o_num_channels, o_height, o_width]
         print(">>>>>>>>> Dynamic Routing: Start Iterating...")
         def _algorithm(i, logits, voting_tensors):
-            print(">>>>>>>>>>>>> Iteration %d" % i)
+            print(">>>>>>>>>>>>> Iteration: ")
+            print(i)
             print(">>>>>>>>>>>>>>>>> Softmax")
             logits = tf.reshape(logits, shape=reduced_logit_shape) # flatten end dimensions of shape
             c_i = tf.nn.softmax(logits, axis=(len(reduced_logit_shape)-1))
@@ -137,9 +138,12 @@ def patch_based_routing(input_tensor, scope_name, squash_biases=None,  num_routi
 
             print(">>>>>>>>>>>>>>>>> Voting")
             batch_n = input_tensor_shape[0]
+            print(">>>>>>>>>>>>>>>>>>> Multiply")
             s_j = tf.multiply(c_i, input_patch_based_tensor, name="indv_vote")
-            dim_to_sum = range(2, len(input_tensor_shape))
+            dim_to_sum = list(range(2, len(input_tensor_shape)))
+            print(">>>>>>>>>>>>>>>>>>> Reduce Sum")
             s_j = tf.reduce_sum(s_j, axis=dim_to_sum, name="vote_res") # [batch, vec_dim, numcha_o, h_o, w_o]
+            print(">>>>>>>>>>>>>>>>>>> Add")
             s_j = tf.add(s_j, tf.transpose(tf.tile(tf.expand_dims(squash_biases, 4), [1,1,1,1, batch_n]), [4,0,1, 2, 3])) # [] [unfinished] - the [1,1,1] needs to be done generically
 
             print(">>>>>>>>>>>>>>>>> Squashing")
@@ -410,7 +414,8 @@ def routing(input_tensor, scope_name, output_dimensions=None, squash_biases=None
         squash_biases = tf.expand_dims(squash_biases, 3)
         squash_biases = tf.expand_dims(squash_biases, 3) # [num_ch, h, w, 1, 1]
         def _algorithm(i, logits, voting_tensors):
-            print(">>>>>>>>>>>>> Iteration %d" % i)
+            print(">>>>>>>>>>>>> Iteration:")
+            print(i)
             logits = tf.reshape(logits, shape=reduced_logit_shape)
             print(reduced_logit_shape)
             c_i = tf.nn.softmax(logits, axis=len(reduced_logit_shape)-1)
@@ -436,7 +441,7 @@ def routing(input_tensor, scope_name, output_dimensions=None, squash_biases=None
             print(">>>>>>>>>>>>>>>>> Voting")
             batch = input_tensor_shape[0]
             s_j = tf.multiply(c_i, tmp_tensor, name="indv_vote")
-            dim_to_sum = range(2, len(input_tensor_shape))
+            dim_to_sum = list(range(2, len(input_tensor_shape)))
             s_j = tf.reduce_sum(s_j, axis=dim_to_sum, name="vote_res")
             s_j = tf.add(s_j, tf.transpose(tf.tile(squash_biases, [1,1,1, batch, vec_dim]), [3,4,0,1,2])) # [] [unfinished] - the [1,1,1] needs to be done generically
             # : [batch, vec_dim, num_ch, h, w]
