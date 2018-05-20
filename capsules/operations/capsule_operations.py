@@ -92,7 +92,7 @@ def init_conv_2d(input_images, num_f_maps, scope_name, kernel_size=5):
         output = tf.expand_dims(output, 1)
         # now: [batch, vec_dim=1, num_chanels=num_f_maps, height, width]
         output_tensor_shape = output.get_shape().as_list()
-        
+
         #[unfinished]
         print(">>>>>>> Create some bias terms for Conv")
         with tf.variable_scope(scope_name):
@@ -248,6 +248,7 @@ kernel_is_vector=False):
                     #end=list(np.array(input_tensor_shape[0:3])+1)+[i+kernel_height, j+kernel_width]
                     this_size = input_tensor_shape[0:2]+[1, kernel_height, kernel_width]
                     strided_slice = tf.slice(input_tensor,begin, this_size)
+                    #print(strided_slice.get_shape().as_list())
                     stacked_slices.append(strided_slice)
             stacked_slices = tf.stack(stacked_slices, axis=5)
             print("End stack list creation")
@@ -293,6 +294,7 @@ kernel_is_vector=False):
         prerouted_output = tf.stack(prerouted_output, axis=6)
         prerouted_output_shape = prerouted_output.get_shape().as_list()
         prerouted_output_shape = prerouted_output_shape[0:5] + [prerouted_output_shape[5]*prerouted_output_shape[6]]
+        print(prerouted_output_shape)
         prerouted_output = tf.reshape(prerouted_output, shape=prerouted_output_shape)
         # M, v_d^l+1, |T^l+1|, x', y', k_h*k_w*|T^l|
         prerouted_output_shape2 = prerouted_output.get_shape().as_list()
@@ -315,6 +317,7 @@ kernel_is_vector=False):
 
         print(">>>>> Perform routing")
         patch_shape=[1,1,prerouted_output_shape[-1]]
+        print(patch_shape)
         routed_output = patch_based_routing(prerouted_output, scope_name+'/routing', squash_biases=squash_biases,  num_routing=3, patch_shape=patch_shape, patch_stride=[1,1,1],deconvolution_factors=None, bias_channel_sharing=False)
         # M, v_d^l+1, |T^l+1|, x'*y', 1
         print(">>>>> Finished Routing")

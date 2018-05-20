@@ -45,7 +45,7 @@ def load_data():
     return mnist_train_data, mnist_train_labels, mnist_test_data, mnist_test_labels
 
 
-def load_data_light(tr=5,te=2):
+def load_data_light(tr=4,te=2):
     dir_path = os.path.dirname(os.path.realpath(__file__))
     filename= dir_path + '/rmnist_expanded_10.pkl'
     print("Loading data")

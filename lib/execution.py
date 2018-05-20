@@ -21,8 +21,8 @@ class execution(object):
     print(">Create TF FileWriter")
     self.writer = tf.summary.FileWriter(self.summary_folder)
     #self.writer = tf.contrib.summary.create_file_writer(self.summary_folder)
-    self.writer.set_as_default()
-    tf.contrib.summary.always_record_summaries()
+    #self.writer.set_as_default()
+    #tf.contrib.summary.always_record_summaries()
 
     self.model = model
     # Set up the data
@@ -89,7 +89,11 @@ class execution(object):
       # save_step defines the increment amount before saving a new checkpoint
       print(">Create TF session")
       #print(self.graph)
-      with tf.Session(graph=self.graph, config=tf.ConfigProto(allow_soft_placement=True)) as self.session:
+
+      config = tf.ConfigProto(allow_soft_placement=False) #[] True is better
+      config.gpu_options.allow_growth = True
+      
+      with tf.Session(graph=self.graph, config=config) as self.session:
           init_op = tf.group(tf.global_variables_initializer(),
                              tf.local_variables_initializer())
           print(">Initialise sesssion with variables")
@@ -108,19 +112,19 @@ class execution(object):
           coord = tf.train.Coordinator()
           threads = tf.train.start_queue_runners(sess=self.session, coord=coord)
           try:
-            self.training(max_steps=max_steps,save_step=save_step)
+            self.training(max_steps=max_steps,save_step=save_step, session=self.session)
           except tf.errors.OutOfRangeError:
             tf.logging.info('Finished experiment.')
           finally:
             coord.request_stop()
           coord.join(threads)
       self.session.close()
-  def training(self, max_steps, save_step):
+  def training(self, max_steps, save_step, session):
     step = 0
     for i in range(self.last_step, max_steps):
         print("training: %d" % i)
         step += 1
-        summary, _ = self.session.run([self.summarised_result.summary, self.summarised_result.train_op]) # Run graph
+        summary, _ = session.run([self.summarised_result.summary, self.summarised_result.train_op]) # Run graph
         print("training: %d" % i)
         self.writer.add_summary(summary, i)
         print("training: %d" % i)
