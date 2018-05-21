@@ -91,8 +91,8 @@ class execution(object):
       #print(self.graph)
 
       config = tf.ConfigProto(allow_soft_placement=False) #[] True is better
-      config.gpu_options.allow_growth = True
-      
+      #[]config.gpu_options.allow_growth = True
+
       with tf.Session(graph=self.graph, config=config) as self.session:
           init_op = tf.group(tf.global_variables_initializer(),
                              tf.local_variables_initializer())
