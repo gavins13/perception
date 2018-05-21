@@ -13,6 +13,23 @@ project_path = '/vol/biomedic/users/kgs13/PhD/capsule_networks/first_model'
 cpu_only = False
 num_gpus=1
 eager=False
+
+''' Logging '''
+import logging
+
+# get TF logger
+log = logging.getLogger('tensorflow')
+log.setLevel(logging.DEBUG)
+
+# create formatter and add it to the handlers
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# create file handler which logs even debug messages
+fh = logging.FileHandler(project_path + '/logs/' + 'tensorflow.log')
+fh.setLevel(logging.DEBUG)
+fh.setFormatter(formatter)
+log.addHandler(fh)
+
 '''
 System is split into 3 objects:
  - An object which creates the capsule architecture and manages special operations.
