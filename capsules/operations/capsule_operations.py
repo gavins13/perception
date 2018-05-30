@@ -71,7 +71,7 @@ def fc_capsule_layer(input_tensor,scope_name, apply_weights=True,    share_weigh
     return input_tensor
 
 
-def init_conv_2d(input_images, num_f_maps, scope_name, kernel_size=5):
+def init_conv_2d(input_images, num_f_maps, scope_name, kernel_size=5, type="SAME"):
     with tf.name_scope(scope_name):
         #input images = [batch, height, width]
         input_images = tf.expand_dims(input_images, 3)
@@ -82,7 +82,7 @@ def init_conv_2d(input_images, num_f_maps, scope_name, kernel_size=5):
             kernel = variables.weight_variable(kernel_shape)
         print(">>>>>>> Convolve")
         print(input_images.get_shape().as_list())
-        output = tf.nn.conv2d(input_images, kernel, [1,1,1,1], "SAME", name="Init2DConv")
+        output = tf.nn.conv2d(input_images, kernel, [1,1,1,1], type, name="Init2DConv")
         print(output.get_shape().as_list())
         # [batch, height, width, num_f_maps]
         output = tf.transpose(output, [0,3,1,2])
@@ -228,8 +228,14 @@ kernel_is_vector=False):
 
 def convolutional_capsule_layer(input_tensor, kernel_height, kernel_width, scope_name,output_kernel_vec_dim=8, strides=[1, 1],
 num_output_channels=None,
-kernel_is_vector=False, upsampling_factor=None):
+kernel_is_vector=False, upsampling_factor=None, type="SAME", num_routing=3):
     with tf.name_scope(scope_name):
+        if(type=="SAME"):
+            padding_height = int((kernel_height-1)/2)
+            padding_width = int((kernel_width-1)/2)
+            paddings = [ [0,0], [0,0], [0,0], [padding_height, padding_width], [padding_height, padding_width]]
+            input_tensor = tf.pad(input_tensor, paddings )
+
         input_tensor_shape = input_tensor.get_shape().as_list()
         print("input tensor shape")
         print(input_tensor_shape)
@@ -238,8 +244,8 @@ kernel_is_vector=False, upsampling_factor=None):
             num_output_channels=input_tensor_shape[2]
 
         def produce_tensor_Vl(channel_number):
-            i_slices = range(0, input_tensor_shape[3]-kernel_height, strides[0])
-            j_slices = range(0, input_tensor_shape[4]-kernel_width, strides[1])
+            i_slices = range(0, input_tensor_shape[3]-kernel_height+1, strides[0])
+            j_slices = range(0, input_tensor_shape[4]-kernel_width+1, strides[1])
             print(list(i_slices))
             print(list(j_slices))
             print(input_tensor_shape)
@@ -272,7 +278,7 @@ kernel_is_vector=False, upsampling_factor=None):
                 #print(strided_slice.get_shape().as_list())
                 #stacked_slices.append(strided_slice)
                 ind = tf.add(tf.multiply(ii,j_slices_len), jj)
-                ind = tf.Print(ind, [ind,ii,jj,i,j], 'This done')
+                #ind = tf.Print(ind, [ind,ii,jj,i,j], 'This done')
                 stacked_slices=stacked_slices.write(ind,strided_slice)
                 def incrementii():
                     tmp = ii +1
@@ -296,7 +302,7 @@ kernel_is_vector=False, upsampling_factor=None):
             _,_,stacked_slices = tf.while_loop(lambda i,j,stacked_slices: i<i_slices_len,
             _stack, loop_vars = [current_i,current_j,stacked_slices], swap_memory=True, parallel_iterations=1)
             stacked_slices = stacked_slices.stack() # WILL STACK on axis=0, but we need to stack along axis = 5
-            stacked_slices = tf.Print(stacked_slices, [i_slices_len], 'Stacked success')
+            #stacked_slices = tf.Print(stacked_slices, [i_slices_len], 'Stacked success')
             stacked_slices = tf.transpose(stacked_slices, [1,2,3,4,5,0])
             stacked_slices_new_shape = input_tensor_shape[0:2] + [1] + [kernel_height, kernel_width, i_slices_len*j_slices_len]
             stacked_slices.set_shape(stacked_slices_new_shape)
@@ -404,6 +410,7 @@ kernel_is_vector=False, upsampling_factor=None):
         prerouted_output = tf.reshape(prerouted_output, shape=prerouted_output_shape2)
         # M, v_d^l+1, |T^l+1|, x'*y', k_h*k_w*|T^l|
 
+
         # squash biases
         print(">>>>>Create squash terms")
         squash_bias_shape = prerouted_output_shape2[1:3] + [1, 1] # [ v_d^l+1, |T^l+1|, 1, 1]
@@ -420,12 +427,289 @@ kernel_is_vector=False, upsampling_factor=None):
         print(">>>>> Perform routing")
         patch_shape=[1,1,prerouted_output_shape[-1]]
         print(patch_shape)
-        routed_output = patch_based_routing(prerouted_output, scope_name+'/routing', squash_biases=squash_biases,  num_routing=3, patch_shape=patch_shape, patch_stride=[1,1,1],deconvolution_factors=None, bias_channel_sharing=False)
+        #routed_output = patch_based_routing(prerouted_output, scope_name+'/routing', squash_biases=squash_biases,  num_routing=num_routing, patch_shape=patch_shape, patch_stride=[1,1,1],deconvolution_factors=None, bias_channel_sharing=False)
+        routed_output = patch_based_routing_for_convcaps(prerouted_output, scope_name+'/routing', squash_biases=squash_biases,  num_routing=num_routing)
+        #routed_output = tf.reduce_mean(prerouted_output, axis=4, keepdims=True)
         # M, v_d^l+1, |T^l+1|, x'*y', 1
         print(">>>>> Finished Routing")
-        routed_output = tf.squeeze(routed_output)
+        routed_output = tf.squeeze(routed_output, axis=4)
          # M, v_d^l+1, |T^l+1|, x'*y'
         routed_output_shape = routed_output.get_shape().as_list()
+        print(routed_output_shape)
+        print(routed_output_shape[0:3] + [prerouted_output_shape[3], prerouted_output_shape[4]])
         output_tensor = tf.reshape(routed_output, routed_output_shape[0:3] + [prerouted_output_shape[3], prerouted_output_shape[4]])
         # M, v_d^l+1, |T^l+1|, x', y'
+    return output_tensor
+
+
+
+
+
+def convolutional_capsule_layer_v2(input_tensor, kernel_height, kernel_width, scope_name,output_kernel_vec_dim=8, strides=[1, 1], num_output_channels=None, type="SAME", num_routing=3):
+    with tf.name_scope(scope_name):
+        '''if(type=="SAME"):
+            padding_height = int((kernel_height-1)/2)
+            padding_width = int((kernel_width-1)/2)
+            paddings = [ [0,0], [0,0], [0,0], [padding_height, padding_width], [padding_height, padding_width]]
+            input_tensor = tf.pad(input_tensor, paddings )'''
+
+        input_tensor_shape = input_tensor.get_shape().as_list()
+        its = input_tensor_shape
+        print("input tensor shape")
+        print(input_tensor_shape)
+        # [batch, vec_dim, num_ch, h, w]
+
+
+        patches = tf.transpose(input_tensor, [0,3,4, 1,2])
+        patches = tf.reshape(patches, [its[0], its[3], its[4], its[1]*its[2], 1 ]) # [M, x, y, v_d^l|T^l|, 1 ]
+        patches = tf.squeeze(patches, axis=4) #  [M, x, y, v_d^l|T^l|]
+        print("Testing")
+        print(patches.get_shape().as_list())
+        patches = tf.transpose(patches, [1,2,3,0])
+        print(patches.get_shape().as_list())
+        patches = tf.reshape(patches, [its[3], its[4], its[1]*its[2]*its[0]]) #  [ x, y, v_d^l|T^l|*M]
+        print(patches.get_shape().as_list())
+        patches = tf.transpose(patches, [2,0,1])#  [ v_d^l|T^l|*M, x, y]
+        print(patches.get_shape().as_list())
+
+        patches = tf.expand_dims(patches, axis=3)#  [ v_d^l|T^l|*M, x, y, 1]
+        print(patches.get_shape().as_list())
+
+        patches = tf.extract_image_patches(patches, [1,kernel_height, kernel_width, 1], strides=[1]+strides+[1], rates=[1,1,1,1], padding=type) #  [ v_d^l|T^l|*M, x, y, k_w*k_h]
+        '''if(type=="VALID"):
+            slicesize = patches.get_shape().as_list()
+            slicesize[1] = slicesize[1] - (kernel_height) + 1
+            slicesize[2] = slicesize[2] - (kernel_width) +1
+            patches = tf.slice(patches, [0,0,0,0], slicesize)
+        patches = tf.tile(patches, [1,1,1,kernel_height*kernel_width]) # [] to delete and uncommment above'''
+
+        print("patches extrateced")
+        print(patches.get_shape().as_list())
+
+
+        patches_shape = patches.get_shape().as_list()
+        itsv2 = its[:]
+        itsv2[3] = patches_shape[1]
+        itsv2[4] = patches_shape[2]
+
+        #  [ v_d^l|T^l|*M, x, y, k_h*k_w]
+        patches = tf.expand_dims(patches,axis=4)#  [ v_d^l|T^l|*M, x, y, k_h*k_w,1]
+        patches = tf.reshape(patches, [its[1]*its[2]*its[0], itsv2[3], itsv2[4], kernel_height, kernel_width])#  [ v_d^l|T^l|*M, x, y, k_h,k_w]
+        patches = tf.transpose(patches, [1,2,3,4,0])#  [ x, y, k_h,k_w, v_d^l|T^l|*M]
+        patches = tf.expand_dims(patches, axis=5)
+        patches = tf.reshape(patches, [itsv2[3], itsv2[4], kernel_height, kernel_width, its[1]*its[2], its[0]] ) #  [ x, y, k_h,k_w, v_d^l|T^l|, M]
+        patches=tf.transpose(patches, [5,0,1,2,3,4])#  [M, x, y, k_h,k_w, v_d^l|T^l|]
+        patches = tf.transpose(patches, [0,3,4, 5,1,2]) # [M, k_h,k_w, v_d^l|T^l|, x, y ]
+        patches_shape = patches.get_shape().as_list()
+
+
+        patches = tf.reshape(patches, [its[0], kernel_height, kernel_width,its[1]*its[2], itsv2[3]*itsv2[4], 1 ]) ## [M, k_h,k_w, v_d^l|T^l|, xy=p, 1 ]
+        patches=tf.squeeze(patches, axis=5)# [M, k_h,k_w, v_d^l|T^l|, xy=p ]
+
+
+        # GOAL: # [M, k_h, k_w, v_d^l|T^l|, p]
+
+        p = int(patches.get_shape().as_list()[4]) # this is supposed to equal its[3]*its[4] or the reduced version = xy=p
+        print(p)
+
+        print("this stage")
+        print(patches.get_shape().as_list())
+
+        patches = tf.expand_dims(patches, axis=4)
+        patches = tf.reshape(patches, [its[0], kernel_height, kernel_width, its[1]*its[2], p]) # [M, k_h, k_w, v_d^l|T^l|, p]
+        print(patches.get_shape().as_list())
+
+        patches = tf.transpose(patches, [0,1,2,4, 3]) # [M, k_h, k_w, p, v_d^l|T^l|]
+        patches = tf.expand_dims(patches, axis=5) # [M, k_h, k_w, p, v_d^l|T^l|, 1]
+        print(patches.get_shape().as_list())
+        patches = tf.reshape(patches, [its[0], kernel_height, kernel_width, p, its[1], its[2] ]) # [M, k_h, k_w, p, v_d^l, |T^l|]
+        patches = tf.transpose(patches, [0,1,2,3,5,4])  # [M, k_h, k_w, p,  |T^l|, v_d^l]
+        patches = tf.expand_dims(patches, 6)# [M, k_h, k_w, p,  |T^l|, v_d^l, 1]
+        patches = tf.expand_dims(patches, 5)# [M, k_h, k_w, p,  |T^l|, 1, v_d^l, 1]
+        print(patches.get_shape().as_list())
+        patches = tf.tile(patches, [1,1,1,1,1,num_output_channels,1,1])# [M, k_h, k_w, p,  |T^l|, |T^l+1|, v_d^l, 1]
+        print(patches.get_shape().as_list())
+        patches_shape = patches.get_shape().as_list()
+
+        with tf.variable_scope(scope_name):
+            matrix_shape = patches_shape[:] # [M, k_h, k_w, p,  |T^l|, |T^l+1|, v_d^l, 1]
+            matrix_shape[-1] = patches_shape[-2] # [M, k_h, k_w, p,  |T^l|, |T^l+1|, v_d^l, v_d^l]
+            matrix_shape[-2] = output_kernel_vec_dim # [M, k_h, k_w, p,  |T^l|, |T^l+1|, v_d^l+1, v_d^l]
+
+            matrix_shape[0] = 1 # [1, k_h, k_w, p,  |T^l|, |T^l+1|,  v_d^l+1, v_d^l]
+            matrix_shape[3] = 1 # [1, k_h, k_w,  1,  |T^l|, |T^l+1|,  v_d^l+1, v_d^l]
+            matrix = variables.weight_variable(matrix_shape) # to keep [] to segment
+        matrix = tf.tile(matrix, [patches_shape[0], 1, 1,  patches_shape[3]] + [1,1,1,1])
+        result = tf.matmul(matrix, patches) # [M, k_h, k_w, p,  |T^l|, |T^l+1|,  v_d^l+1, 1]
+        #result = patches # [] todlete
+
+        result = tf.transpose(result, [0,6,5,3,  1,2,4,7])# [M,v_d^l+1, |T^l+1|,p, k_h, k_w,   |T^l|,    1]
+        print("result")
+        print(result.get_shape().as_list())
+        result = tf.reshape(result, [its[0], output_kernel_vec_dim, num_output_channels, p, kernel_height*kernel_width*its[2]*1, 1, 1, 1])
+        # [M,v_d^l+1, |T^l+1|,p, k_h* k_w*|T^l|*1, 1, 1    1]
+        prerouted_output = tf.squeeze(result, axis=[5,6,7]) # # [M,v_d^l+1, |T^l+1|,p, k_h*k_w*|T^l|]
+        prerouted_output_shape = prerouted_output.get_shape().as_list()
+        prerouted_output_shape2 = prerouted_output.get_shape().as_list()
+
+        # squash biases
+        print(">>>>>Create squash terms")
+        squash_bias_shape = prerouted_output_shape2[1:3] + [1, 1] # [ v_d^l+1, |T^l+1|, 1, 1]
+        print(squash_bias_shape)
+        with tf.variable_scope(scope_name):
+            squash_biases = variables.bias_variable(squash_bias_shape)
+        print([1, 1, prerouted_output_shape2[3], 1])
+        squash_biases = tf.tile(squash_biases, [1, 1, prerouted_output_shape2[3], 1])
+        # [v_d^l+1, |T^l+1|, x'*y', 1]
+        '''squash_bias_shape = prerouted_output_shape2[1:3] + [ prerouted_output_shape2[3], 1] # [ v_d^l+1, |T^l+1|, x'*y', 1]
+        squash_biases = tf.fill(squash_bias_shape, 0.)'''
+        # [v_d^l+1, |T^l+1|, x'*y', 1]
+
+
+
+        print(">>>>> Perform routing")
+        patch_shape=[1,1,prerouted_output_shape[-1]]
+        print(patch_shape)
+        #routed_output = patch_based_routing(prerouted_output, scope_name+'/routing', squash_biases=squash_biases,  num_routing=num_routing, patch_shape=patch_shape, patch_stride=[1,1,1],deconvolution_factors=None, bias_channel_sharing=False)
+        routed_output = patch_based_routing_for_convcaps(prerouted_output, squash_biases=squash_biases,  num_routing=num_routing)
+        #routed_output = tf.reduce_mean(prerouted_output, axis=4, keepdims=True)
+        # M, v_d^l+1, |T^l+1|, x'*y', 1
+        print(">>>>> Finished Routing")
+        #routed_output = tf.squeeze(routed_output, axis=4)
+         # M, v_d^l+1, |T^l+1|, x'*y', 1
+        routed_output_shape = routed_output.get_shape().as_list()
+        print(routed_output_shape)
+        if(type=="SAME"):
+            _end = [itsv2[3],itsv2[4]]
+        else:
+            _end = [1, p]
+        print(_end)
+
+        output_tensor = tf.reshape(routed_output, routed_output_shape[0:3] + _end)
+        # M, v_d^l+1, |T^l+1|, x', y'
+        print(">>>>> Finished ConvCaps")
+        print(output_tensor.get_shape().as_list())
+    return output_tensor
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def simple_capsules(input_tensor, k=5, stride=3, output_shape=[None, 8, 32, 40, 40], pipeline_channels=8, upsampling=None, scope_name='simple', type="SAME", num_routing=3):
+    with tf.name_scope(scope_name):
+        with tf.variable_scope(scope_name):
+            input_tensor = depthwise_convolutional_capsule_layer(input_tensor, k, k, 'conv', strides=[stride, stride], num_output_channels=pipeline_channels, upsampling_factor=upsampling, type=type, conv_vector=False)
+            input_tensor = matmul_capsule_layer(input_tensor, 'matmul', output_kernel_vec_dim=output_shape[1])
+            input_tensor = quick_routing_2(input_tensor, 'routing', output_shape[2], output_shape[3], output_shape[4], num_routing=num_routing)
+    return input_tensor
+
+
+def depthwise_convolutional_capsule_layer(input_tensor, kernel_height, kernel_width, scope_name, strides=[1, 1], num_output_channels=None, upsampling_factor=None, type="SAME", conv_vector=False):
+    with tf.name_scope(scope_name):
+        ''' Note: if conv_vec=True and type=VALID, then the output vector size is 1 '''
+        input_tensor_shape = input_tensor.get_shape().as_list()
+        its = input_tensor_shape
+        print("input tensor shape depthwise conv")
+        print(input_tensor_shape)
+        # [batch, vec_dim, num_ch, h, w]
+
+        input_tensor = tf.transpose(input_tensor, [0,1,3,4, 2]) # # [batch, vec_dim, h, w, num_ch]
+        kernel_shape = [1, kernel_height, kernel_width, its[2], num_output_channels]
+        if(conv_vector==True):
+            kernel_shape[0] = its[1]
+        with tf.variable_scope(scope_name):
+            kernel = variables.weight_variable(kernel_shape)
+        strides = [1,1] + strides + [1]
+        if(upsampling_factor==None):
+            input_tensor = tf.nn.conv3d(input_tensor, kernel, strides, type)
+        else:
+            deconv_shape = input_tensor.get_shape().as_list()
+            deconv_shape[2] = deconv_shape[2]*upsampling_factor
+            deconv_shape[3] = deconv_shape[3]*upsampling_factor
+            input_tensor = tf.nn.conv3d_transpose(input_tensor, kernel, deconv_shape, strides, type)
+        # input tensor now has shape:
+        # [batch, vec_dim or 1, h*, w*, o_num_ch]
+        input_tensor = tf.transpose(input_tensor, [0,1,4, 2,3])
+    return input_tensor
+
+def matmul_capsule_layer(input_tensor, scope_name,output_kernel_vec_dim=8, intra_channel_sharing=False):
+    with tf.name_scope(scope_name):
+        #input tensor:  [batch, vec_dim, num_ch, h, w]
+        its = input_tensor.get_shape().as_list()
+        print("matmul caps")
+        print(its)
+        input_tensor = tf.transpose(input_tensor, [0,2,3,4,1])
+        input_tensor = tf.expand_dims(input_tensor, axis=5) # [b,num_ch,h,w,v,1]
+        matrix_shape = [1, its[2], its[3], its[4], output_kernel_vec_dim,  its[1]]
+        matrix_tiling = [its[0], 1, 1, 1, 1, 1]
+        if(intra_channel_sharing==True):
+            matrix_shape[2] = 1
+            matrix_tiling[2] = its[3]
+            matrix_shape[3] = 1
+            matrix_tiling[3] = its[4]
+        with tf.variable_scope(scope_name):
+            matrix = variables.weight_variable(matrix_shape)
+        matrix = tf.tile(matrix, matrix_tiling)# [b,num_ch,h,w,o_v,v]
+        output_tensor = tf.matmul(matrix, input_tensor)# [b,num_ch,h,w,o_v,1]
+        output_tensor = tf.squeeze(output_tensor, axis=5)
+        output_tensor = tf.transpose(output_tensor, [0,4,1,2,3])
+    return output_tensor
+
+
+def quick_routing_2(input_tensor, scope_name,output_channels, output_height, output_width, num_routing=3):
+    ''' Note: this will route all channels as well '''
+    with tf.name_scope(scope_name):
+        its = input_tensor.get_shape().as_list()
+        #input tensor [b,v,ch,h,w]
+        print('quick routing')
+        print(its)
+        output_tensor = routing(input_tensor, 'quickrouting', output_dimensions=[output_channels,output_height,output_width],  num_routing=num_routing) # [b,v,o_ch, p,1]
+        #output_tensor = tf.reshape(output_tensor, [its[0], its[1], output_channels, output_height, output_width])
+    return output_tensor
+
+def quick_routing_1(input_tensor, scope_name,output_channels, output_height, output_width, num_routing=3):
+    ''' Note: this will route all channels as well '''
+    with tf.name_scope(scope_name):
+        its = input_tensor.get_shape().as_list()
+        #input tensor [b,v,ch,h,w]
+        print('quick routing')
+        print(its)
+        input_tensor = tf.expand_dims(input_tensor, axis=2)
+        input_tensor = tf.expand_dims(input_tensor, axis=2) # [b,v,1,1,ch,h,w]
+        input_tensor = tf.reshape(input_tensor, shape=[its[0], its[1], 1, 1, its[2]*its[3]*its[4]]) # [b,v,1,1,ch*h*w]
+        p = output_height*output_width
+        input_tensor = tf.tile(input_tensor, [1,1,output_channels, p, 1])#[b,v,o_ch,p,ch*h*w]
+        biases_shape = [its[1], output_channels, 1, 1] # [v, o_ch, 1, 1]
+        biases_tiling = [ 1, 1, p, 1]
+        with tf.variable_scope(scope_name):
+            biases = variables.bias_variable(biases_shape)
+        biases = tf.tile(biases, biases_tiling) # [v, o_ch, p, 1]
+        print('bisaes shape')
+        print(biases.get_shape().as_list())
+        print('to routing shape')
+        print(input_tensor.get_shape().as_list())
+        output_tensor = patch_based_routing_for_convcaps(input_tensor, squash_biases=biases,  num_routing=num_routing) # [b,v,o_ch, p,1]
+        output_tensor = tf.reshape(output_tensor, [its[0], its[1], output_channels, output_height, output_width])
     return output_tensor
