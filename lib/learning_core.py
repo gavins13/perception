@@ -1,5 +1,4 @@
 import tensorflow as tf
-from losses import margin_loss as main_loss_function
 import numpy as np
 
 
