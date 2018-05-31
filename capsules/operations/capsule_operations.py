@@ -446,6 +446,7 @@ kernel_is_vector=False, upsampling_factor=None, type="SAME", num_routing=3):
 
 
 def convolutional_capsule_layer_v2(input_tensor, kernel_height, kernel_width, scope_name,output_kernel_vec_dim=8, strides=[1, 1], num_output_channels=None, type="SAME", num_routing=3):
+    print(">>>> %s START" % scope_name)
     with tf.name_scope(scope_name):
         '''if(type=="SAME"):
             padding_height = int((kernel_height-1)/2)
@@ -476,6 +477,9 @@ def convolutional_capsule_layer_v2(input_tensor, kernel_height, kernel_width, sc
         print(patches.get_shape().as_list())
 
         patches = tf.extract_image_patches(patches, [1,kernel_height, kernel_width, 1], strides=[1]+strides+[1], rates=[1,1,1,1], padding=type) #  [ v_d^l|T^l|*M, x, y, k_w*k_h]
+        patches_shape = patches.get_shape().as_list()
+        its[3] = patches_shape[1]
+        its[4] = patches_shape[2]
         '''if(type=="VALID"):
             slicesize = patches.get_shape().as_list()
             slicesize[1] = slicesize[1] - (kernel_height) + 1
@@ -501,6 +505,7 @@ def convolutional_capsule_layer_v2(input_tensor, kernel_height, kernel_width, sc
         patches=tf.transpose(patches, [5,0,1,2,3,4])#  [M, x, y, k_h,k_w, v_d^l|T^l|]
         patches = tf.transpose(patches, [0,3,4, 5,1,2]) # [M, k_h,k_w, v_d^l|T^l|, x, y ]
         patches_shape = patches.get_shape().as_list()
+        print(patches_shape)
 
 
         patches = tf.reshape(patches, [its[0], kernel_height, kernel_width,its[1]*its[2], itsv2[3]*itsv2[4], 1 ]) ## [M, k_h,k_w, v_d^l|T^l|, xy=p, 1 ]
@@ -551,6 +556,7 @@ def convolutional_capsule_layer_v2(input_tensor, kernel_height, kernel_width, sc
         prerouted_output = tf.squeeze(result, axis=[5,6,7]) # # [M,v_d^l+1, |T^l+1|,p, k_h*k_w*|T^l|]
         prerouted_output_shape = prerouted_output.get_shape().as_list()
         prerouted_output_shape2 = prerouted_output.get_shape().as_list()
+        print(prerouted_output_shape)
 
         # squash biases
         print(">>>>>Create squash terms")
@@ -579,16 +585,20 @@ def convolutional_capsule_layer_v2(input_tensor, kernel_height, kernel_width, sc
          # M, v_d^l+1, |T^l+1|, x'*y', 1
         routed_output_shape = routed_output.get_shape().as_list()
         print(routed_output_shape)
-        if(type=="SAME"):
+
+        '''if(type=="SAME"):
             _end = [itsv2[3],itsv2[4]]
         else:
             _end = [1, p]
-        print(_end)
+        print(_end)'''
+        _end = [itsv2[3],itsv2[4]]
 
         output_tensor = tf.reshape(routed_output, routed_output_shape[0:3] + _end)
         # M, v_d^l+1, |T^l+1|, x', y'
         print(">>>>> Finished ConvCaps")
         print(output_tensor.get_shape().as_list())
+    print(output_tensor.get_shape().as_list())
+    print(">>>> %s END" % scope_name)
     return output_tensor
 
 
@@ -627,16 +637,23 @@ def simple_capsules(input_tensor, k=5, stride=3, output_shape=[None, 8, 32, 40, 
 
 
 def depthwise_convolutional_capsule_layer(input_tensor, kernel_height, kernel_width, scope_name, strides=[1, 1], num_output_channels=None, upsampling_factor=None, type="SAME", conv_vector=False):
+    print(">>>> %s START" % scope_name)
     with tf.name_scope(scope_name):
         ''' Note: if conv_vec=True and type=VALID, then the output vector size is 1 '''
         input_tensor_shape = input_tensor.get_shape().as_list()
         its = input_tensor_shape
         print("input tensor shape depthwise conv")
         print(input_tensor_shape)
+        print(input_tensor.dtype)
         # [batch, vec_dim, num_ch, h, w]
 
         input_tensor = tf.transpose(input_tensor, [0,1,3,4, 2]) # # [batch, vec_dim, h, w, num_ch]
-        kernel_shape = [1, kernel_height, kernel_width, its[2], num_output_channels]
+        if(upsampling_factor!=None):
+            kernel_shape = [1, kernel_height, kernel_width,  num_output_channels, its[2]]
+        else:
+            kernel_shape = [1, kernel_height, kernel_width, its[2], num_output_channels]
+        print("kernel shape")
+        print(kernel_shape)
         if(conv_vector==True):
             kernel_shape[0] = its[1]
         with tf.variable_scope(scope_name):
@@ -646,12 +663,17 @@ def depthwise_convolutional_capsule_layer(input_tensor, kernel_height, kernel_wi
             input_tensor = tf.nn.conv3d(input_tensor, kernel, strides, type)
         else:
             deconv_shape = input_tensor.get_shape().as_list()
-            deconv_shape[2] = deconv_shape[2]*upsampling_factor
-            deconv_shape[3] = deconv_shape[3]*upsampling_factor
+            deconv_shape[2] = int(deconv_shape[2]*upsampling_factor)
+            deconv_shape[3] = int(deconv_shape[3]*upsampling_factor)
+            deconv_shape[4] = num_output_channels
+            print("decov shape")
+            print(deconv_shape)
             input_tensor = tf.nn.conv3d_transpose(input_tensor, kernel, deconv_shape, strides, type)
         # input tensor now has shape:
         # [batch, vec_dim or 1, h*, w*, o_num_ch]
         input_tensor = tf.transpose(input_tensor, [0,1,4, 2,3])
+    print(input_tensor.get_shape().as_list())
+    print(">>>> %s END" % scope_name)
     return input_tensor
 
 def matmul_capsule_layer(input_tensor, scope_name,output_kernel_vec_dim=8, intra_channel_sharing=False):
