@@ -57,11 +57,12 @@ class multi_gpu_model(learning_core):
     with tf.variable_scope(tf.get_variable_scope()):
       for i in range(num_gpus):
         print('>>Assignment of data to tower/GPU %d' % i)
-        input_data, input_labels = DataObject.get_data(gpu=i)
+        input_data_shape, input_labels_shape = DataObject.get_data_shape(gpu=i)
         print('>>>Data Shapes')
-        print(np.shape(input_data))
-        print(np.shape(input_labels))
-        tower_output = self._single_tower(i, input_data, input_labels)
+        print(input_data_shape)
+        print(input_labels_shape)
+        tower_output = self._single_tower(i, input_data_shape, input_labels_shape)
+
         print(">>>Grad shapes")
         results.append(tower_output.result)
         tower_grads.append(tower_output.grads)
@@ -72,7 +73,7 @@ class multi_gpu_model(learning_core):
     print('>> Return results from all towers')
     return summarized_results, results
 
-  def _single_tower(self, tower_ind, input_data, input_labels, num_targets=1):
+  def _single_tower(self, tower_ind, input_data_shape, input_labels_shape, num_targets=1):
     """Calculates the model gradient for one tower.
 
     Adds the inference and loss operations to the graph. Calculates the
@@ -96,16 +97,23 @@ class multi_gpu_model(learning_core):
         device_name_prefix = 'gpu'
 
     with tf.device('/' + device_name_prefix + ':%d' % tower_ind):
+      input_data = tf.placeholder(tf.float32, shape=input_data_shape, name="InputDataGPU"+str(tower_ind))
+      input_labels = tf.placeholder(tf.float32, shape=input_labels_shape, name="InputLabelsGPU"+str(tower_ind))
       with tf.name_scope('tower_%d' % (tower_ind)) as scope:
+
+
         tf.get_variable_scope().reuse_variables()
         if(self.eager==False):
           with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
 
-            input_data = np.asarray(input_data)
-            print(np.shape(input_data))
-            print(input_data.dtype)
+            #input_data = np.asarray(input_data)
+            #print(np.shape(input_data))
+            #print(input_data.dtype)
+            #print(input_data.get_shape().as_list())
+            #print(input_data_gpu0)
             input_data = tf.convert_to_tensor(input_data, dtype=tf.float32)
-            input_labels = tf.convert_to_tensor(np.asarray(input_labels), dtype=tf.float32)
+            print(input_data.get_shape().as_list())
+            input_labels = tf.convert_to_tensor(input_labels, dtype=tf.float32)
             output, loss = self.ArchitectureObject.loss_func(input_images=input_data, ground_truth=input_labels)
             grads_and_vars  = self._optimizer.compute_gradients(loss) # [] [unfinished] why
         else:
