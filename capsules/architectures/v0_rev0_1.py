@@ -34,7 +34,7 @@ class architecture(object):
         print(">>>>> Initial Convolution")
         print(input_images.get_shape().as_list())
         layer1 = init_conv_2d(input_images, 16, "Init", kernel_size=9, type="SAME")# [batch, 1, num_ch, height, width]
-        #layer1 = tf.Print(layer1, layer1.get_shape().as_list(), "Memory check 0")
+        layer1 = tf.Print(layer1, layer1.get_shape().as_list(), "Memory check 0")
         tmp=layer1.get_shape().as_list()
 
 
@@ -45,23 +45,23 @@ class architecture(object):
 
 
         layer3 = convolutional_capsule_layer_v2(layer2,5,5,'ConvCaps1',output_kernel_vec_dim=16,    num_output_channels=4, strides=[1,1], type="SAME")
-        #layer3 = tf.Print(layer3, layer2.get_shape().as_list(), "Memory check 00")
+        layer3 = tf.Print(layer3, layer2.get_shape().as_list(), "Memory check 00")
 
 
         layer4 = convolutional_capsule_layer_v2(layer3,5,5,'ConvCaps2_red',output_kernel_vec_dim=32,  num_output_channels=4, strides=[2,2], type="SAME")
-        #layer4 = tf.Print(layer4, layer2.get_shape().as_list(), "Memory check 00")
+        layer4 = tf.Print(layer4, layer2.get_shape().as_list(), "Memory check 00")
 
 
         layer5 = convolutional_capsule_layer_v2(layer4,5,5,'ConvCaps3',output_kernel_vec_dim=32,  num_output_channels=8, strides=[1,1], type="SAME")
-        #layer5 = tf.Print(layer5, layer2.get_shape().as_list(), "Memory check 00")
+        layer5 = tf.Print(layer5, layer2.get_shape().as_list(), "Memory check 00")
 
         ######################################################
         layer6 = convolutional_capsule_layer_v2(layer5,5,5,'ConvCaps4_red',output_kernel_vec_dim=64,  num_output_channels=8, strides=[2,2], type="SAME")
-        #layer6 = tf.Print(layer6, layer2.get_shape().as_list(), "Memory check 00")
+        layer6 = tf.Print(layer6, layer2.get_shape().as_list(), "Memory check 00")
 
 
         layer7 = convolutional_capsule_layer_v2(layer6,5,5,'ConvCaps5',output_kernel_vec_dim=32,  num_output_channels=8, strides=[1,1], type="SAME")
-        #layer7 = tf.Print(layer7, layer2.get_shape().as_list(), "Memory check 00")
+        layer7 = tf.Print(layer7, layer2.get_shape().as_list(), "Memory check 00")
         ###########################################################
         layer8 = depthwise_convolutional_capsule_layer(layer7, 4,4, "DecovCaps1", strides=[2,2], num_output_channels=8, upsampling_factor=2., type="SAME", conv_vector=False)
         print(layer5.get_shape().as_list())
