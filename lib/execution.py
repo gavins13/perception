@@ -17,12 +17,8 @@ class execution(object):
     print("Results will be saved to %s" % self.foldername_full)
     os.mkdir( self.foldername_full, 0o755 );
     self.summary_folder = self.foldername_full + '/' +type + '/'
-
     print(">Create TF FileWriter")
     self.writer = tf.summary.FileWriter(self.summary_folder)
-    #self.writer = tf.contrib.summary.create_file_writer(self.summary_folder)
-    #self.writer.set_as_default()
-    #tf.contrib.summary.always_record_summaries()
 
     self.model = model
     # Set up the data
@@ -41,28 +37,21 @@ class execution(object):
         raise Exception('experiment stage-type not valid')
     self.data_strap.set_mini_batch(mini_batch_size)
   def __enter__(self):
-    # Set up the retrieval of the results (I.e. Build the Summarisd results, and results Graph)
-    self.graph = tf.Graph() # [] [unfinished]
+    self.graph = tf.Graph()
     with self.graph.as_default():
-        #   -->  Build model
         print(">>>Set initialiser for training - i.e. set AdamOptimizer")
         self.model.initialise_training()
         print(">>>Finished setting initialiser")
         print(">> Time to build TF Graph!")
         self.summarised_result, self.results = self.model.run_multi_gpu(self.data_strap)
-        #print(">>>Set training operation")
-        #self.train_op = self.model._optimizer.minimize(self.summarised_result.total_loss)
         self.saver = tf.train.Saver(max_to_keep=self.max_steps_to_save)
-    #   -->  Print stats
     print(">> Let's analyse the model parameters")
     print(">> Finished analysing")
 
   def run_task(self, max_steps, save_step=1, max_steps_to_save=1000):
-      # save_step defines the increment amount before saving a new checkpoint
       print(">Create TF session")
-      #print(self.graph)
 
-      config = tf.ConfigProto(allow_soft_placement=True) #[] True is better
+      config = tf.ConfigProto(allow_soft_placement=True)
       #config.gpu_options.allow_growth = True
 
       with tf.Session(graph=self.graph, config=config) as self.session:
