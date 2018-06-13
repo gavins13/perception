@@ -130,4 +130,6 @@ class architecture(object):
             tf.summary.scalar('mean_ssim', mean_ssim)
             tf.summary.scalar('positive_loss', positive_loss)
             tf.summary.scalar('negative_loss', tf.multiply(negative_loss, -1.))
-        return output, batch_loss
+
+        diagnostics = {'max_psnr': max_psnr, 'min_psnr': min_psnr, 'mean_psnr': mean_psnr, 'max_ssim':max_ssim, 'min_ssim':min_ssim, 'mean_ssim':mean_ssim, 'positive_loss':positive_loss, 'negative_loss':negative_loss}
+        return output, batch_loss, diagnostics
