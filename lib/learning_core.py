@@ -18,10 +18,30 @@ class learning_core(object):
           global_step=self._global_step,
           decay_steps=self.hparams.decay_steps,
           decay_rate=self.hparams.decay_rate)
-      learning_rate = tf.maximum(learning_rate, 1e-6)
-
+      learning_rate = tf.maximum(learning_rate, self.hparams.maximum_learning_rate)
+      self.learning_rate = learning_rate
 
       self._optimizer = tf.train.AdamOptimizer(learning_rate)
+
+
+  def _average_diagnostics(self, diagnostics_all_towers):
+    n = len(diagnostics_all_towers)
+    keys=list(diagnostics_all_towers[0].keys())
+    diagnostics = {}
+    for key in keys:
+        vals = []
+        for i in range(n):
+            vals.append(diagnostics_all_towers[i][key])
+        if('min' in key):
+            diagnostics[key] = tf.reduce_min(vals)
+        elif('max' in key):
+            diagnostics[key] = tf.reduce_max(vals)
+        else:
+            diagnostics[key] = tf.reduce_mean(vals)
+    return diagnostics
+
+
+
 
 
   def _average_gradients(self, tower_grads):
@@ -62,7 +82,8 @@ class learning_core(object):
       v = grads_and_vars[0][1] # i.e. the variable value # i.e Tower 0, element 1=variable   (becaus element 0 = gradient)
       print("====== %s" % v.name)
       print(grad.get_shape().as_list())
-      print(v.get_shape().as_list())
+      print(v.get_shape().as_list(), end=" = ")
+      print(np.prod(v.get_shape().as_list()))
       n_vars += np.prod(v.get_shape().as_list())
       grad_and_var = (grad, v) # (average_grad_across_all_tower, the variable value)
       average_grads.append(grad_and_var)
