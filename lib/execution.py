@@ -7,8 +7,10 @@ import json
 import time
 
 import matplotlib
-matplotlib.use("qt4agg")
+matplotlib.use("qt5agg")
 import matplotlib.pyplot as plt
+
+import scipy
 
 # Object is a context manager!
 class execution(object):
@@ -86,11 +88,12 @@ class execution(object):
       step = 0
       last_epoch = int(self.last_global_step / self.data_strap.n_splits)
       last_mini_batch = self.last_global_step - (last_epoch * self.data_strap.n_splits)
+      step = (last_epoch*self.data_strap.n_splits)+last_mini_batch
+      print("Saving to: cd %s; tensorboard --logdir=./ --port=6394" % self.summary_folder)
       for j in range(last_epoch, max_steps):
           n_splits_list = range(last_mini_batch, self.data_strap.n_splits)
           last_mini_batch = 0
           for i in n_splits_list:
-              print("training epoch: %d" % j)
               step += 1
               feed_dict = {}
               for gpu in range(self.data_strap.num_gpus):
@@ -98,12 +101,19 @@ class execution(object):
                   feed_dict["InputDataGPU" + str(gpu) + ":0"] = train_data
                   feed_dict["InputLabelsGPU" + str(gpu) + ":0"] = train_labels
               #sess.run(y, {tf.get_default_graph().get_operation_by_name('x').outputs[0]: [1, 2, 3]})
-              print("data split: %d of %d" % (i, self.data_strap.n_splits))
-              print("step: %d" % step)
-              summary, _ = session.run([self.summarised_result.summary, self.summarised_result.train_op], feed_dict=feed_dict) # Run graph # summary_i, result, ground_truth, input_data
+
+              summary, _, learn_rate, diagnostics = session.run([self.summarised_result.summary, self.summarised_result.train_op, self.model._optimizer._lr, self.summarised_result.diagnostics], feed_dict=feed_dict) # Run graph # summary_i, result, ground_truth, input_data
+              print("training epoch: %d" % j, end=";")
+              print("data split: %d of %d" % (i+1, self.data_strap.n_splits), end=";")
+              print("step: %d" % step, end=";")
+              print("loss: " + str(diagnostics["total_loss"]), end=";")
+              print("mean psnr: " + str(diagnostics["mean_psnr"]), end=";")
+              print("mean ssim: " + str(diagnostics["mean_ssim"]), end=";")
+              print("Learning rate: " + str(learn_rate), end='                                  \r')
               self.writer.add_summary(summary, step)
               if (step + 1) % save_step == 0:
                   self.saver.save(self.session, os.path.join(self.summary_folder, 'model.ckpt'), global_step=step + 1)
+
 
 
 
@@ -160,7 +170,7 @@ class execution(object):
               test_data, test_labels = self.data_strap.get_data(gpu=gpu, mb_ind=i)
               feed_dict["InputDataGPU" + str(gpu) + ":0"] = test_data
               feed_dict["InputLabelsGPU" + str(gpu) + ":0"] = test_labels
-            print("data split: %d of %d" % (i, self.data_strap.n_splits))
+            print("data split: %d of %d" % (i+1, self.data_strap.n_splits))
             summary_i, result, ground_truth, input_data = self.session.run([self.summarised_result.summary, self.results, self.ground_truths, self.input_data],feed_dict=feed_dict)
             print("finished data split: %d of %d" % (i+1, self.data_strap.n_splits))
 
@@ -209,11 +219,14 @@ class execution(object):
             print(np.squeeze(ground_truths[i]).shape)
             fig=plt.figure()
             plt.subplot(131)
-            plt.imshow(np.squeeze(input_datas[i]), cmap=plt.cm.gray)
+            plt.imshow(scipy.misc.imresize(np.squeeze(input_datas[i])[96:160, 96:160], 0.5), cmap=plt.cm.gray)
+            plt.colorbar()
             plt.subplot(132)
             plt.imshow(np.squeeze(results[i]), cmap=plt.cm.gray)
+            plt.colorbar()
             plt.subplot(133)
-            plt.imshow(np.squeeze(ground_truths[i]), cmap=plt.cm.gray)
+            plt.imshow(scipy.misc.imresize(np.squeeze(ground_truths[i])[96:160, 96:160], 0.5), cmap=plt.cm.gray)
+            plt.colorbar()
             plt.savefig(path_mri + str(i) + ".png")
             plt.close(fig)
 
