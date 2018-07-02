@@ -1,48 +1,45 @@
 from lib.multi_gpu_frame import multi_gpu_model as resources_model
-from capsules.architectures.test import architecture as test_caps_architecture
 from lib.data_frame import Data
-
-from data.load_mnist import load_data_light as load_data
-from lib.execution import execution
-
-import tensorflow as tf
-
 import os, sys
-''' Config here '''
-project_path = '/vol/biomedic/users/kgs13/PhD/capsule_networks/first_model'
-cpu_only = False
-num_gpus=1
-eager=False
-'''
-System is split into 3 objects:
- - An object which creates the capsule architecture and manages special operations.
- - An object which manages the system resources (e.g. GPUs) and divides the workload across available resources (GPUs), at the ending producing a suitable summary from all resources
- - An object which manages the training of the system, number of iterations run, and saving the model to the create points
+import tensorflow as tf
+import collections
+from pprint import pprint
+#from data.load_mnist import load_data_light as load_data
+sys.path.insert(0, '/homes/kgs13/biomedic/PhD/sunnybrook-data-dicom/')
+from load_data import load_data
+from lib.execution import execution
+DataConfiguration = collections.namedtuple("DataConfiguration", ['project_path', 'execution_type', 'model_load_dir'])
+SystemConfiguration = collections.namedtuple("SystemConfiguration", ["cpu_only", "num_gpus", "eager", "mini_batch_size", "test_architecture"])
 
-NB/ in the future, the 'learning_core.py' might need to be rethought (as well as multi_gpu_frame.py) as it only really works for classification-type problems
-'''
+''' Config here '''
+from capsules.architectures.v0_rev0_1 import architecture as Architecture
+from capsules.architectures.v0_rev13_1_verylowparams_9_residual_highres import architecture as TestArchitecture
+experiment_name = 'v0_rev13_1_verylowparams_9_residual_highres'
+data_config = DataConfiguration(project_path='/vol/biomedic/users/kgs13/PhD/capsule_networks/first_model',execution_type='train',
+    model_load_dir=None)
+system_config = SystemConfiguration(cpu_only=False, num_gpus=1, eager=False, mini_batch_size=4, test_architecture=True)
+''' End Config '''
 
 try:
-  if eager==True:
+  if system_config.eager==True:
     tf.enable_eager_execution()
-  DataModel = Data(load_data, num_gpus=num_gpus)
+  DataModel = Data(load_data, num_gpus=system_config.num_gpus)
   print("Start resource manager...")
-  System = resources_model(cpu_only=cpu_only,eager=eager)
+  System = resources_model(cpu_only=system_config.cpu_only,eager=system_config.eager)
   print("Create Network Architecture...")
-  CapsuleNetwork = test_caps_architecture()
+  if(system_config.test_architecture==True):
+      print("Running Test Architecture... *** MAIN ARCHITECTURE NOT BEING USED ***")
+      CapsuleNetwork = TestArchitecture()
+  else:
+      CapsuleNetwork = Architecture()
   print("Strap Architecture to Resource Manager")
   System.strap_architecture(CapsuleNetwork)
 
   print("Strap Managed Architecture to a training scheme `Executer`")
-  #with execution(project_path, System, DataModel, experiment_name="test") as Executer:
-  #    Executer.run_task(max_steps=1000, save_step=0)
-  Executer = execution(project_path, System, DataModel, experiment_name="test", max_steps_to_save=1000)
-  Executer.__enter__()
-  Executer.run_task(max_steps=1000, save_step=0)
-  Executer.__exit__()
-
-
-
+  with execution(data_config.project_path, System, DataModel, experiment_name=experiment_name, max_steps_to_save=5, mini_batch_size=system_config.mini_batch_size, type=data_config.execution_type, load=data_config.model_load_dir) as Executer:
+        Executer.run_task(max_steps=1000, save_step=1)
 except Exception as e:
   err_message = e.args
+  print("Exception thrown, see below:")
   print(err_message)
+  pprint(e)

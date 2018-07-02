@@ -1,1 +1,8 @@
 *.pyc
+thislog.txt
+thislog2.txt
+tmp_reduced_thislog.txt
+logs/
+debug.txt
+less
+thislogcopy.txt
