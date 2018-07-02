@@ -16,6 +16,23 @@ class Data(object):
         else:
             raise NotImplementedError()
 
+    def reduce_dataset(self, max_size=1):
+        # max_size sets the minimum size of the mini-batch. Hence, for a dataset size = 1, you will need to self.set_num_gpus(1).
+        if(max_size<1):
+            raise ValueError()
+        if(self.num_gpus==1):
+            self.train_data = self.train_data[0:max_size]
+            self.train_data_labels = self.train_data_labels[0:max_size]
+            self.dataset_size_train = max_size
+            
+        elif(self.num_gpus>1):
+            for gpu in range(self.num_gpus):
+                this_size = this.train_data[gpu].shape[0]
+                max_size = max_size if(this_size>=max_size) else this_size
+            for gpu in range(self.num_gpus):
+                this.train_data[gpu] = this.train_data[gpu][0:max_size]
+                this.train_data_labels[gpu] = this.train_data_labels[gpu][0:max_size]
+            self.dataset_size_train = max_size * self.num_gpus
     def set_num_gpus(self, num):
         ''' Sets the number of gpus that will be used and subsequently split up the data '''
         print(">>>> Let's set the number of GPUs and manage the data across them")
