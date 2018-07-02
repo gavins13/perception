@@ -102,8 +102,11 @@ class execution(object):
               feed_dict = {}
               for gpu in range(self.data_strap.num_gpus):
                   train_data, train_labels = self.data_strap.get_data(gpu=gpu, mb_ind=i)
+                  validation_data, validation_labels = self.data_strap.get_validation_data(gpu=gpu, mb_ind=i)
                   feed_dict["InputDataGPU" + str(gpu) + ":0"] = train_data
                   feed_dict["InputLabelsGPU" + str(gpu) + ":0"] = train_labels
+                  feed_dict["ValidationInputDataGPU" + str(gpu) + ":0"] = validation_data
+                  feed_dict["ValidationInputLabelsGPU" + str(gpu) + ":0"] = validation_labels
               #sess.run(y, {tf.get_default_graph().get_operation_by_name('x').outputs[0]: [1, 2, 3]})
 
               summary, _, learn_rate, diagnostics = session.run([self.summarised_result.summary, self.summarised_result.train_op, self.model._optimizer._lr, self.summarised_result.diagnostics], feed_dict=feed_dict) # Run graph # summary_i, result, ground_truth, input_data
