@@ -13,10 +13,10 @@ SystemConfiguration = collections.namedtuple("SystemConfiguration", ["cpu_only",
 
 ''' Config here '''
 from capsules.architectures.v0_rev0_1 import architecture as Architecture
-from capsules.architectures.v0_rev13_1_verylowparams_9_residual_highres import architecture as TestArchitecture
-experiment_name = 'v0_rev13_1_verylowparams_9_residual_highres'
+from capsules.architectures.v1_rev1_3 import architecture as TestArchitecture
+experiment_name = 'v1_rev1_3'
 data_config = DataConfiguration(project_path='/vol/biomedic/users/kgs13/PhD/capsule_networks/first_model',execution_type='train',
-    model_load_dir=None)
+    model_load_dir='v1_rev1_3_2018-07-04-16:00:27.537862')
 system_config = SystemConfiguration(cpu_only=False, num_gpus=1, eager=False, mini_batch_size=4, test_architecture=True, validation_size=4)
 ''' End Config '''
 
@@ -37,7 +37,7 @@ try:
 
   print("Strap Managed Architecture to a training scheme `Executer`")
   with execution(data_config.project_path, System, DataModel, experiment_name=experiment_name, max_steps_to_save=5, mini_batch_size=system_config.mini_batch_size, type=data_config.execution_type, load=data_config.model_load_dir) as Executer:
-        Executer.run_task(max_epochs=1000, save_step=1)
+        Executer.run_task(max_epochs=10000, save_step=1)
 except Exception as e:
   err_message = e.args
   print("Exception thrown, see below:")
