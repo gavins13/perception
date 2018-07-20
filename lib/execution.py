@@ -10,7 +10,7 @@ import matplotlib
 matplotlib.use("qt5agg")
 import matplotlib.pyplot as plt
 
-import scipy
+import skimage.transform
 
 # Object is a context manager!
 class execution(object):
@@ -147,7 +147,7 @@ class execution(object):
   def __exit__(self, exception_type, exception_value, traceback):
     print("Exectioner has been exited")
 
-  def evaluate(self, max_steps=None, save_step=None, session=None, checkpoint_path=None):
+  def evaluate(self, max_steps=None, max_epochs=None, save_step=None, session=None, checkpoint_path=None):
     def extract_step(path):
       file_name = os.path.basename(path)
       return int(file_name.split('-')[-1])
@@ -171,14 +171,20 @@ class execution(object):
         results = []
         ground_truths = []
         input_datas = []
+        all_diagnostics = []
         for i in range(self.data_strap.n_splits):
             feed_dict = {}
             for gpu in range(self.data_strap.num_gpus):
               test_data, test_labels = self.data_strap.get_data(gpu=gpu, mb_ind=i)
+              validation_data, validation_labels = self.data_strap.get_validation_data(gpu=gpu)
               feed_dict["InputDataGPU" + str(gpu) + ":0"] = test_data
               feed_dict["InputLabelsGPU" + str(gpu) + ":0"] = test_labels
+              feed_dict["ValidationInputDataGPU" + str(gpu) + ":0"] = validation_data
+              feed_dict["ValidationInputLabelsGPU" + str(gpu) + ":0"] = validation_labels
             print("data split: %d of %d" % (i+1, self.data_strap.n_splits))
-            summary_i, result, ground_truth, input_data = self.session.run([self.summarised_result.summary, self.results, self.ground_truths, self.input_data],feed_dict=feed_dict)
+            summary_i, result, ground_truth, input_data, this_split_diagnostics,this_split_full_diagnostics = self.session.run([self.summarised_result.summary, self.results, self.ground_truths, self.input_data, self.summarised_result.diagnostics, self.summarised_result.full_diagnostics],feed_dict=feed_dict)
+
+
             print("finished data split: %d of %d" % (i+1, self.data_strap.n_splits))
 
 
@@ -198,49 +204,85 @@ class execution(object):
             #print(len(np.split(input_data[0], result[0].shape[0])))
             #print(np.split(input_data[0], result[0].shape[0])[0].shape)
             input_datas = input_datas + np.split(input_data[0], result[0].shape[0])
+            all_diagnostics.append(this_split_full_diagnostics)
+            print(this_split_full_diagnostics['mse'])
+            tmp = list(this_split_full_diagnostics['mse'])
+            print(np.array(tmp))
         def _average_diagnostics(summaries):
             n = len(summaries)
             keys=list(summaries[0].keys())
-            diagnostics = {}
+            reduced_diagnostics = {}
+            full_diagnostics = {}
             for key in keys:
                 vals = []
                 for i in range(n):
                     vals.append(summaries[i][key])
                 if('min' in key):
-                    diagnostics[key] = np.min(vals)
+                    reduced_diagnostics[key] = np.min(vals)
                 elif('max' in key):
-                    diagnostics[key] = np.max(vals)
+                    reduced_diagnostics[key] = np.max(vals)
                 else:
-                    diagnostics[key] = np.mean(vals)
-            return diagnostics
-        diagnostics = _average_diagnostics(summaries)
-
+                    reduced_diagnostics[key] = np.mean(vals)
+                full_diagnostics[key] = np.array(vals).flatten()
+            return reduced_diagnostics, full_diagnostics
+        reduced_diagnostics, full_diagnostics = _average_diagnostics(summaries)
+        user_diagnostics_reduced, user_diagnostics = _average_diagnostics(all_diagnostics)
+        diag = user_diagnostics
         path_orig = self.summary_folder + '/original/'
         os.mkdir(path_orig, 0o755 )
         path_mri = self.summary_folder + '/mri/'
         os.mkdir(path_mri, 0o755 )
+        main_results = {"x": [], "y": [], "gt": []}
         for i in range(len(results)):
             print("Saving results %s of %s" % (i, len(results)))
             print(np.squeeze(input_datas[i]).shape)
             print(np.squeeze(results[i]).shape)
             print(np.squeeze(ground_truths[i]).shape)
-            fig=plt.figure()
-            plt.subplot(131)
-            plt.imshow(scipy.misc.imresize(np.squeeze(input_datas[i])[96:160, 96:160], 0.5), cmap=plt.cm.gray)
-            plt.colorbar()
-            plt.subplot(132)
+            fig=plt.figure(figsize=(10,8), dpi=80, facecolor='w', edgecolor='k')
+            print("fig diag")
+            fig.suptitle("PSNR: " + str(diag['psnr'][i]) + "; SSIM: " + str(diag['ssim'][i]) + "; MSE: " + str(diag['mse'][i]) + ";\nSA(1): " + str(diag['sa1'][i]) + "; SA(2): " + str(diag['sa2'][i]), fontsize=8)
+            print("data to fig")
+            plt.subplot(231)
+            plt.gca().set_title('x')
+            x = skimage.transform.resize(np.squeeze(input_datas[i])[64:192, 64:192], [128,128],preserve_range=True)
+            plt.imshow(x, cmap=plt.cm.gray)
+            main_results["x"].append(x)
+            #plt.colorbar()
+            plt.subplot(232)
+            plt.gca().set_title('y')
             plt.imshow(np.squeeze(results[i]), cmap=plt.cm.gray)
-            plt.colorbar()
-            plt.subplot(133)
-            plt.imshow(scipy.misc.imresize(np.squeeze(ground_truths[i])[96:160, 96:160], 0.5), cmap=plt.cm.gray)
-            plt.colorbar()
+            main_results["y"].append(np.squeeze(results[i]))
+            plt.subplot(233)
+            plt.gca().set_title('gt')
+            gt=skimage.transform.resize(np.squeeze(ground_truths[i])[64:192, 64:192], [128,128],preserve_range=True)
+            plt.imshow(gt, cmap=plt.cm.gray)
+            main_results["gt"].append(gt)
+            plt.subplot(234)
+            plt.gca().set_title('gt-y')
+            plt.imshow(skimage.transform.resize(np.squeeze(ground_truths[i])[64:192, 64:192], [128,128],preserve_range=True)-np.squeeze(results[i]), cmap=plt.cm.gray)
+            plt.subplot(235)
+            plt.gca().set_title('y-x')
+            plt.imshow(np.squeeze(results[i]) - skimage.transform.resize(np.squeeze(input_datas[i])[64:192, 64:192], [128,128],preserve_range=True), cmap=plt.cm.gray)
+            plt.subplot(236)
+            plt.gca().set_title('gt-x')
+            plt.imshow(skimage.transform.resize(np.squeeze(ground_truths[i])[64:192, 64:192], [128,128],preserve_range=True) - skimage.transform.resize(np.squeeze(input_datas[i])[64:192, 64:192], [128,128],preserve_range=True), cmap=plt.cm.gray)
             plt.savefig(path_mri + str(i) + ".png")
             plt.close(fig)
+        zipped_diag = list(zip(diag['psnr'], diag['ssim'], diag['mse'], diag['sa1'], diag['sa2']))
+        with open(self.summary_folder + '/diagnostics.csv', 'w') as the_file:
+            the_file.write('psnr, ssim, mse, sa1, sa2\n')
+            for entry in zipped_diag:
+                for val in list(entry):
+                    the_file.write(str(val))
+                    the_file.write(',')
+                the_file.write('\n')
+
+
 
 
         print("Test results:")
-        print(diagnostics)
-        tf.logging.info(json.dumps(diagnostics))
+        print(reduced_diagnostics)
+        tf.logging.info(json.dumps(reduced_diagnostics))
 
         '''summary = tf.Summary.FromString(summaries)
         summary.value.add(tag='mean_ssim', simple_value=diagnostics["mean_ssim"])
