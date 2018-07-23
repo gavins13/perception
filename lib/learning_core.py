@@ -28,6 +28,7 @@ class learning_core(object):
     n = len(diagnostics_all_towers)
     keys=list(diagnostics_all_towers[0].keys())
     diagnostics = {}
+    full_diagnostics = {}
     for key in keys:
         vals = []
         for i in range(n):
@@ -38,9 +39,8 @@ class learning_core(object):
             diagnostics[key] = tf.reduce_max(vals)
         else:
             diagnostics[key] = tf.reduce_mean(vals)
-    return diagnostics
-
-
+        full_diagnostics[key] = tf.convert_to_tensor(vals)
+    return diagnostics, full_diagnostics
 
 
 
