@@ -26,7 +26,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 
-def weight_variable(shape, stddev=0.1, verbose=False):
+def weight_variable(shape, stddev=0.1, verbose=False, He=False, He_nl=None):
   """Creates a CPU variable with normal initialization. Adds summaries.
 
   Args:
@@ -37,6 +37,8 @@ def weight_variable(shape, stddev=0.1, verbose=False):
   Returns:
     Weight variable tensor of shape=shape.
   """
+  n = tf.reduce_prod(shape) if(He_nl==None) else He_nl
+  stddev=tf.sqrt(tf.divide(2., n)) if(He==True) else stddev
   with tf.device('/cpu:0'):
     with tf.name_scope('weights'):
       weights = tf.get_variable(
@@ -49,7 +51,7 @@ def weight_variable(shape, stddev=0.1, verbose=False):
   return weights
 
 
-def bias_variable(shape, verbose=False, init=0.1):
+def bias_variable(shape, verbose=False, init=0.1, He=False, He_nl=None):
   """Creates a CPU variable with constant initialization. Adds summaries.
 
   Args:
@@ -61,7 +63,12 @@ def bias_variable(shape, verbose=False, init=0.1):
   """
   with tf.device('/cpu:0'):
     with tf.name_scope('biases'):
-      biases = tf.get_variable(
+      if(He==True):
+        n = tf.reduce_prod(shape) if(He_nl==None) else tf.reduce_prod(He_nl)
+        limit=tf.sqrt(tf.divide(6., n))
+        biases = tf.get_variable('biases', shape, initialiser=tf.random_uniform_initializer(-limit, limit, dtype=tf.float32), dtype=tf.float32, trainable=True)
+      else:
+        biases = tf.get_variable(
           'biases',
           shape,
           initializer=tf.constant_initializer(init),
