@@ -3,8 +3,8 @@ import numpy as np
 import sys
 
 import collections
-TowerResult = collections.namedtuple('TowerResult', ('result', 'grads', 'loss', 'diagnostics', 'ground_truth', 'input_data'))
-JoinedResult = collections.namedtuple('JoinedResult', ('summary', 'train_op','total_loss', 'diagnostics', 'full_diagnostics'))
+TowerResult = collections.namedtuple('TowerResult', ('result', 'grads', 'loss', 'diagnostics', 'ground_truth', 'input_data', 'output_weights'))
+JoinedResult = collections.namedtuple('JoinedResult', ('summary', 'train_op','total_loss', 'diagnostics', 'full_diagnostics', 'output_weights'))
 
 sys.path.insert(0, 'lib/')
 from learning_core import learning_core
@@ -48,7 +48,7 @@ class multi_gpu_model(learning_core):
         ground_truths.append(tower_output.ground_truth)
         input_data.append(tower_output.input_data)
     print('>> Sumarise results from all towers')
-    summarized_results = self._summarize_towers(tower_grads, losses, diagnostics)
+    summarized_results = self._summarize_towers(tower_grads, losses, diagnostics, tower_output.output_weights)
     print('>> Return results from all towers')
     return summarized_results, results, ground_truths, input_data
 
@@ -76,7 +76,7 @@ class multi_gpu_model(learning_core):
             input_data = tf.convert_to_tensor(input_data, dtype=tf.float32)
             print(input_data.get_shape().as_list())
             input_labels = tf.convert_to_tensor(input_labels, dtype=tf.float32)
-            output, loss, diagnostics = self.ArchitectureObject.loss_func(input_images=input_data, ground_truth=input_labels, validation_input_images=validation_input_data, validation_ground_truth=validation_input_labels)
+            output, loss, diagnostics, output_weights = self.ArchitectureObject.loss_func(input_images=input_data, ground_truth=input_labels, validation_input_images=validation_input_data, validation_ground_truth=validation_input_labels)
             grads_and_vars  = self._optimizer.compute_gradients(loss) # [] [unfinished] why
         else:
             #grads_and_vars  = self._optimizer.compute_gradients(losses_func)
@@ -85,9 +85,9 @@ class multi_gpu_model(learning_core):
             loss, grads_and_vars = grad_function(self.ArchitectureObject, input_data, input_labels)
         print("-----grads and vars shape----")
         print(np.shape(grads_and_vars))
-    return TowerResult(output, grads_and_vars, loss, diagnostics, input_labels, input_data)
+    return TowerResult(output, grads_and_vars, loss, diagnostics, input_labels, input_data, output_weights)
 
-  def _summarize_towers(self, tower_grads, losses, diagnostics):
+  def _summarize_towers(self, tower_grads, losses, diagnostics, output_weights):
     print("....")
     grads = self._average_gradients(tower_grads)
     print("....")
@@ -101,4 +101,4 @@ class multi_gpu_model(learning_core):
     summary = tf.summary.merge(summaries)
     print("....")
     summed_losses = tf.reduce_sum(losses)
-    return JoinedResult(summary, train_op, summed_losses, diag, full_diag)
+    return JoinedResult(summary, train_op, summed_losses, diag, full_diag, output_weights)
