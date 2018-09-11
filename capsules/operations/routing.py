@@ -6,12 +6,11 @@ from capsule_functions import _squash
 import variables
 import sys
 
-def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False):
+def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False, squash_relu_leaky=False, softmax_opposite=False):
     # Start Config [config] #
-    clear_after_read_for_votes = True
     its = input_tensor.get_shape().as_list()
 
-    # input tensor has form: [batch, o_vec, o_num_channels, o_h*o_w, TOBEROUTED]
+    # input tensor has form: [batch, o_vec, o_num_channels, o_h*o_w, TOBEROUTED]  [M, v_d^l+1, |T^l+1|, x'*y', VOTES]
     print("begining on patch based conv caps routing")
     print(squash_biases.get_shape().as_list())
     #squash biases has form: # [o_vec_dim, o_num_channel, o_h*o_w, 1]
@@ -34,7 +33,7 @@ def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False)
     vec_dim = input_tensor_shape[1]
     batch_n = input_tensor_shape[0]
 
-    def _squash_relu(input_tensor): # provided: [batch, vec_dim, num_ch, h_o, w_o]; same out
+    def _squash_relu(input_tensor, leaky=False): # provided: [batch, vec_dim, num_ch, h_o, w_o]; same out
         '''norm = tf.norm(input_tensor, axis=1, keepdims=True)
         norm_squared = tf.multiply(norm ,norm)
         part_b = tf.divide( input_tensor, norm)
@@ -42,8 +41,10 @@ def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False)
         part_a = tf.divide(norm_squared , denom)
         res = tf.multiply( part_a, part_b  )
         return tf.nn.relu(part_b)'''
-        return tf.nn.relu(input_tensor)
-
+        if(leaky==True):
+            return tf.nn.leaky_relu(input_tensor)
+        else:
+            return tf.nn.relu(input_tensor)
 
     print(">>>>>>>>> Dynamic Routing: Start Iterating...")
     def _algorithm(i, logits, voting_tensors):
@@ -55,7 +56,11 @@ def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False)
 
         logits_prep = tf.transpose(logits, [0,1,4, 2,3])#[batch, 1, TOBEROUTED, o_num_channel, o_h*o_w,]
         logits_prep = tf.reshape(logits_prep, [ls[0], ls[1], ls[4], ls[2]*ls[3], 1]) #[batch, 1, TOBEROUTED, o_num_channel*o_h*o_w, 1]
-        c_i = tf.nn.softmax(logits_prep, axis=3)#[batch, 1, TOBEROUTED, o_num_channel*o_h*o_w, 1]
+        if(softmax_opposite==True):
+            print("NB/ Not the same softmax as in paper")
+            c_i = tf.nn.softmax(logits_prep, axis=2) #[batch, 1, TOBEROUTED, o_num_channel*o_h*o_w, 1]
+        else:
+            c_i = tf.nn.softmax(logits_prep, axis=3)#[batch, 1, TOBEROUTED, o_num_channel*o_h*o_w, 1]
         c_i = tf.reshape(c_i, [ls[0], ls[1], ls[4], ls[2],ls[3]])#[batch, 1, TOBEROUTED, o_num_channel, o_h*o_w,]
         c_i = tf.transpose(c_i, [0,1,3,4,2])#[batch, 1,  o_num_channel, o_h*o_w,TOBEROUTED]
 
@@ -100,7 +105,7 @@ def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False)
         if(squash_relu==False):
             v_j = _squash(s_j) # provided: [batch, vec_dim, num_ch, h_o, w_o]; same out
         else:
-            v_j = _squash_relu(s_j)
+            v_j = _squash_relu(s_j, leaky=squash_relu_leaky)
         #v_j dimensions = [batch, vec_dim, num_channels_output, height_output, width_output]
         # # [batch, o_vec, o_num_channels, o_h*o_w]
         print(v_j.get_shape().as_list())
@@ -153,7 +158,8 @@ def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False)
     # # [batch, o_vec, o_num_channels, o_h*o_w, 1]
     print(resulting_votes.get_shape().as_list())
 
-    return tf.cast(resulting_votes, dtype="float32")
+    #return tf.cast(resulting_votes, dtype="float32")
+    return resulting_votes
 
 
 
