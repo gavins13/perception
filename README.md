@@ -6,7 +6,7 @@
 Architecture models are objects derived from the base model in `lib/architecture.py`. An example of a architecture derived from this abstract class is shown in `models/example.py`.
 
 ## How to run a simple model
-1. Import perception models
+1. Import perception modules
 ```
 import sys
 from perception.lib.misc import DataConfiguration, SystemConfiguration, run_model
