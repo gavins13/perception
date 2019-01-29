@@ -370,7 +370,11 @@ class Data_V2(object):
         #if(self.num_gpus==1):
         #    return [len(self.train_indices[0])] + np.shape(self.train_data[0]), [len(self.train_indices[0])] + np.shape(self.train_data_labels[0])
         #elif(self.num_gpus>1):
-        return [len(self.train_indices[gpu][0])] + list(np.asarray(self.train_data[0]).shape), [len(self.train_indices[gpu][0])] + list(np.asarray(self.train_data_labels[0]).shape)
+        #return [len(self.train_indices[gpu][0])] + list(np.asarray(self.train_data[0]).shape), [len(self.train_indices[gpu][0])] + list(np.asarray(self.train_data_labels[0]).shape)
+        # [] To check
+        print(">>>>>>>>>>>>>>>>>> self.validation_size =  ")
+        print(self.validation_size)
+        return [self.validation_size] + list(np.asarray(self.train_data[0]).shape), [self.validation_size] + list(np.asarray(self.train_data_labels[0]).shape)
 
     def get_extra_data_shapes(self, gpu=0):
         extra_data_shapes =  {}
@@ -392,9 +396,14 @@ class Data_V2(object):
             print(">>>> Key loop")
             print(key)
             if(self.num_gpus==1):
-                extra_data_shapes[key] =  [len(self.test_indices[0][0])] + list(np.asarray(getattr(self.extra_data, key)[1]).shape)[1::]
+                #extra_data_shapes[key] =  [len(self.test_indices[0][0])] + list(np.asarray(getattr(self.extra_data, key)[1]).shape)[1::]
+                extra_data_shapes[key] =  [self.validation_size] + list(np.asarray(getattr(self.extra_data, key)[1]).shape)[1::]
             elif(self.num_gpus>1):
-                extra_data_shapes[key] =  [len(self.test_indices[gpu][0])] + list(np.asarray(getattr(self.extra_data, key)[1]).shape)[1::]  ## [] redundant code here.
+                #extra_data_shapes[key] =  [len(self.test_indices[gpu][0])] + list(np.asarray(getattr(self.extra_data, key)[1]).shape)[1::]  ## [] redundant code here.
+                extra_data_shapes[key] =  [self.validation_size] + list(np.asarray(getattr(self.extra_data, key)[1]).shape)[1::]  ## [] redundant code here.
+
+        print(">>>>>>>>>> EXTRA VALIDATION SHAPE")
+        print(extra_data_shapes)
         print(">> Extra data shape found")
         print(extra_data_shapes)
         return extra_data_shapes
@@ -424,6 +433,29 @@ class Data_V2(object):
                 data = getattr(self.extra_data, key).test
             else:
                 raise KeyError('Key doesn\'t exists')
+        elif(set_type=='validation'):
+            indices = self.test_indices
+            #print(indices)
+            indices = [[[0]]*self.num_gpus]
+            #print(">>>>>>>>>>>>>> VALIDATION INDICES")
+            #print(indices)
+            if(key=='labels'):
+                data = self.test_data_labels
+            elif(key=='input'):
+                data = self.test_data
+            elif(key in self.extra_data._fields):
+                data = getattr(self.extra_data, key).test
+            else:
+                raise KeyError('Key doesn\'t exists')
+
+            '''indices =indices[gpu][batch_number]
+            indices = list(np.asarray(indices).flatten())
+            data = np.asarray(data)'''
+            data = np.asarray(data)
+            data = data[0]
+            if(len(data.shape)==2):
+                data = np.expand_dims(data, axis=0)
+            return data
         else:
             raise ValueError('please select test or training set')
         #indices = indices[gpu] if(batch_number==None) else indices[gpu][batch_number] # just a simple list
@@ -449,7 +481,7 @@ class Data_V2(object):
         self.validation_size = validation_size if (validation_size != None) else self.validation_size
         if(self.validation_size<1):
             raise ValueError()
-        self.validation_size = validation_size if(self.mini_batch_size>=validation_size) else self.mini_batch_size
+        #self.validation_size = validation_size if(self.mini_batch_size>=validation_size) else self.mini_batch_size
 
     def reduce_dataset(self, max_size=1):
         # max_size sets the minimum size of the mini-batch. Hence, for a dataset size = 1, you will need to self.set_num_gpus(1).
