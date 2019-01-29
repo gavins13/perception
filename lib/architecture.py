@@ -10,6 +10,8 @@ class architecture_base(ABC):
           learning_rate=1.e-5,  # 0.001
           maximum_learning_rate=1.e-7,  # 1.e-7
         )
+        self.evaluate = False
+        self.__config__()
 
     @abstractmethod
     def build(self, input_images):
@@ -20,7 +22,7 @@ class architecture_base(ABC):
                   validation_ground_truth, extra_data, validation_extra_data):
         raise NotImplementedError()
 
-    @abstractmethod
+    #@abstractmethod
     def analyse(self, main_results, full_diagnostics, user_diagnostics,
                 save_directory):
         raise NotImplementedError()
