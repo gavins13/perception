@@ -54,8 +54,21 @@ class execution(object):
             print(">>>Set initialiser for training - i.e. set AdamOptimizer")
             self.model.initialise_training()
             print(">>>Finished setting initialiser")
+
+            self.train_data_placeholder = tf.placeholder(tf.complex64, shape=[1575, 30, 8192])
+            self.tf_dataset = tf.data.Dataset.from_tensor_slices(self.train_data_placeholder)
+            print(".")
+            self.tf_dataset = self.tf_dataset.batch(1)
+            print(".")
+
+            self.iterator = self.tf_dataset.make_initializable_iterator()
+            print(".")
+            train_data= self.iterator.get_next()
+            train_data.set_shape([1,30,8192])
+            validation_data = train_data
+
             print(">> Time to build TF Graph!")
-            self.summarised_result, self.results, self.ground_truths, self.input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=self.data_strap.num_gpus)
+            self.summarised_result, self.results, self.ground_truths, self.input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=self.data_strap.num_gpus, train_data=train_data, validation_data=validation_data)
             self.saver = tf.train.Saver(max_to_keep=self.max_steps_to_save)
         print(">> Let's analyse the model parameters")
         print(">> Finished analysing")
@@ -69,6 +82,8 @@ class execution(object):
               config.gpu_options.allow_growth = True
 
           with tf.Session(graph=self.graph, config=config) as self.session:
+              self.session.run(self.iterator.initializer, feed_dict={ self.train_data_placeholder: self.data_strap.extra_data.image_data_complex.train})
+
               init_op = tf.group(tf.global_variables_initializer(),
                                  tf.local_variables_initializer())
               print(">Initialise sesssion with variables")
@@ -93,6 +108,21 @@ class execution(object):
           step = (last_epoch*self.data_strap.n_splits_per_gpu_train[0])+last_mini_batch # [] This is cheating and needs to be fixed
           print("Saving to: cd %s; tensorboard --logdir=./ --port=6394" % self.summary_folder)
           print(last_mini_batch, last_epoch, max_epochs, self.last_global_step, self.data_strap.n_splits_per_gpu_train, self.data_strap.num_gpus)
+
+          '''feed_dict = {}
+          for gpu in list(range(self.data_strap.num_gpus)):
+            for key in self.data_strap.extra_data._fields:
+                feed_dict["ExtraData_"+key+"GPU"+str(gpu)+":0"] = self.data_strap.extra_data.image_data_complex.train #self.data_strap.fetch_data('train',key,gpu,i)
+            for key in self.data_strap.extra_data._fields:
+                feed_dict["ValidationExtraData_"+key+"GPU"+str(gpu)+":0"] = self.data_strap.extra_data.image_data_complex.train # needs fixing to a proper validation set'''
+
+
+          #sess.run(y, {tf.get_default_graph().get_operation_by_name('x').outputs[0]: [1, 2, 3]})
+          #next_element = iterator.get_next()
+          #session.run(iterator.initializer, feed_dict=feed_dict)
+          #session.run(iterator.string_handle())
+          #training_handle = session.run(iterator.string_handle())
+
           for j in range(last_epoch, max_epochs):
               #print(".")
               n_splits_list = range(last_mini_batch, self.data_strap.n_splits_per_gpu_train[0]) # [] This is cheating and needs to be fixed
@@ -101,25 +131,18 @@ class execution(object):
                   #print(".")
                   step += 1
                   feed_dict = {}
-                  for gpu in list(range(self.data_strap.num_gpus)):
-                      #print(">>>>> Start looping over gpus")
-                      train_data, train_labels = self.data_strap.get_data(gpu=gpu, mb_ind=i)
-                      #print(".")
-                      validation_data, validation_labels = self.data_strap.get_validation_data(gpu=gpu)
-                      #print("..")
-                      feed_dict["InputDataGPU" + str(gpu) + ":0"] = train_data
-                      feed_dict["InputLabelsGPU" + str(gpu) + ":0"] = train_labels
-                      feed_dict["ValidationInputDataGPU" + str(gpu) + ":0"] = validation_data
-                      feed_dict["ValidationInputLabelsGPU" + str(gpu) + ":0"] = validation_labels
-                      #print(">>>>>Extra data feed_dict")
+                  #self.data_strap.extra_data.image_data_complex.train
+                  '''for gpu in list(range(self.data_strap.num_gpus)):
                       for key in self.data_strap.extra_data._fields:
-                          feed_dict["ExtraData_"+key+"GPU"+str(gpu)+":0"] = self.data_strap.fetch_data('train',key,gpu,i)
+                          feed_dict["ExtraData_"+key+"GPU"+str(gpu)+":0"] = self.data_strap.extra_data.image_data_complex.train #self.data_strap.fetch_data('train',key,gpu,i)
                       for key in self.data_strap.extra_data._fields:
-                          feed_dict["ValidationExtraData_"+key+"GPU"+str(gpu)+":0"] = self.data_strap.fetch_data('validation',key,gpu,0) # needs fixing to a proper validation set
+                          feed_dict["ValidationExtraData_"+key+"GPU"+str(gpu)+":0"] = self.data_strap.extra_data.image_data_complex.train # needs fixing to a proper validation set'''
                   #sess.run(y, {tf.get_default_graph().get_operation_by_name('x').outputs[0]: [1, 2, 3]})
 
                   print("training epoch: %d" % j, end=";")
-                  summary, _, learn_rate, diagnostics = session.run([self.summarised_result.summary, self.summarised_result.train_op, self.model._optimizer._lr, self.summarised_result.diagnostics], feed_dict=feed_dict) # Run graph # summary_i, result, ground_truth, input_data
+                  summary, _, learn_rate, diagnostics = session.run([self.summarised_result.summary, self.summarised_result.train_op, self.model._optimizer._lr, self.summarised_result.diagnostics])
+                  #feed_dict=feed_dict) # Run graph # summary_i, result, ground_truth, input_data
+
                   print("data split: %d of %d" % (i+1, self.data_strap.n_splits_per_gpu_train[0]), end=";")# [] This is cheating and needs to be fixed
 
                   print("step: %d" % step, end=";")
