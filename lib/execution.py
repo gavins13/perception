@@ -51,46 +51,75 @@ class execution(object):
     def __enter__(self):
         self.graph = tf.Graph()
         with self.graph.as_default():
-            print(">>>Set initialiser for training - i.e. set AdamOptimizer")
+            print(">>> Set initialiser for training - i.e. set AdamOptimizer")
             self.model.initialise_training()
-            print(">>>Finished setting initialiser")
+            print(">>> Finished setting initialiser")
 
+            print(">>> Build training datasets and iterators")
             self.train_data_placeholder = tf.placeholder(tf.as_dtype(self.data_strap.train_data.dtype), shape=self.data_strap.train_data.shape)
             self.train_data_labels_placeholder = tf.placeholder(tf.as_dtype(self.data_strap.train_data_labels.dtype), shape=self.data_strap.train_data_labels.shape)
-            self.tf_train_dataset = tf.data.Dataset.from_tensor_slices((self.train_data_placeholder, self.train_data_labels_placeholder))
+            tensor_slices = [self.train_data_placeholder, self.train_data_labels_placeholder]
+            self.extra_data_placeholders = {}
+            print(">>>> Build placeholders")
+            for key in self.data_strap.extra_data._fields:
+                this_data = getattr(getattr(self.data_strap.extra_data, key), 'train')
+                self.extra_data_placeholders[key] = tf.placeholder(tf.as_dtype(this_data.dtype), shape=this_data.shape)
+                tensor_slices.append(self.extra_data_placeholders[key])
+            self.tf_train_dataset = tf.data.Dataset.from_tensor_slices(tuple(tensor_slices))
             self.tf_train_dataset = self.tf_train_dataset.batch(self.data_strap.mini_batch_size)
+            self.tf_train_dataset = self.tf_train_dataset.repeat(None) # number of epochs = None = infinity
             self.train_data_iterator = self.tf_train_dataset.make_initializable_iterator()
             train_data_gpus = []
             train_data_labels_gpus = []
+            extra_data_gpus = []
+            print(">>>> Build graph elements")
             for i in range(self.data_strap.num_gpus):
-                (train_data, train_data_labels) = self.train_data_iterator.get_next()
+                graph_data = self.train_data_iterator.get_next()
+                train_data = graph_data[0]
+                train_data_labels = graph_data[1]
                 train_data.set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.train_data.shape[1::]))
                 train_data_labels.set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.train_data_labels.shape[1::]))
                 train_data_gpus.append(train_data)
                 train_data_labels_gpus.append(train_data_labels)
+                extra_data = {}
+                for j, key in enumerate(self.data_strap.extra_data._fields):
+                    extra_data[key] = graph_data[j+2]
+                    extra_data[key].set_shape([self.data_strap.mini_batch_size] + list(getattr(self.data_strap.extra_data, key).train.shape[1::]))
+                extra_data_gpus.append(extra_data)
 
+
+            print(">>> Build validation datasets and iterators")
             self.validation_data_placeholder = tf.placeholder(tf.as_dtype(self.data_strap.validation_data.dtype), shape=self.data_strap.validation_data.shape)
             self.validation_data_labels_placeholder = tf.placeholder(tf.as_dtype(self.data_strap.validation_data_labels.dtype), shape=self.data_strap.validation_data_labels.shape)
-            self.tf_validation_dataset = tf.data.Dataset.from_tensor_slices((self.validation_data_placeholder, self.validation_data_labels_placeholder))
-            self.tf_validation_dataset = self.tf_validation_dataset.batch(self.data_strap.mini_batch_size)
-            self.tf_validation_dataset = self.tf_validation_dataset.repeat(10) #for example.
+            tensor_slices = [self.validation_data_placeholder, self.validation_data_labels_placeholder]
+            self.validation_extra_data_placeholders = {}
+            print(">>>> Build placeholders")
+            for key in self.data_strap.validation_extra_data.keys():
+                this_data = self.data_strap.validation_extra_data[key]
+                self.validation_extra_data_placeholders[key] = tf.placeholder(tf.as_dtype(this_data.dtype), shape=this_data.shape)
+                tensor_slices.append(self.validation_extra_data_placeholders[key])
+            self.tf_validation_dataset = tf.data.Dataset.from_tensor_slices(tuple(tensor_slices))
+            self.tf_validation_dataset = self.tf_validation_dataset.batch(1)
+            self.tf_validation_dataset = self.tf_validation_dataset.repeat(None) # number of epochs = None = infinity
             self.validation_data_iterator = self.tf_validation_dataset.make_initializable_iterator()
-            (validation_data, validation_data_labels) = self.validation_data_iterator.get_next()
-            validation_data.set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.validation_data.shape[1::]))
-            validation_data_labels.set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.validation_data_labels.shape[1::]))
-
-
-            '''self.train_data_placeholder = tf.placeholder(tf.complex64, shape=[1575, 30, 8192])
-            self.tf_dataset = tf.data.Dataset.from_tensor_slices(self.train_data_placeholder)
-            print(".")
-            self.tf_dataset = self.tf_dataset.batch(1)
-            print(".")
-
-            self.iterator = self.tf_dataset.make_initializable_iterator()
-            print(".")
-            train_data= self.iterator.get_next()
-            train_data.set_shape([1,30,8192])
-            validation_data = train_data'''
+            validation_data_gpus = []
+            validation_data_labels_gpus = []
+            validation_extra_data_gpus = []
+            validation_num_gpus = 1
+            print(">>>> Build graph elements")
+            for i in range(validation_num_gpus): # only need to run on 1 gpu
+                graph_data = self.validation_data_iterator.get_next()
+                validation_data = graph_data[0]
+                validation_data_labels = graph_data[1]
+                validation_data.set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.validation_data.shape[1::]))
+                validation_data_labels.set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.validation_data_labels.shape[1::]))
+                validation_data_gpus.append(validation_data)
+                validation_data_labels_gpus.append(validation_data_labels)
+                validation_extra_data = {}
+                for j, key in enumerate(self.data_strap.validation_extra_data.keys()):
+                    validation_extra_data[key] = graph_data[j+2]
+                    validation_extra_data[key].set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.validation_extra_data[key].shape[1::]))
+                validation_extra_data_gpus.append(validation_extra_data)
 
             # This make the iterator a saveable object that can be reloaded when restarting training
             #saveable_train = tf.contrib.data.make_saveable_from_iterator(self.train_data_iterator)
@@ -98,9 +127,12 @@ class execution(object):
             '''saveable_validation = tf.contrib.data.make_saveable_from_iterator(self.validation_data_iterator)
             tf.add_to_collection(tf.GraphKeys.SAVEABLE_OBJECTS, saveable_validation)'''
 
+            training = {"input": train_data_gpus, "labels": train_data_labels_gpus, "extra_data": extra_data_gpus}
+            validation = {"input": validation_data_gpus, "labels": validation_data_labels_gpus, "extra_data": validation_extra_data_gpus}
+
             print(">> Time to build TF Graph!")
-            self.summarised_result, self.results, self.ground_truths, self.input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=self.data_strap.num_gpus, data=train_data_gpus, validation_graph=False)
-            self.validation_summarised_result, self.validation_results, self.validation_ground_truths, self.validation_input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=self.data_strap.num_gpus, data=validation_data, validation_graph=True)
+            self.summarised_result, self.results, self.ground_truths, self.input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=self.data_strap.num_gpus, data=training, validation_graph=False)
+            self.validation_summarised_result, self.validation_results, self.validation_ground_truths, self.validation_input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=validation_num_gpus, data=validation, validation_graph=True)
             self.saver = tf.train.Saver(max_to_keep=self.max_steps_to_save)
         print(">> Let's analyse the model parameters")
         print(">> Finished analysing")
@@ -114,17 +146,15 @@ class execution(object):
               config.gpu_options.allow_growth = True
 
           with tf.Session(graph=self.graph, config=config) as self.session:
-              print(tf.as_dtype(self.data_strap.train_data.dtype))
-              print(self.data_strap.extra_data.image_data_complex.train.shape)
-              print(self.data_strap.extra_data.image_data_complex.test.shape)
-              print(self.data_strap.validation_data.shape)
-              print([self.data_strap.mini_batch_size] + list(self.data_strap.train_data_labels.shape[1::]))
-              print([self.data_strap.mini_batch_size] + list(self.data_strap.validation_data_labels.shape[1::]))
-              print(self.data_strap.train_data.shape)
-              print(self.data_strap.train_data_labels.shape)
-              self.session.run(self.train_data_iterator.initializer, feed_dict={ self.train_data_placeholder: self.data_strap.extra_data.image_data_complex.train, self.train_data_labels_placeholder: self.data_strap.train_data_labels})
+              train_feed_dict = { self.train_data_placeholder: self.data_strap.train_data, self.train_data_labels_placeholder: self.data_strap.train_data_labels }
+              for key in self.data_strap.extra_data._fields:
+                  train_feed_dict[self.extra_data_placeholders[key]] = getattr(self.data_strap.extra_data, key).train
+              self.session.run(self.train_data_iterator.initializer, feed_dict=train_feed_dict)
               print(".")
-              self.session.run(self.validation_data_iterator.initializer, feed_dict={ self.validation_data_placeholder: np.expand_dims(self.data_strap.extra_data.image_data_complex.test[0], axis=0), self.validation_data_labels_placeholder: self.data_strap.validation_data_labels}) #[0] because we want validation size = 1
+              validation_feed_dict = { self.validation_data_placeholder: self.data_strap.validation_data, self.validation_data_labels_placeholder: self.data_strap.validation_data_labels }
+              for key in self.data_strap.validation_extra_data.keys():
+                  validation_feed_dict[self.validation_extra_data_placeholders[key]] = self.data_strap.validation_extra_data[key]
+              self.session.run(self.validation_data_iterator.initializer, feed_dict=validation_feed_dict) #[0] because we want validation size = 1
 
               init_op = tf.group(tf.global_variables_initializer(),
                                  tf.local_variables_initializer())
@@ -193,12 +223,12 @@ class execution(object):
                   if (step + 1) % save_step == 0:
                       self.writer.add_summary(summary, step)
                   if (step + 1) % validation_step == 0:
-                      print("save validation")
+                      #print("save validation")
                       summary, diagnostics = session.run([self.validation_summarised_result.summary, self.validation_summarised_result.diagnostics])
                       self.writer.add_summary(summary, step)
                   if (step + 1) % save_step == 0:
                       self.saver.save(self.session, os.path.join(self.summary_folder, 'model.ckpt'), global_step=step + 1)
-                  print([last_epoch, max_epochs, len(n_splits_list)])
+                  #print([last_epoch, max_epochs, len(n_splits_list)])
 
     def load_saved_model(self):
         def extract_step(path):
