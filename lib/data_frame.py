@@ -259,11 +259,19 @@ class Data_V2(object):
         if(data_loader != None):
             print(">> Enter Loader")
             self.train_data, self.train_data_labels, self.test_data, self.test_data_labels, self.extra_data = data_loader() # must be np tensors
+            #self.extra_data.image_data_complex.train = self.extra_data.image_data_complex.train.astype(np.complex64)
+            #self.extra_data.image_data_complex.test = self.extra_data.image_data_complex.test.astype(np.complex64)
+            self.train_data = self.extra_data.image_data_complex.train.astype(np.complex64)
+            self.train_data_labels = np.asarray([0]*self.train_data.shape[0])
+            self.test_data = self.extra_data.image_data_complex.test.astype(np.complex64)
+            self.test_data_labels = np.asarray([0]*self.train_data.shape[0])
+
             print(">> Exit  Loader")
             self.mode = None
             self.dataset_size_train = len(self.train_data_labels)
             self.dataset_size_test = len(self.test_data_labels)
             self.set_num_gpus(num_gpus)
+            self.set_validation_dataset()
         else:
             raise NotImplementedError()
 
@@ -475,13 +483,19 @@ class Data_V2(object):
         labels=self.fetch_data('test','labels', gpu,0)
         return data[0:self.validation_size], labels[0:self.validation_size]
         #return self.fetch_data('test','input',gpu, mb_ind),self.fetch_data('test','labels',gpu, 0)
-
-
     def set_validation_dataset(self, validation_size=None):
+        self.validation_size = validation_size if (validation_size != None) else self.validation_size
+        # returns validation set on the gpu'th GPU
+        if(self.validation_size==None):
+            raise ValueError()
+        self.validation_data =  self.test_data[0:self.validation_size]
+        self.validation_data_labels = self.test_data_labels[0:self.validation_size]
+
+    '''def set_validation_dataset(self, validation_size=None):
         self.validation_size = validation_size if (validation_size != None) else self.validation_size
         if(self.validation_size<1):
             raise ValueError()
-        #self.validation_size = validation_size if(self.mini_batch_size>=validation_size) else self.mini_batch_size
+        #self.validation_size = validation_size if(self.mini_batch_size>=validation_size) else self.mini_batch_size'''
 
     def reduce_dataset(self, max_size=1):
         # max_size sets the minimum size of the mini-batch. Hence, for a dataset size = 1, you will need to self.set_num_gpus(1).
