@@ -55,7 +55,32 @@ class execution(object):
             self.model.initialise_training()
             print(">>>Finished setting initialiser")
 
-            self.train_data_placeholder = tf.placeholder(tf.complex64, shape=[1575, 30, 8192])
+            self.train_data_placeholder = tf.placeholder(tf.as_dtype(self.data_strap.train_data.dtype), shape=self.data_strap.train_data.shape)
+            self.train_data_labels_placeholder = tf.placeholder(tf.as_dtype(self.data_strap.train_data_labels.dtype), shape=self.data_strap.train_data_labels.shape)
+            self.tf_train_dataset = tf.data.Dataset.from_tensor_slices((self.train_data_placeholder, self.train_data_labels_placeholder))
+            self.tf_train_dataset = self.tf_train_dataset.batch(self.data_strap.mini_batch_size)
+            self.train_data_iterator = self.tf_train_dataset.make_initializable_iterator()
+            train_data_gpus = []
+            train_data_labels_gpus = []
+            for i in range(self.data_strap.num_gpus):
+                (train_data, train_data_labels) = self.train_data_iterator.get_next()
+                train_data.set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.train_data.shape[1::]))
+                train_data_labels.set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.train_data_labels.shape[1::]))
+                train_data_gpus.append(train_data)
+                train_data_labels_gpus.append(train_data_labels)
+
+            self.validation_data_placeholder = tf.placeholder(tf.as_dtype(self.data_strap.validation_data.dtype), shape=self.data_strap.validation_data.shape)
+            self.validation_data_labels_placeholder = tf.placeholder(tf.as_dtype(self.data_strap.validation_data_labels.dtype), shape=self.data_strap.validation_data_labels.shape)
+            self.tf_validation_dataset = tf.data.Dataset.from_tensor_slices((self.validation_data_placeholder, self.validation_data_labels_placeholder))
+            self.tf_validation_dataset = self.tf_validation_dataset.batch(self.data_strap.mini_batch_size)
+            self.tf_validation_dataset = self.tf_validation_dataset.repeat(10) #for example.
+            self.validation_data_iterator = self.tf_validation_dataset.make_initializable_iterator()
+            (validation_data, validation_data_labels) = self.validation_data_iterator.get_next()
+            validation_data.set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.validation_data.shape[1::]))
+            validation_data_labels.set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.validation_data_labels.shape[1::]))
+
+
+            '''self.train_data_placeholder = tf.placeholder(tf.complex64, shape=[1575, 30, 8192])
             self.tf_dataset = tf.data.Dataset.from_tensor_slices(self.train_data_placeholder)
             print(".")
             self.tf_dataset = self.tf_dataset.batch(1)
@@ -65,16 +90,23 @@ class execution(object):
             print(".")
             train_data= self.iterator.get_next()
             train_data.set_shape([1,30,8192])
-            validation_data = train_data
+            validation_data = train_data'''
+
+            # This make the iterator a saveable object that can be reloaded when restarting training
+            #saveable_train = tf.contrib.data.make_saveable_from_iterator(self.train_data_iterator)
+            #tf.add_to_collection(tf.GraphKeys.SAVEABLE_OBJECTS, saveable_train)
+            '''saveable_validation = tf.contrib.data.make_saveable_from_iterator(self.validation_data_iterator)
+            tf.add_to_collection(tf.GraphKeys.SAVEABLE_OBJECTS, saveable_validation)'''
 
             print(">> Time to build TF Graph!")
-            self.summarised_result, self.results, self.ground_truths, self.input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=self.data_strap.num_gpus, train_data=train_data, validation_data=validation_data)
+            self.summarised_result, self.results, self.ground_truths, self.input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=self.data_strap.num_gpus, data=train_data_gpus, validation_graph=False)
+            self.validation_summarised_result, self.validation_results, self.validation_ground_truths, self.validation_input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=self.data_strap.num_gpus, data=validation_data, validation_graph=True)
             self.saver = tf.train.Saver(max_to_keep=self.max_steps_to_save)
         print(">> Let's analyse the model parameters")
         print(">> Finished analysing")
         return self
 
-    def run_task(self, max_epochs, save_step=1, max_steps_to_save=1000, memory_growth=False):
+    def run_task(self, max_epochs, save_step=1, max_steps_to_save=1000, memory_growth=False, validation_step=5):
           print(">Create TF session")
 
           config = tf.ConfigProto(allow_soft_placement=True)
@@ -82,7 +114,17 @@ class execution(object):
               config.gpu_options.allow_growth = True
 
           with tf.Session(graph=self.graph, config=config) as self.session:
-              self.session.run(self.iterator.initializer, feed_dict={ self.train_data_placeholder: self.data_strap.extra_data.image_data_complex.train})
+              print(tf.as_dtype(self.data_strap.train_data.dtype))
+              print(self.data_strap.extra_data.image_data_complex.train.shape)
+              print(self.data_strap.extra_data.image_data_complex.test.shape)
+              print(self.data_strap.validation_data.shape)
+              print([self.data_strap.mini_batch_size] + list(self.data_strap.train_data_labels.shape[1::]))
+              print([self.data_strap.mini_batch_size] + list(self.data_strap.validation_data_labels.shape[1::]))
+              print(self.data_strap.train_data.shape)
+              print(self.data_strap.train_data_labels.shape)
+              self.session.run(self.train_data_iterator.initializer, feed_dict={ self.train_data_placeholder: self.data_strap.extra_data.image_data_complex.train, self.train_data_labels_placeholder: self.data_strap.train_data_labels})
+              print(".")
+              self.session.run(self.validation_data_iterator.initializer, feed_dict={ self.validation_data_placeholder: np.expand_dims(self.data_strap.extra_data.image_data_complex.test[0], axis=0), self.validation_data_labels_placeholder: self.data_strap.validation_data_labels}) #[0] because we want validation size = 1
 
               init_op = tf.group(tf.global_variables_initializer(),
                                  tf.local_variables_initializer())
@@ -93,7 +135,7 @@ class execution(object):
               coord = tf.train.Coordinator()
               threads = tf.train.start_queue_runners(sess=self.session, coord=coord)
               try:
-                self.experiment(max_epochs=max_epochs,save_step=save_step, session=self.session) # experiment = training() or evaluate()
+                self.experiment(max_epochs=max_epochs,save_step=save_step, session=self.session, validation_step=validation_step) # experiment = training() or evaluate()
               except tf.errors.OutOfRangeError:
                 tf.logging.info('Finished experiment.')
               finally:
@@ -101,7 +143,7 @@ class execution(object):
               coord.join(threads)
           self.session.close()
 
-    def training(self, max_epochs, save_step, session):
+    def training(self, max_epochs, save_step, session, validation_step):
           step = 0
           last_epoch = int(self.last_global_step / self.data_strap.n_splits_per_gpu_train[0]) # [] This is cheating and needs to be fixed
           last_mini_batch = self.last_global_step - (last_epoch * self.data_strap.n_splits_per_gpu_train[0]) # [] This is cheating and needs to be fixed
@@ -142,15 +184,21 @@ class execution(object):
                   print("training epoch: %d" % j, end=";")
                   summary, _, learn_rate, diagnostics = session.run([self.summarised_result.summary, self.summarised_result.train_op, self.model._optimizer._lr, self.summarised_result.diagnostics])
                   #feed_dict=feed_dict) # Run graph # summary_i, result, ground_truth, input_data
-
                   print("data split: %d of %d" % (i+1, self.data_strap.n_splits_per_gpu_train[0]), end=";")# [] This is cheating and needs to be fixed
 
                   print("step: %d" % step, end=";")
                   print("loss: " + str(diagnostics["total_loss"]), end=";")
                   print("Learning rate: " + str(learn_rate), end='                                  \r')
+
                   if (step + 1) % save_step == 0:
                       self.writer.add_summary(summary, step)
-                  self.saver.save(self.session, os.path.join(self.summary_folder, 'model.ckpt'), global_step=step + 1)
+                  if (step + 1) % validation_step == 0:
+                      print("save validation")
+                      summary, diagnostics = session.run([self.validation_summarised_result.summary, self.validation_summarised_result.diagnostics])
+                      self.writer.add_summary(summary, step)
+                  if (step + 1) % save_step == 0:
+                      self.saver.save(self.session, os.path.join(self.summary_folder, 'model.ckpt'), global_step=step + 1)
+                  print([last_epoch, max_epochs, len(n_splits_list)])
 
     def load_saved_model(self):
         def extract_step(path):
@@ -174,7 +222,7 @@ class execution(object):
     def __exit__(self, exception_type, exception_value, traceback):
         print("Exectioner has been exited")
 
-    def evaluate(self, max_steps=None, max_epochs=None, save_step=None, session=None, checkpoint_path=None):
+    def evaluate(self, max_steps=None, max_epochs=None, save_step=None, session=None, checkpoint_path=None, validation_step=None):
         def extract_step(path):
             file_name = os.path.basename(path)
             return int(file_name.split('-')[-1])

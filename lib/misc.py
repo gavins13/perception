@@ -14,7 +14,7 @@ SystemConfiguration = collections.namedtuple(
                             "grow_memory"])
 
 
-def run_model(load_data, Architecture, system_config, data_config, experiment_name, save_step=1):
+def run_model(load_data, Architecture, system_config, data_config, experiment_name, save_step=1, validation_step=5):
     try:
         if system_config.eager is True:
             tf.enable_eager_execution()
@@ -35,7 +35,7 @@ def run_model(load_data, Architecture, system_config, data_config, experiment_na
                        type=data_config.execution_type,
                        load=data_config.model_load_dir) as Executer:
             Executer.run_task(max_epochs=100000, save_step=save_step,
-                              memory_growth=system_config.grow_memory)
+                              memory_growth=system_config.grow_memory, validation_step=validation_step)
     except Exception as e:
         err_message = e.args
         print("Exception thrown, see below:")
