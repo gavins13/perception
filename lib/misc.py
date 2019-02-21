@@ -24,9 +24,9 @@ def run_model(load_data, Architecture, system_config, data_config, experiment_na
         System = resources_model(cpu_only=system_config.cpu_only,
                                  eager=system_config.eager)
         print("Create Network Architecture...")
-        CapsuleNetwork = Architecture()
+        Network = Architecture(evaluate=data_config.execution_type)
         print("Strap Architecture to Resource Manager")
-        System.strap_architecture(CapsuleNetwork)
+        System.strap_architecture(Network)
 
         print("Strap Managed Architecture to a training scheme `Executer`")
         with execution(data_config.project_path, System, DataModel,
