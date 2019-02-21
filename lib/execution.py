@@ -149,12 +149,13 @@ class execution(object):
               train_feed_dict = { self.train_data_placeholder: self.data_strap.train_data, self.train_data_labels_placeholder: self.data_strap.train_data_labels }
               for key in self.data_strap.extra_data._fields:
                   train_feed_dict[self.extra_data_placeholders[key]] = getattr(self.data_strap.extra_data, key).train
-              self.session.run(self.train_data_iterator.initializer, feed_dict=train_feed_dict)
+              #self.session.run(self.train_data_iterator.initializer, feed_dict=train_feed_dict)
               print(".")
               validation_feed_dict = { self.validation_data_placeholder: self.data_strap.validation_data, self.validation_data_labels_placeholder: self.data_strap.validation_data_labels }
               for key in self.data_strap.validation_extra_data.keys():
                   validation_feed_dict[self.validation_extra_data_placeholders[key]] = self.data_strap.validation_extra_data[key]
-              self.session.run(self.validation_data_iterator.initializer, feed_dict=validation_feed_dict) #[0] because we want validation size = 1
+              #self.session.run(self.validation_data_iterator.initializer, feed_dict=validation_feed_dict) #[0] because we want validation size = 1
+              self.session.run([self.train_data_iterator.initializer, self.validation_data_iterator.initializer], feed_dict={**train_feed_dict, **validation_feed_dict})
 
               init_op = tf.group(tf.global_variables_initializer(),
                                  tf.local_variables_initializer())
