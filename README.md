@@ -2,6 +2,9 @@
 
 * Purely for learning purposes ;)
 
+## Current Issues:
+1. Single GPU input pipeline is sorted but Multi-GPUs still has some performance issues with feeding in the data
+
 ## How to build architectures
 Architecture models are objects derived from the base model in `lib/architecture.py`. An example of a architecture derived from this abstract class is shown in `models/example.py`.
 
