@@ -91,7 +91,7 @@ class execution(object):
                 extra_data = {}
                 for j, key in enumerate(self.data_strap.extra_data._fields):
                     extra_data[key] = graph_data[j+2]
-                    extra_data[key].set_shape([self.data_strap.mini_batch_size] + list(getattr(self.data_strap.extra_data, key).train.shape[1::]))
+                    extra_data[key].set_shape([self.data_strap.mini_batch_size] + list(getattr(getattr(self.data_strap.extra_data, key), type).shape[1::]))
                 extra_data_gpus.append(extra_data)
 
 
@@ -253,7 +253,7 @@ class execution(object):
             ground_truths = []
             input_datas = []
             all_diagnostics = []
-            for i in range(self.data_strap.n_splits_per_gpu_test[0]):
+            for i in range(self.data_strap.n_splits_per_gpu_test[0] * self.model.ArchitectureObject.evaluation.forward_passes):
                 print("data split: %d of %d" %
                       (i+1, self.data_strap.n_splits_per_gpu_test[0]))
                 summary_i, result, ground_truth, input_data, this_split_diagnostics,this_split_full_diagnostics = self.session.run([self.summarised_result.summary, self.results, self.ground_truths, self.input_data, self.summarised_result.diagnostics, self.summarised_result.full_diagnostics])
