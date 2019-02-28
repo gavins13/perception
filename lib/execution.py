@@ -46,7 +46,8 @@ class execution(object):
             self.data_strap.will_test()
         else:
             raise Exception('experiment stage-type not valid')
-        self.data_strap.set_mini_batch(mini_batch_size)
+        #self.data_strap.set_mini_batch(mini_batch_size) # [] Commented out since Dataset API
+        self.data_strap.mini_batch_size = mini_batch_size
         self.execution_type = type
     def __enter__(self):
         self.graph = tf.Graph()
@@ -75,6 +76,8 @@ class execution(object):
             self.tf_train_dataset = tf.data.Dataset.from_tensor_slices(tuple(tensor_slices))
             self.tf_train_dataset = self.tf_train_dataset.batch(self.data_strap.mini_batch_size)
             self.tf_train_dataset = self.tf_train_dataset.repeat(None) # number of epochs = None = infinity
+            #self.tf_train_dataset = self.tf_train_dataset.cache()
+            self.tf_train_dataset = self.tf_train_dataset.prefetch(buffer_size=self.data_strap.mini_batch_size)
             self.train_data_iterator = self.tf_train_dataset.make_initializable_iterator()
             train_data_gpus = []
             train_data_labels_gpus = []
@@ -143,14 +146,15 @@ class execution(object):
     def run_task(self, max_epochs, save_step=1, max_steps_to_save=1000, memory_growth=False, validation_step=5):
           print(">Create TF session")
 
-          config = tf.ConfigProto(allow_soft_placement=True)
+          config = tf.ConfigProto(allow_soft_placement=True)# ,intra_op_parallelism_threads=2, inter_op_parallelism_threads=2, device_count={ "CPU": 2 }, log_device_placement=True
           if(memory_growth is True):
               config.gpu_options.allow_growth = True
 
           with tf.Session(graph=self.graph, config=config) as self.session:
               train_feed_dict = { self.train_data_placeholder: self.data_strap.train_data, self.train_data_labels_placeholder: self.data_strap.train_data_labels }
+              type = 'test' if self.execution_type == 'evaluate' else 'train'
               for key in self.data_strap.extra_data._fields:
-                  train_feed_dict[self.extra_data_placeholders[key]] = getattr(self.data_strap.extra_data, key).train
+                  train_feed_dict[self.extra_data_placeholders[key]] = getattr(getattr(self.data_strap.extra_data, key), type)
               #self.session.run(self.train_data_iterator.initializer, feed_dict=train_feed_dict)
               print(".")
               validation_feed_dict = { self.validation_data_placeholder: self.data_strap.validation_data, self.validation_data_labels_placeholder: self.data_strap.validation_data_labels }
@@ -189,13 +193,15 @@ class execution(object):
               for i in n_splits_list:
                   step += 1
                   print("training epoch: %d" % j, end=";")
-                  summary, _, learn_rate, diagnostics = session.run([self.summarised_result.summary, self.summarised_result.train_op, self.model._optimizer._lr, self.summarised_result.diagnostics])
+                  learn_rate = 'NaN'
+                  _ = session.run([self.summarised_result.train_op])
+                  #summary, _, learn_rate, diagnostics = session.run([self.summarised_result.summary, self.summarised_result.train_op, self.model._optimizer._lr, self.summarised_result.diagnostics])
                   print("data split: %d of %d" % (i+1, self.data_strap.n_splits_per_gpu_train[0]), end=";")# [] This is cheating and needs to be fixed
                   print("step: %d" % step, end=";")
-                  print("loss: " + str(diagnostics["total_loss"]), end=";")
+                  #print("loss: " + str(diagnostics["total_loss"]), end=";")
                   print("Learning rate: " + str(learn_rate), end='                                  \r')
-                  if (step + 1) % save_step == 0:
-                      self.writer.add_summary(summary, step)
+                  #if (step + 1) % save_step == 0:
+                  #  self.writer.add_summary(summary, step)
                   if (step + 1) % validation_step == 0:
                       summary, diagnostics = session.run([self.validation_summarised_result.summary, self.validation_summarised_result.diagnostics])
                       self.writer.add_summary(summary, step)
@@ -256,23 +262,24 @@ class execution(object):
             for i in range(self.data_strap.n_splits_per_gpu_test[0] * self.model.ArchitectureObject.evaluation.forward_passes):
                 print("data split: %d of %d" %
                       (i+1, self.data_strap.n_splits_per_gpu_test[0]))
-                summary_i, result, ground_truth, input_data, this_split_diagnostics,this_split_full_diagnostics = self.session.run([self.summarised_result.summary, self.results, self.ground_truths, self.input_data, self.summarised_result.diagnostics, self.summarised_result.full_diagnostics])
+                '''summary_i, result, ground_truth, input_data, this_split_diagnostics,this_split_full_diagnostics = self.session.run([self.summarised_result.summary, self.results, self.ground_truths, self.input_data, self.summarised_result.diagnostics, self.summarised_result.full_diagnostics])'''
+                this_split_full_diagnostics = self.session.run([self.summarised_result.full_diagnostics])
                 print("finished data split: %d of %d" % (i+1, self.data_strap.n_splits_per_gpu_test[0]))
 
 
-                summary_i = tf.Summary.FromString(summary_i)
+                '''summary_i = tf.Summary.FromString(summary_i)
                 #print(summary_i)
                 summary_dict = {}
                 for val in summary_i.value:
                     this_tag = val.tag.split('/')[-1]
                     summary_dict[this_tag] = val.simple_value
                 print(summary_dict)
-                summaries.append(summary_dict)
+                summaries.append(summary_dict)'''
                 print(self.data_strap.mode)
 
                 print(">>>> testing: ")
-                print(np.asarray(result).shape)
-                print(np.asarray(result[0]).shape)
+                #print(np.asarray(result).shape)
+                #print(np.asarray(result[0]).shape)
 
                 def map_reduce(accumulator, pilot):
                     pilot = np.asarray(pilot)
@@ -287,31 +294,41 @@ class execution(object):
                     return accumulator+pilot
 
                 print(">>>>>>>> res")
-                results = map_reduce(results, result)
+                #results = map_reduce(results, result)
                 print(">>>>>>>> gts")
-                ground_truths =  map_reduce(ground_truths,ground_truth)
+                #ground_truths =  map_reduce(ground_truths,ground_truth)
                 #print(len(np.split(input_data[0], result[0].shape[0])))
                 #print(np.split(input_data[0], result[0].shape[0])[0].shape)
-                input_datas = map_reduce(input_datas, input_data)
+                #input_datas = map_reduce(input_datas, input_data)
                 all_diagnostics.append(this_split_full_diagnostics)
+            print(all_diagnostics)
+            print(len(all_diagnostics))
+            print(len(all_diagnostics[0]))
+            print(all_diagnostics[0][0].keys())
+            print(len(all_diagnostics[0][0]['ground_truth']))
+            print(all_diagnostics[0][0]['ground_truth'].shape)
             def _average_diagnostics(summaries):
                 n = len(summaries)
-                keys=list(summaries[0].keys())
+                keys=list(summaries[0][0].keys())
                 reduced_diagnostics = {}
                 full_diagnostics = {}
                 for key in keys:
                     vals = []
                     for i in range(n):
-                        vals.append(summaries[i][key])
+                        vals.append(summaries[i][0][key])
                     if('min' in key):
                         reduced_diagnostics[key] = np.min(vals)
                     elif('max' in key):
                         reduced_diagnostics[key] = np.max(vals)
                     else:
                         reduced_diagnostics[key] = np.mean(vals)
-                    full_diagnostics[key] = np.array(vals).flatten()
+                    #full_diagnostics[key] = np.array(vals).flatten()
+                    full_diagnostics[key] = np.array(vals)
+                    print("key shape:")
+                    print(key)
+                    print(full_diagnostics[key].shape)
                 return reduced_diagnostics, full_diagnostics
-            reduced_summaries, user_summaries = _average_diagnostics(summaries)
+            #reduced_summaries, user_summaries = _average_diagnostics(summaries)
             reduced_diagnostics, user_diagnostics = _average_diagnostics(all_diagnostics)
 
             self.model.ArchitectureObject.analyse(user_diagnostics, reduced_diagnostics, self.summary_folder)
