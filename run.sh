@@ -5,4 +5,6 @@ export LIBRARY_PATH=$LIBRARY_PATH:/vol/cuda/$folder:/vol/cuda/$folder/lib64:/vol
 export LD_LIBRARY_PATH=:/vol/cuda/$folder:/vol/cuda/$folder/lib64:/vol/cuda/$folder2:/vol/cuda/$folder2/lib64
 export CPATH=$CPATH:/vol/cuda/$folder:/vol/cuda/$folder/lib64:/vol/cuda/$folder2:/vol/cuda/$folder2/lib64
 echo $LD_LIBRARY_PATH
+export TF_CPP_MIN_LOG_LEVEL=0
+export TF_CPP_MIN_VLOG_LEVEL=0 # usually = 1 is okay for debugging
 python3 experiment.py
