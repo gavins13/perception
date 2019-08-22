@@ -14,3 +14,4 @@ experiment*.py
 run_*.sh
 tb
 *DS_Store
+experiments_archive.txt
