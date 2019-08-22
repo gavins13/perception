@@ -3,7 +3,6 @@ from routing import *
 import numpy as np
 import variables
 from functools import reduce
-import unittest
 
 class LocalisedCapsuleLayer(object): # LocalCaps
     def __init__(self, k=3, kernel_height=None, kernel_width=None, output_vec_dim=8, strides=[1,1], num_output_channels=8, type="SAME", num_routing=3, use_matrix_bias=True, use_squash_bias=True, supplied_squash_biases=None, squash_He=False, squash_relu=False, convolve=False):

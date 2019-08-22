@@ -6,7 +6,7 @@ from capsule_functions import _squash
 import variables
 import sys
 
-def patch_based_routing_for_convcaps(input_tensor, squash_biases,  num_routing=3 , squash_relu=False):
+def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False):
     # Start Config [config] #
     clear_after_read_for_votes = True
     its = input_tensor.get_shape().as_list()
@@ -307,4 +307,3 @@ def routing(input_tensor, scope_name, output_dimensions=None, squash_biases=None
         results = voting_tensors.read(num_routing-1)
 
     return results
-
