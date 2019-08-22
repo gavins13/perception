@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-import os
+import os, sys
 
 from datetime import datetime
 import time
@@ -44,6 +44,7 @@ class execution(object):
             if (load==None): raise Exception('The Model Saved directory is not set!')
             self.experiment = self.evaluate
             self.data_strap.will_test()
+            self.model.ArchitectureObject.evaluate = True
         else:
             raise Exception('experiment stage-type not valid')
         #self.data_strap.set_mini_batch(mini_batch_size) # [] Commented out since Dataset API
@@ -259,12 +260,15 @@ class execution(object):
             ground_truths = []
             input_datas = []
             all_diagnostics = []
-            for i in range(self.data_strap.n_splits_per_gpu_test[0] * self.model.ArchitectureObject.evaluation.forward_passes):
+            os.mkdir(self.summary_folder + 'individual_pkle/', 0o777)
+            _N_ = int(self.data_strap.n_splits_per_gpu_test[0] * self.model.ArchitectureObject.evaluation.forward_passes)
+            for i in range(_N_):
                 print("data split: %d of %d" %
                       (i+1, self.data_strap.n_splits_per_gpu_test[0]))
                 '''summary_i, result, ground_truth, input_data, this_split_diagnostics,this_split_full_diagnostics = self.session.run([self.summarised_result.summary, self.results, self.ground_truths, self.input_data, self.summarised_result.diagnostics, self.summarised_result.full_diagnostics])'''
                 this_split_full_diagnostics = self.session.run([self.summarised_result.full_diagnostics])
-                print("finished data split: %d of %d" % (i+1, self.data_strap.n_splits_per_gpu_test[0]))
+                print("finished data split: %d of %d" % (i+1, _N_))
+                self.model.ArchitectureObject.analyse_single(i, this_split_full_diagnostics, self.summary_folder, final_idx=_N_-1)
 
 
                 '''summary_i = tf.Summary.FromString(summary_i)
@@ -300,13 +304,17 @@ class execution(object):
                 #print(len(np.split(input_data[0], result[0].shape[0])))
                 #print(np.split(input_data[0], result[0].shape[0])[0].shape)
                 #input_datas = map_reduce(input_datas, input_data)
-                all_diagnostics.append(this_split_full_diagnostics)
-            print(all_diagnostics)
-            print(len(all_diagnostics))
-            print(len(all_diagnostics[0]))
-            print(all_diagnostics[0][0].keys())
-            print(len(all_diagnostics[0][0]['ground_truth']))
-            print(all_diagnostics[0][0]['ground_truth'].shape)
+
+                # TO UNCOMMENT:
+                #all_diagnostics.append(this_split_full_diagnostics)
+
+
+            #print(all_diagnostics)
+            #print(len(all_diagnostics))
+            #print(len(all_diagnostics[0]))
+            #print(all_diagnostics[0][0].keys())
+            #print(len(all_diagnostics[0][0]['ground_truth']))
+            #print(all_diagnostics[0][0]['ground_truth'].shape)
             def _average_diagnostics(summaries):
                 n = len(summaries)
                 keys=list(summaries[0][0].keys())
@@ -329,11 +337,11 @@ class execution(object):
                     print(full_diagnostics[key].shape)
                 return reduced_diagnostics, full_diagnostics
             #reduced_summaries, user_summaries = _average_diagnostics(summaries)
-            reduced_diagnostics, user_diagnostics = _average_diagnostics(all_diagnostics)
+            #reduced_diagnostics, user_diagnostics = _average_diagnostics(all_diagnostics)
 
-            self.model.ArchitectureObject.analyse(user_diagnostics, reduced_diagnostics, self.summary_folder)
+            #self.model.ArchitectureObject.analyse(user_diagnostics, reduced_diagnostics, self.summary_folder)
             print("Test results:")
-            print(reduced_diagnostics)
+            #print(reduced_diagnostics)
 
 
         seen_step = -1
@@ -359,5 +367,15 @@ class execution(object):
                 seen_step = step
                 # Run Evaluation!
                 run_evaluation(last_checkpoint_path)
+
+                if len(sys.argv) == 3:
+                    save_dir = self.summary_folder
+                    while save_dir[-1] == '/':
+                        save_dir = save_dir[:-1]
+                    print('Save to: ' + save_dir)
+                    # then rename the directory where saving occurs
+                    os.rename(save_dir, save_dir + '_'  + str(sys.argv[2]))
+                    print('Rename successful')
+
                 if checkpoint:
                     break

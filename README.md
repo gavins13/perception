@@ -140,3 +140,30 @@ except Exception as e:
     pprint(e)
 
 ```
+
+# Compiling TensorFlow with new ops in a Anaconda virtual environment
+1. Clone and checkout require TF release and make CUDA ops changes. Remember to update the BUILD files to include required kernels.
+2. Create new conda virtual environment. Run "conda install python3.6" (To speed up process can create and install tensorflow-gpu)
+3. In repo, run "./configure"
+4. The python version is found run running "which python3.6" inside the environment. You should use python3.6 (install it if not present)
+5. The python library is the one in the anaconda environment directory
+6. The CUDA version is 9, and directory is /vol/cuda/9.0.176
+7. CUDNN version is 7 and directory is also /vol/cuda/9.0.176
+8. Answer no/enter to everything else
+9. Run "PYTHONPATH= bazel --output_base=/vol/biomedic/users/kgs13/Software/bazel_base build -c opt --config=cuda //tensorflow/tools/pip_package:build_pip_package"
+10. "mkdir ../tmp"
+11. "PYTHONPATH= ./bazel-bin/tensorflow/tools/pip_package/build_pip_package ../tmp/tensorflow_pkg"
+12. cd ../tmp/tensorflow_pkg
+13. PYTHONPATH= pip install tensorflow-1.12.2-cp36-cp36m-linux_x86_64.whl
+14. Can test by doing "PYTHONPATH= python3.6" and then "import tensorflow"
+
+
+
+# Running with conda
+
+```
+conda activate tf_roll
+```
+```
+CUDA_VISIBLE_DEVICES=3 PYTHONPATH= CUDA_PATH=/vol/biomedic/users/kgs13/Software/cuda_envs/9.2.148-cudnn7.2.1/cuda CUDA_INC_PATH=/vol/biomedic/users/kgs13/Software/cuda_envs/9.2.148-cudnn7.2.1/cuda/include LD_LIBRARY_PATH=/vol/biomedic/users/kgs13/Software/cuda_envs/9.2.148-cudnn7.2.1/cuda/lib64:/vol/biomedic/users/kgs13/Software/cuda_envs/9.2.148-cudnn7.2.1/cuda/:$LD_LIBRARY_PATH python3 experiment.py
+```
