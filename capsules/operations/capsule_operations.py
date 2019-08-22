@@ -445,7 +445,7 @@ kernel_is_vector=False, upsampling_factor=None, type="SAME", num_routing=3):
 
 
 
-def convolutional_capsule_layer_v2(input_tensor, kernel_height, kernel_width, scope_name,output_kernel_vec_dim=8, strides=[1, 1], num_output_channels=None, type="SAME", num_routing=3, split_routing=False, use_matrix_bias=True, use_squash_bias=True, supplied_squash_biases=None, squash_He=False):
+def convolutional_capsule_layer_v2(input_tensor, kernel_height, kernel_width, scope_name,output_kernel_vec_dim=8, strides=[1, 1], num_output_channels=None, type="SAME", num_routing=3, split_routing=False, use_matrix_bias=True, use_squash_bias=True, supplied_squash_biases=None, squash_He=False, squash_relu=False, convolve=False):
     print(">>>> %s START" % scope_name)
     with tf.name_scope(scope_name):
         '''if(type=="SAME"):
@@ -529,6 +529,7 @@ def convolutional_capsule_layer_v2(input_tensor, kernel_height, kernel_width, sc
         print(patches.get_shape().as_list())
         patches = tf.reshape(patches, [its[0], kernel_height, kernel_width, p, its[1], its[2] ]) # [M, k_h, k_w, p, v_d^l, |T^l|]
         patches = tf.transpose(patches, [0,1,2,3,5,4])  # [M, k_h, k_w, p,  |T^l|, v_d^l]
+        patches_pre_tiling = patches 
         patches = tf.expand_dims(patches, 6)# [M, k_h, k_w, p,  |T^l|, v_d^l, 1]
         patches = tf.expand_dims(patches, 5)# [M, k_h, k_w, p,  |T^l|, 1, v_d^l, 1]
         print(patches.get_shape().as_list())
@@ -536,28 +537,33 @@ def convolutional_capsule_layer_v2(input_tensor, kernel_height, kernel_width, sc
         print(patches.get_shape().as_list())
         patches_shape = patches.get_shape().as_list()
 
-        with tf.variable_scope(scope_name):
-            matrix_shape = patches_shape[:] # [M, k_h, k_w, p,  |T^l|, |T^l+1|, v_d^l, 1]
-            matrix_shape[-1] = patches_shape[-2] # [M, k_h, k_w, p,  |T^l|, |T^l+1|, v_d^l, v_d^l]
-            matrix_shape[-2] = output_kernel_vec_dim # [M, k_h, k_w, p,  |T^l|, |T^l+1|, v_d^l+1, v_d^l]
+        if(convolve==False):
+          with tf.variable_scope(scope_name):
+              matrix_shape = patches_shape[:] # [M, k_h, k_w, p,  |T^l|, |T^l+1|, v_d^l, 1]
+              matrix_shape[-1] = patches_shape[-2] # [M, k_h, k_w, p,  |T^l|, |T^l+1|, v_d^l, v_d^l]
+              matrix_shape[-2] = output_kernel_vec_dim # [M, k_h, k_w, p,  |T^l|, |T^l+1|, v_d^l+1, v_d^l]
 
-            matrix_shape[0] = 1 # [1, k_h, k_w, p,  |T^l|, |T^l+1|,  v_d^l+1, v_d^l]
-            matrix_shape[3] = 1 # [1, k_h, k_w,  1,  |T^l|, |T^l+1|,  v_d^l+1, v_d^l]
-            matrix = variables.weight_variable(matrix_shape) # to keep [] to segment
-            if(use_matrix_bias==True):
-                matrix_shape_bias = matrix_shape[:]
-                matrix_shape_bias[6] = 1
-                matrix_shape_bias[7] = 1 # [1, k_h, k_w,  1,  |T^l|, |T^l+1|,  1, 1]
-                with tf.variable_scope('matrix_bias'):
-                    matrix_bias = variables.bias_variable(matrix_shape_bias)
-        matrix = tf.tile(matrix, [patches_shape[0], 1, 1,  patches_shape[3]] + [1,1,1,1])
-        if(use_matrix_bias==True):
-            matrix_bias = tf.tile(matrix_bias, [patches_shape[0], 1, 1,  patches_shape[3]] + [1,1,output_kernel_vec_dim,1])
-            result = tf.matmul(matrix, patches) + matrix_bias # [M, k_h, k_w, p,  |T^l|, |T^l+1|,  v_d^l+1, 1]
+              matrix_shape[0] = 1 # [1, k_h, k_w, p,  |T^l|, |T^l+1|,  v_d^l+1, v_d^l]
+              matrix_shape[3] = 1 # [1, k_h, k_w,  1,  |T^l|, |T^l+1|,  v_d^l+1, v_d^l]
+              matrix = variables.weight_variable(matrix_shape) # to keep [] to segment
+              if(use_matrix_bias==True):
+                  matrix_shape_bias = matrix_shape[:]
+                  matrix_shape_bias[6] = 1
+                  matrix_shape_bias[7] = 1 # [1, k_h, k_w,  1,  |T^l|, |T^l+1|,  1, 1]
+                  with tf.variable_scope('matrix_bias'):
+                      matrix_bias = variables.bias_variable(matrix_shape_bias)
+          matrix = tf.tile(matrix, [patches_shape[0], 1, 1,  patches_shape[3]] + [1,1,1,1])
+          if(use_matrix_bias==True):
+              matrix_bias = tf.tile(matrix_bias, [patches_shape[0], 1, 1,  patches_shape[3]] + [1,1,output_kernel_vec_dim,1])
+              result = tf.matmul(matrix, patches) + matrix_bias # [M, k_h, k_w, p,  |T^l|, |T^l+1|,  v_d^l+1, 1]
+          else:
+              result = tf.matmul(matrix, patches)
+          #result = patches # [] todlete
         else:
-            result = tf.matmul(matrix, patches)
-        #result = patches # [] todlete
-
+          # Instead, use convolution to generate the output
+          patches = patches_pre_tiling #  # [M, k_h, k_w, p,  |T^l|, v_d^l]
+          # we need to produce # [M, k_h, k_w, p,  |T^l|, |T^l+1|,  v_d^l+1, 1]
+          # i.e. 3
         result = tf.transpose(result, [0,6,5,3,  1,2,4,7])# [M,v_d^l+1, |T^l+1|,p, k_h, k_w,   |T^l|,    1]
         print("result")
         print(result.get_shape().as_list())
@@ -600,7 +606,7 @@ def convolutional_capsule_layer_v2(input_tensor, kernel_height, kernel_width, sc
         print(patch_shape)
         #routed_output = patch_based_routing(prerouted_output, scope_name+'/routing', squash_biases=squash_biases,  num_routing=num_routing, patch_shape=patch_shape, patch_stride=[1,1,1],deconvolution_factors=None, bias_channel_sharing=False)
         if(split_routing==False):
-            routed_output = patch_based_routing_for_convcaps(prerouted_output, squash_biases=squash_biases,  num_routing=num_routing)
+            routed_output = patch_based_routing_for_convcaps(prerouted_output, squash_biases=squash_biases,  num_routing=num_routing, squash_relu=squash_relu)
         else:
             def _alg(position_number, routed_output):
                 squash_slice = tf.slice(squash_biases, [0,0,position_number,0], [squash_bias_shape[0], squash_bias_shape[1], 1, 1])
