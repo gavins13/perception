@@ -94,8 +94,8 @@ class architecture(object):
         negative_loss =  tf.reduce_sum(tf.boolean_mask(difference, tf.less(difference, 0.)))
 
         print(">>>> PSNR and SSIM")
-        psnr = tf.image.psnr(tf.expand_dims(ground_truth, axis=3), tf.expand_dims(output, axis=3), max_val=65535)
-        ssim = tf.image.ssim(tf.expand_dims(ground_truth, axis=3), tf.expand_dims(output, axis=3), max_val=65535)
+        psnr = tf.image.psnr(tf.expand_dims(ground_truth, axis=3), tf.expand_dims(output, axis=3), max_val=3480)
+        ssim = tf.image.ssim(tf.expand_dims(ground_truth, axis=3), tf.expand_dims(output, axis=3), max_val=3480)
 
         print(">>>> PSNR Stats")
         max_psnr = tf.reduce_max(psnr)
