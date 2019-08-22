@@ -11,6 +11,12 @@ class architecture_base(ABC):
           maximum_learning_rate=1.e-7,  # 1.e-7
         )
         self.evaluate = evaluate
+
+        class Config: pass
+        self.evaluation = Config()
+        self.evaluation.__enabled__ = self.evaluate
+        self.evaluation.forward_passes = 1
+
         self.__config__()
 
     @abstractmethod
