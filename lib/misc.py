@@ -34,7 +34,7 @@ def run_model(load_data, Architecture, system_config, data_config, experiment_na
                        mini_batch_size=system_config.mini_batch_size,
                        type=data_config.execution_type,
                        load=data_config.model_load_dir) as Executer:
-            Executer.run_task(max_epochs=100000, save_step=save_step,
+            Executer.run_task(max_epochs=14000, save_step=save_step,
                               memory_growth=system_config.grow_memory, validation_step=validation_step)
     except Exception as e:
         err_message = e.args
