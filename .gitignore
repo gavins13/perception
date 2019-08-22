@@ -10,3 +10,6 @@ thislogcopy.txt
 *.swp
 *__pycache__*
 experiment.py
+experiment*.py
+run_*.sh
+tb
