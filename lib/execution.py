@@ -47,7 +47,7 @@ class execution(object):
         else:
             raise Exception('experiment stage-type not valid')
         self.data_strap.set_mini_batch(mini_batch_size)
-
+        self.execution_type = type
     def __enter__(self):
         self.graph = tf.Graph()
         with self.graph.as_default():
@@ -56,13 +56,20 @@ class execution(object):
             print(">>> Finished setting initialiser")
 
             print(">>> Build training datasets and iterators")
+            type = 'test' if self.execution_type == 'evaluate' else 'train'
+            if(self.execution_type == 'evaluate'):
+                _tmp_ = [self.data_strap.train_data, self.data_strap.train_data_labels]
+                self.data_strap.train_data = self.data_strap.test_data
+                self.data_strap.train_data_labels = self.data_strap.test_data_labels
+                #self.data_strap.test_data = _tmp_[0]
+                #self.data_strap.test_data_labels = _tmp_[1]
             self.train_data_placeholder = tf.placeholder(tf.as_dtype(self.data_strap.train_data.dtype), shape=self.data_strap.train_data.shape)
             self.train_data_labels_placeholder = tf.placeholder(tf.as_dtype(self.data_strap.train_data_labels.dtype), shape=self.data_strap.train_data_labels.shape)
             tensor_slices = [self.train_data_placeholder, self.train_data_labels_placeholder]
             self.extra_data_placeholders = {}
             print(">>>> Build placeholders")
             for key in self.data_strap.extra_data._fields:
-                this_data = getattr(getattr(self.data_strap.extra_data, key), 'train')
+                this_data = getattr(getattr(self.data_strap.extra_data, key), type)
                 self.extra_data_placeholders[key] = tf.placeholder(tf.as_dtype(this_data.dtype), shape=this_data.shape)
                 tensor_slices.append(self.extra_data_placeholders[key])
             self.tf_train_dataset = tf.data.Dataset.from_tensor_slices(tuple(tensor_slices))
@@ -121,11 +128,6 @@ class execution(object):
                     validation_extra_data[key].set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.validation_extra_data[key].shape[1::]))
                 validation_extra_data_gpus.append(validation_extra_data)
 
-            # This make the iterator a saveable object that can be reloaded when restarting training
-            #saveable_train = tf.contrib.data.make_saveable_from_iterator(self.train_data_iterator)
-            #tf.add_to_collection(tf.GraphKeys.SAVEABLE_OBJECTS, saveable_train)
-            '''saveable_validation = tf.contrib.data.make_saveable_from_iterator(self.validation_data_iterator)
-            tf.add_to_collection(tf.GraphKeys.SAVEABLE_OBJECTS, saveable_validation)'''
 
             training = {"input": train_data_gpus, "labels": train_data_labels_gpus, "extra_data": extra_data_gpus}
             validation = {"input": validation_data_gpus, "labels": validation_data_labels_gpus, "extra_data": validation_extra_data_gpus}
@@ -181,55 +183,24 @@ class execution(object):
           step = (last_epoch*self.data_strap.n_splits_per_gpu_train[0])+last_mini_batch # [] This is cheating and needs to be fixed
           print("Saving to: cd %s; tensorboard --logdir=./ --port=6394" % self.summary_folder)
           print(last_mini_batch, last_epoch, max_epochs, self.last_global_step, self.data_strap.n_splits_per_gpu_train, self.data_strap.num_gpus)
-
-          '''feed_dict = {}
-          for gpu in list(range(self.data_strap.num_gpus)):
-            for key in self.data_strap.extra_data._fields:
-                feed_dict["ExtraData_"+key+"GPU"+str(gpu)+":0"] = self.data_strap.extra_data.image_data_complex.train #self.data_strap.fetch_data('train',key,gpu,i)
-            for key in self.data_strap.extra_data._fields:
-                feed_dict["ValidationExtraData_"+key+"GPU"+str(gpu)+":0"] = self.data_strap.extra_data.image_data_complex.train # needs fixing to a proper validation set'''
-
-
-          #sess.run(y, {tf.get_default_graph().get_operation_by_name('x').outputs[0]: [1, 2, 3]})
-          #next_element = iterator.get_next()
-          #session.run(iterator.initializer, feed_dict=feed_dict)
-          #session.run(iterator.string_handle())
-          #training_handle = session.run(iterator.string_handle())
-
           for j in range(last_epoch, max_epochs):
-              #print(".")
               n_splits_list = range(last_mini_batch, self.data_strap.n_splits_per_gpu_train[0]) # [] This is cheating and needs to be fixed
               last_mini_batch = 0
               for i in n_splits_list:
-                  #print(".")
                   step += 1
-                  feed_dict = {}
-                  #self.data_strap.extra_data.image_data_complex.train
-                  '''for gpu in list(range(self.data_strap.num_gpus)):
-                      for key in self.data_strap.extra_data._fields:
-                          feed_dict["ExtraData_"+key+"GPU"+str(gpu)+":0"] = self.data_strap.extra_data.image_data_complex.train #self.data_strap.fetch_data('train',key,gpu,i)
-                      for key in self.data_strap.extra_data._fields:
-                          feed_dict["ValidationExtraData_"+key+"GPU"+str(gpu)+":0"] = self.data_strap.extra_data.image_data_complex.train # needs fixing to a proper validation set'''
-                  #sess.run(y, {tf.get_default_graph().get_operation_by_name('x').outputs[0]: [1, 2, 3]})
-
                   print("training epoch: %d" % j, end=";")
                   summary, _, learn_rate, diagnostics = session.run([self.summarised_result.summary, self.summarised_result.train_op, self.model._optimizer._lr, self.summarised_result.diagnostics])
-                  #feed_dict=feed_dict) # Run graph # summary_i, result, ground_truth, input_data
                   print("data split: %d of %d" % (i+1, self.data_strap.n_splits_per_gpu_train[0]), end=";")# [] This is cheating and needs to be fixed
-
                   print("step: %d" % step, end=";")
                   print("loss: " + str(diagnostics["total_loss"]), end=";")
                   print("Learning rate: " + str(learn_rate), end='                                  \r')
-
                   if (step + 1) % save_step == 0:
                       self.writer.add_summary(summary, step)
                   if (step + 1) % validation_step == 0:
-                      #print("save validation")
                       summary, diagnostics = session.run([self.validation_summarised_result.summary, self.validation_summarised_result.diagnostics])
                       self.writer.add_summary(summary, step)
                   if (step + 1) % save_step == 0:
                       self.saver.save(self.session, os.path.join(self.summary_folder, 'model.ckpt'), global_step=step + 1)
-                  #print([last_epoch, max_epochs, len(n_splits_list)])
 
     def load_saved_model(self):
         def extract_step(path):
@@ -275,44 +246,17 @@ class execution(object):
             return extract_step(ckpt_path)
 
         def run_evaluation(last_checkpoint_path):
-            last_step = load_model_and_last_saved_step(last_checkpoint_path)
+            last_step_number = load_model_and_last_saved_step(last_checkpoint_path)
+            print("Last Step: %d" % last_step_number)
             summaries = []
             results = []
             ground_truths = []
             input_datas = []
             all_diagnostics = []
             for i in range(self.data_strap.n_splits_per_gpu_test[0]):
-                # [] This is cheating and needs to be fixed
-                feed_dict = {}
-                for gpu in range(self.data_strap.num_gpus):
-                    test_data, test_labels = self.data_strap.get_data(gpu=gpu,
-                                                                      mb_ind=i)
-                    validation_data, validation_labels = self.data_strap.get_validation_data(gpu=gpu)
-                    feed_dict["InputDataGPU" + str(gpu) + ":0"] = test_data
-                    feed_dict["InputLabelsGPU" + str(gpu) + ":0"] = test_labels
-                    feed_dict["ValidationInputDataGPU" +
-                              str(gpu) + ":0"] = validation_data
-                    feed_dict["ValidationInputLabelsGPU" +
-                              str(gpu) + ":0"] = validation_labels
-                    # print(">>>>>Extra data feed_dict")
-                    for key in self.data_strap.extra_data._fields:
-                        feed_dict["ExtraData_"+key+"GPU"+str(gpu)
-                                  + ":0"] = self.data_strap.fetch_data(
-                                      'test', key, gpu, i)
-                    for key in self.data_strap.extra_data._fields:
-                        feed_dict["ValidationExtraData_"+key+"GPU"+str(gpu)
-                                  + ":0"] = self.data_strap.fetch_data(
-                                      'test', key, gpu, 0)
-                        # needs fixing to a proper validation set
                 print("data split: %d of %d" %
                       (i+1, self.data_strap.n_splits_per_gpu_test[0]))
-                print(test_data.shape)
-                print(test_labels.shape)
-                print(validation_data.shape)
-                print(validation_labels.shape)
-                summary_i, result, ground_truth, input_data, this_split_diagnostics,this_split_full_diagnostics = self.session.run([self.summarised_result.summary, self.results, self.ground_truths, self.input_data, self.summarised_result.diagnostics, self.summarised_result.full_diagnostics],feed_dict=feed_dict)
-
-
+                summary_i, result, ground_truth, input_data, this_split_diagnostics,this_split_full_diagnostics = self.session.run([self.summarised_result.summary, self.results, self.ground_truths, self.input_data, self.summarised_result.diagnostics, self.summarised_result.full_diagnostics])
                 print("finished data split: %d of %d" % (i+1, self.data_strap.n_splits_per_gpu_test[0]))
 
 
@@ -370,27 +314,10 @@ class execution(object):
             reduced_summaries, user_summaries = _average_diagnostics(summaries)
             reduced_diagnostics, user_diagnostics = _average_diagnostics(all_diagnostics)
 
-            '''main_results = {"x": [], "y": [], "gt": []}
-            for i in range(len(results)):  # loop over results and store in dict
-                print("Saving results %s of %s" % (i, len(results)))
-                print(np.squeeze(input_datas[i]).shape)
-                print(np.squeeze(results[i]).shape)
-                print(np.squeeze(ground_truths[i]).shape)
-                main_results["x"].append(np.squeeze(input_datas[i]))
-                main_results["y"].append(np.squeeze(results[i]))
-                main_results["gt"].append(np.squeeze(ground_truths[i]))
-            pickle.dump(main_results, open(self.summary_folder + '/main_results.p', "wb"))
-            pickle.dump(user_diagnostics, open(self.summary_folder + '/user_diagnostics.p', "wb"))
-            pickle.dump(user_summaries, open(self.summary_folder + '/user_summaries.p', "wb"))'''
             self.model.ArchitectureObject.analyse(user_diagnostics, reduced_diagnostics, self.summary_folder)
             print("Test results:")
             print(reduced_diagnostics)
-            #tf.logging.info(json.dumps(reduced_diagnostics))
 
-            '''summary = tf.Summary.FromString(summaries)
-            summary.value.add(tag='mean_ssim', simple_value=diagnostics["mean_ssim"])
-
-            self.writer.add_summary(summary, last_step)'''
 
         seen_step = -1
         paused = 0
