@@ -20,7 +20,7 @@ class execution(object):
             self.foldername = experiment_name + '_' + datetimestr
             self.foldername_full = project_path + '/experimental_results/' + self.foldername
         else:
-            self.foldername_full = project_path + '/experimental_results/' + load + '/'
+            self.foldername_full = project_path + '/experimental_results/' + load
             print("Load Dir being used.")
 
         print("Results will be saved to %s" % self.foldername_full)
@@ -139,7 +139,10 @@ class execution(object):
             print(">> Time to build TF Graph!")
             self.summarised_result, self.results, self.ground_truths, self.input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=self.data_strap.num_gpus, data=training, validation_graph=False)
             self.validation_summarised_result, self.validation_results, self.validation_ground_truths, self.validation_input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=validation_num_gpus, data=validation, validation_graph=True)
-            self.saver = tf.train.Saver(max_to_keep=self.max_steps_to_save)
+            print("Trainable variables list:")
+            var_list = tf.trainable_variables()
+            print(var_list)
+            self.saver = tf.train.Saver(max_to_keep=self.max_steps_to_save) # ! [] Added var_list var_list=var_list,
         print(">> Let's analyse the model parameters")
         print(">> Finished analysing")
         return self
@@ -204,7 +207,8 @@ class execution(object):
                   #if (step + 1) % save_step == 0:
                   #  self.writer.add_summary(summary, step)
                   if (step + 1) % validation_step == 0:
-                      summary, diagnostics = session.run([self.validation_summarised_result.summary, self.validation_summarised_result.diagnostics])
+                      #summary, diagnostics = session.run([self.validation_summarised_result.summary, self.validation_summarised_result.diagnostics]) # [] CHECK !!!!
+                      summary= session.run(self.validation_summarised_result.summary)
                       self.writer.add_summary(summary, step)
                   if (step + 1) % save_step == 0:
                       self.saver.save(self.session, os.path.join(self.summary_folder, 'model.ckpt'), global_step=step + 1)
@@ -368,13 +372,13 @@ class execution(object):
                 # Run Evaluation!
                 run_evaluation(last_checkpoint_path)
 
-                if len(sys.argv) == 3:
+                if len(sys.argv) == 4:
                     save_dir = self.summary_folder
                     while save_dir[-1] == '/':
                         save_dir = save_dir[:-1]
                     print('Save to: ' + save_dir)
                     # then rename the directory where saving occurs
-                    os.rename(save_dir, save_dir + '_'  + str(sys.argv[2]))
+                    os.rename(save_dir, save_dir + '_MAIN_'  + str(sys.argv[2]))
                     print('Rename successful')
 
                 if checkpoint:
