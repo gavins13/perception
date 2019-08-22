@@ -52,6 +52,7 @@ class learning_core(object):
     #stop()
     # if you use `in tower_grads` then it will loop over each Tower
     # but if you use `in zip(*tower_grads)`, it will loop over the variables
+    n_vars = 0
     for grads_and_vars in zip(*tower_grads): # for each tower
       gs = [variable_gradient for variable_gradient, variable_value in grads_and_vars if variable_gradient != None]
       grads = tf.stack(gs)# for each pair in the e.g. (32, 2) list
@@ -62,8 +63,10 @@ class learning_core(object):
       print("====== %s" % v.name)
       print(grad.get_shape().as_list())
       print(v.get_shape().as_list())
+      n_vars += np.prod(v.get_shape().as_list())
       grad_and_var = (grad, v) # (average_grad_across_all_tower, the variable value)
       average_grads.append(grad_and_var)
+    print("THERE ARE %d WEIGHTS/BIASES IN THIS MODEL" % n_vars)
     return average_grads
 
 
