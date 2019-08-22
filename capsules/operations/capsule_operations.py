@@ -7,7 +7,7 @@ from functools import reduce
 class LocalisedCapsuleLayer(object): # LocalCaps
     def __init__(self, k=3, kernel_height=None, kernel_width=None, output_vec_dim=8, strides=[1,1], num_output_channels=8, type="SAME", num_routing=3, use_matrix_bias=True, use_squash_bias=True, supplied_squash_biases=None, squash_He=False, squash_relu=False, convolve=False):
         kernel_height = k if(kernel_height==None) else kernel_height
-        kenrel_width =  k if(kernel_width== None) else kernel_width
+        kernel_width =  k if(kernel_width== None) else kernel_width
         self.params = {"k_h": kernel_height, "k_w": kernel_width, "strides": strides, "num_routing": num_routing}
         self.output = {"channels": num_output_channels, "vec_dim": output_vec_dim, 'x': None, 'y': None}
         self.options= {"type": type, "use_matrix_bias": use_matrix_bias, "use_squash_bias": use_squash_bias, "supplied_squash_biases": supplied_squash_biases, "squash_He": squash_He,"squash_relu": squash_relu, "convolve": convolve}
@@ -21,24 +21,25 @@ class LocalisedCapsuleLayer(object): # LocalCaps
         # [batch, vec_dim, num_ch, h, w]
         if(self.options["convolve"]==False):
           matrix_shape = [1,self.output["channels"],   its[2],1,1, self.output["vec_dim"], its[1]]
-          matrix_bias_shape = [1,self.output["vec_dim"], its[2], 1,1, 1, 1]
+          matrix_bias_shape = [1,self.output["channels"], its[2], 1,1, self.output["vec_dim"], 1]
           tmp = tf.expand_dims(tf.expand_dims(input_tensor, axis=5), axis=6)
           tmp = tf.transpose(tmp, [0,6, 2,3,4,1, 5]) # [M, 1, T^l, x, y, v_d, 1]
-          with tf.variable_scope('matrix_transform'):
-            matrix_bias =  variables.bias_variable(matrix_bias_shape)
-            matrix = variables.weight_variable(matrix_shape)
-          votes = tf.add(tf.matmul(matrix, tmp), matrix_bias)
-          # [M, T^l+1, T^l, x,y, v_d+1, l]
-          votes = tf.transpose(votes, [0, 3, 4, 5, 2, 1]) # [M, x, y, v_d^l+1, |T^l|, |T^l+1|]
+          with tf.variable_scope(self.scope_name):
+              with tf.variable_scope('matrix_transform'):
+                  matrix_bias =  variables.bias_variable(matrix_bias_shape)
+                  matrix = variables.weight_variable(matrix_shape)
+          votes = tf.add(tf.matmul(tf.tile(matrix, [its[0],1,1,self.output["x"],self.output["y"],1,1]), tf.tile(tmp, [1,self.output["channels"],1,1,1,1,1])), matrix_bias)
+          # [M, T^l+1, T^l, x,y, v_d+1, 1]
+          votes = tf.transpose(tf.squeeze(votes,axis=6), [0, 3, 4, 5, 2, 1]) # [M, x, y, v_d^l+1, |T^l|, |T^l+1|]
         else:
           raise NotImplementedError()
         return votes
     def localise(self, input_tensor): # [M, x, y, v_d^l+1, |T^l|, |T^l+1|] ---> [M,v_d^l+1, |T^l+1|,p, k_h*k_w*|T^l|]
         votes_shape = input_tensor.get_shape().as_list()
         # new input: [M, x, y, v_d^l+1, |T^l|, |T^l+1|]
-        patches = tf.transpose(input_tensor, [0,3,4,5,1,2]) #  [x, y, v_d^l+1, |T^l|, |T^l+1|, M]
+        patches = tf.transpose(input_tensor, [1,2,3,4,5,0]) #  [x, y, v_d^l+1, |T^l|, |T^l+1|, M]
         patches_shape = patches.get_shape().as_list()
-        patches = tf.reshape(patches, patches_shape[0:2] + [reduce(lambda x,y: x*y, votes_shape[2:6], 1,1,1])     # [x, y, v_d^l+1* |T^l|* |T^l+1|* M, 1, 1, 1]
+        patches = tf.reshape(patches, patches_shape[0:2] + [reduce(lambda x,y: x*y, patches_shape[2:6]), 1,1,1])     # [x, y, v_d^l+1* |T^l|* |T^l+1|* M, 1, 1, 1]
         patches = tf.squeeze(patches, axis=[4,5]) # [x, y, v_d^l+1* |T^l|* |T^l+1|* M, 1]
         patches = tf.transpose(patches, [2,0,1,3])  #  [v_d^l+1* |T^l|* |T^l+1|* M, x, y, 1]
 
@@ -50,7 +51,7 @@ class LocalisedCapsuleLayer(object): # LocalCaps
         patches = tf.reshape(patches, patches_new_shape[0:3] + [self.params["k_h"], self.params["k_w"]])   #  [ v_d^l+1|T^l|*|T^l+1|*M, x, y, k_w, k_h]
         patches = tf.transpose(patches, [1,2,3,4,0])
         patches = tf.expand_dims(tf.expand_dims(tf.expand_dims(patches, axis=5), axis=6), axis=7)
-        patches = tf.reshape(patches, patches_new_shape[1:2] + [self.params["k_h"], self.params["k_w"]] + patches_shape[2:6]) # [x, y, k_w, k_h, v_d^l+1, |T^l|, |T^l+1|, M]
+        patches = tf.reshape(patches, patches_new_shape[1:3] + [self.params["k_h"], self.params["k_w"]] + patches_shape[2:6]) # [x, y, k_w, k_h, v_d^l+1, |T^l|, |T^l+1|, M]
         patches_main_shape = patches.get_shape().as_list()
         patches = tf.transpose(patches, [7, 4, 6, 0,1, 2,3,5])
         patches_new_shape = patches.get_shape().as_list() # [M, v_d^l+1, |T^l+1|, x,y, k_h, k_w, |T^l|]
@@ -67,10 +68,10 @@ class LocalisedCapsuleLayer(object): # LocalCaps
           print(">>>>>Create squash terms")
           squash_bias_shape = [self.output["vec_dim"], self.output["channels"], self.output["x"]*self.output["y"], 1] # [ v_d^l+1, |T^l+1|, x'*y', 1]
           print(squash_bias_shape)
-          if(use_squash_bias==True):
+          if(self.options["use_squash_bias"]==True):
               with tf.variable_scope(self.scope_name):
                   with tf.variable_scope('squash'):
-                      squash_biases = variables.bias_variable(squash_bias_shape) if(squash_He==False) else variables.weight_variable(squash_bias_shape,He=True, He_nl=np.int(np.prod(squash_bias_shape)))
+                      squash_biases = variables.bias_variable(squash_bias_shape) if(self.options["squash_He"]==False) else variables.weight_variable(squash_bias_shape,He=True, He_nl=np.int(np.prod(squash_bias_shape)))
           else:
               squash_biases = tf.fill(squash_bias_shape, 0.)
           # [v_d^l+1, |T^l+1|, x'*y', 1]
@@ -87,8 +88,9 @@ class LocalisedCapsuleLayer(object): # LocalCaps
         _end = [self.output["x"],self.output["y"]]
         output_tensor = tf.reshape(routed_output, routed_output_shape[0:3] + _end)
         # M, v_d^l+1, |T^l+1|, x', y'
-        return output
+        return output_tensor
     def __call__(self, input_tensor, scope_name):
+        self.scope_name = scope_name
         print(">>>> %s START" % scope_name)
         with tf.name_scope(scope_name):
             transform_caps = self.transform(input_tensor)

@@ -1,5 +1,7 @@
 import unittest
+import tensorflow as tf
 import sys
+import copy
 sys.path.insert(0, 'capsules/operations')
 from capsule_operations import LocalisedCapsuleLayer
 
@@ -13,21 +15,24 @@ class LocalisedCapsuleLayerTest(unittest.TestCase):
     def test_transform(self):
         input_tensor = tf.placeholder(tf.float32, shape=[self.M, self.input["vec_dim"], self.input["channels"], self.input["x"],self.input["y"]])
         output_tensor = self.CapsLayer.transform(input_tensor)
-        self.assertItemsEqual(output_tensor.get_shape().as_list(), [self.M,self.input["x"], self.input["y"], self.output["vec_dim"], self.input["channels"], self.output["channels"]])
+        self.assertCountEqual(output_tensor.get_shape().as_list(), [self.M,self.input["x"], self.input["y"], self.output["vec_dim"], self.input["channels"], self.output["channels"]])
     def test_localise(self):
         input_tensor = tf.placeholder(tf.float32, shape=[self.M,  self.input["x"],self.input["y"], self.output["vec_dim"], self.input["channels"], self.output["channels"]])
         output_tensor = self.CapsLayer.localise(input_tensor)
-        self.assertItemsEqual(output_tensor.get_shape().as_list(), [self.M,  self.output["vec_dim"],  self.output["channels"], self.input["x"]*self.input["y"], self.k*self.k*self.input["channels"]])
+        self.assertCountEqual(output_tensor.get_shape().as_list(), [self.M,  self.output["vec_dim"],  self.output["channels"], self.input["x"]*self.input["y"], self.k*self.k*self.input["channels"]])
     def test_route(self):
-        input_tensor = [self.M,  self.output["vec_dim"],  self.output["channels"], self.input["x"]*self.input["y"], self.k*self.k*self.input["channels"]]
-        output_tensor = self.CapsLayer.route(input_tensor)
-        self.assertItemsEqual(output_tensor.get_shape().as_list(), [self.M,  self.output["vec_dim"],  self.output["channels"], self.input["x"],self.input["y"]])
+        self.tmpCapsLayer = copy.deepcopy(self.CapsLayer)
+        self.tmpCapsLayer.output["x"] = self.input["x"]
+        self.tmpCapsLayer.output["y"] = self.input["y"]
+        input_tensor_shape = [self.M,  self.output["vec_dim"],  self.output["channels"], self.input["x"]*self.input["y"], self.k*self.k*self.input["channels"]]
+        input_tensor = tf.placeholder(tf.float32, shape=input_tensor_shape)
+        output_tensor = self.tmpCapsLayer.route(input_tensor)
+        self.assertCountEqual(output_tensor.get_shape().as_list(), [self.M,  self.output["vec_dim"],  self.output["channels"], self.input["x"],self.input["y"]])
     def test_all(self):
         input_tensor = tf.placeholder(tf.float32, shape=[self.M, self.input["vec_dim"], self.input["channels"], self.input["x"],self.input["y"]])
         output_tensor = self.CapsLayer(input_tensor, "TestLocalCaps")
-        self.assertItemsEqual(output_tensor.get_shape().as_list(), [self.M,  self.output["vec_dim"],  self.output["channels"], self.input["x"],self.input["y"]])
+        self.assertCountEqual(output_tensor.get_shape().as_list(), [self.M,  self.output["vec_dim"],  self.output["channels"], self.input["x"],self.input["y"]])
 
 
-
-if(__name__ == "main"):
+if(__name__ == "__main__"):
     unittest.main()
