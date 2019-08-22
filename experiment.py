@@ -1,5 +1,5 @@
 from lib.multi_gpu_frame import multi_gpu_model as resources_model
-from capsules.architectures.baseline import architecture as architecture
+from capsules.architectures.v0_rev0_1 import architecture as architecture
 from lib.data_frame import Data
 
 import os, sys
@@ -8,7 +8,7 @@ import tensorflow as tf
 
 #from data.load_mnist import load_data_light as load_data
 sys.path.insert(0, '/homes/kgs13/biomedic/PhD/sunnybrook-data-dicom/')
-from sunnybrook-data-dicom import load_data
+from load_data import load_data
 
 from lib.execution import execution
 
