@@ -1,12 +1,12 @@
 import tensorflow as tf
-
+import numpy as np
 import os, sys
 
 from datetime import datetime
 
 # Object is a context manager!
 class execution(object):
-  def __init__(self, project_path, model, data_strap, type='train', load=None, experiment_name=None):
+  def __init__(self, project_path, model, data_strap, type='train', load=None, experiment_name=None, max_steps_to_save=1000):
     # Set Saving Directories
     if(experiment_name==None):
       experiment_name = input("Name of experiment: ")
@@ -18,8 +18,16 @@ class execution(object):
     os.mkdir( self.foldername_full, 0o755 );
     self.summary_folder = self.foldername_full + '/' +type + '/'
 
+    print(">Create TF FileWriter")
+    #self.writer = tf.summary.FileWriter(self.summary_folder)
+    self.writer = tf.contrib.summary.create_file_writer(self.summary_folder)
+    self.writer.set_as_default()
+    tf.contrib.summary.always_record_summaries()
+
+    self.model = model
     # Set up the data
     self.data_strap = data_strap
+    self.max_steps_to_save=max_steps_to_save
     if(type=='train'):
         self.experiment = self.training
         self.data_strap.will_train()
@@ -31,47 +39,95 @@ class execution(object):
         self.load_folder = self.foldername_full + '/' + load + '/'
     else:
         raise Exception('experiment stage-type not valid')
-
-    # Set up the retrieval of the results (I.e. Build the Summarisd results, and results Graph)
-    with tf.Graph().as_default():
-    #   -->  Build model
-        print(">> Time to build TF Graph!")
-        self.summarised_result, self.results = model.run_multi_gpu(data_strap)
-    #   -->  Print stats
-    self.param_stats = tf.contrib.tfprof.model_analyzer.print_model_analysis(
-        tf.get_default_graph(),
-        tfprof_options=tf.contrib.tfprof.model_analyzer.
-        TRAINABLE_VARS_PARAMS_STAT_OPTIONS)
-    sys.stdout.write('total_params: %d\n' % self.param_stats.total_parameters)
-
   def __enter__(self):
-      print(">Create TF FileWriter")
-      #self.writer = tf.summary.FileWriter(self.summary_folder)
-      self.writer = tf.contrib.summary.create_file_writer(self.summary_folder)
-      self.writer.set_as_default()
+    # Set up the retrieval of the results (I.e. Build the Summarisd results, and results Graph)
+    self.graph = tf.Graph() # [] [unfinished]
+    with self.graph.as_default():
+        #   -->  Build model
+        print(">>>Set initialiser for training - i.e. set AdamOptimizer")
+        self.model.initialise_training()
+        print(">>>Finished setting initialiser")
+        print(">> Time to build TF Graph!")
+        self.summarised_result, self.results = self.model.run_multi_gpu(self.data_strap)
+        #print(">>>Set training operation")
+        #self.train_op = self.model._optimizer.minimize(self.summarised_result.total_loss)
+        self.saver = tf.train.Saver(max_to_keep=self.max_steps_to_save)
+    #   -->  Print stats
+    print(">> Let's analyse the model parameters")
+    #self.param_stats = tf.contrib.tfprof.model_analyzer.print_model_analysis(
+    #    tf.get_default_graph(),
+    #    tfprof_options=tf.contrib.tfprof.model_analyzer.
+    #    TRAINABLE_VARS_PARAMS_STAT_OPTIONS)
+    #[] [unfinished]
+    #opts = (tf.profiler.ProfileOptionBuilder.trainable_variables_parameter())
+    #self.param_stats = tf.profiler.profile(tf.get_default_graph(),options=opts, cmd='scope')
+    #print(">>>Number:")
+    #sys.stdout.write('total_params: %d\n' % self.param_stats.total_parameters)
+    #print(self.param_stats)
+    '''total_parameters = 0
+    for variable in tf.trainable_variables():
+      # shape is an array of tf.Dimension
+      shape = variable.get_shape()
+      #print(shape)
+      #print(len(shape))
+      variable_parameters = 1
+      for dim in shape:
+        #print(dim)
+        variable_parameters *= dim.value
+      #print(variable_parameters)
+      total_parameters += variable_parameters
+    print(total_parameters)'''
+    print(">> Finished analysing")
+  #def __enter__(self):
+  #    print(">Create TF FileWriter")
+  #    #self.writer = tf.summary.FileWriter(self.summary_folder)
+  #    self.writer = tf.contrib.summary.create_file_writer(self.summary_folder)
+  #    self.writer.set_as_default()
+  #    self.contrib.summary.always_record_summaries()
 
   def run_task(self, max_steps, save_step=1, max_steps_to_save=1000):
       # save_step defines the increment amount before saving a new checkpoint
       print(">Create TF session")
-      self.session = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
-      init_op = tf.group(tf.global_variables_initializer(),
-                         tf.local_variables_initializer())
-      print(">Initialise sesssion with variables")
-      self.session.run(init_op) # Initialise graph with variables
-      print(">Create TF Saver")
-      self.saver = tf.train.Saver(max_to_keep=max_steps_to_save)
-      print(">Load last saved model")
-      self.last_step = self.load_saved_model()
-      coord = tf.train.Coordinator()
-      threads = tf.train.start_queue_runners(sess=session, coord=coord)
-      try:
-        self.experiment(max_steps=max_steps,save_step=save_step)
-      except tf.errors.OutOfRangeError:
-        tf.logging.info('Finished experiment.')
-      finally:
-        coord.request_stop()
-      coord.join(threads)
-      session.close()
+      #print(self.graph)
+      with tf.Session(graph=self.graph, config=tf.ConfigProto(allow_soft_placement=True)) as self.session:
+          init_op = tf.group(tf.global_variables_initializer(),
+                             tf.local_variables_initializer())
+          print(">Initialise sesssion with variables")
+          graph_res_fetches = self.session.run(init_op) # Initialise graph with variables
+
+          '''for i in range(max_steps):
+            print("Train Iteration #%d" % i)
+            self.model._global_step +=1
+            graph_res_fetches = self.session.run(self.train_op)
+            if(self.model._global_step>max_steps):
+              raise tf.errors.OutOfRangeError()
+          #[]print(">Create TF Saver")'''
+          #[]self.saver = tf.train.Saver(max_to_keep=max_steps_to_save)
+          print(">Load last saved model")
+          self.last_step = self.load_saved_model()
+          coord = tf.train.Coordinator()
+          threads = tf.train.start_queue_runners(sess=self.session, coord=coord)
+          try:
+            self.training(max_steps=max_steps,save_step=save_step)
+          except tf.errors.OutOfRangeError:
+            tf.logging.info('Finished experiment.')
+          finally:
+            coord.request_stop()
+          coord.join(threads)
+      self.session.close()
+  def training(self, max_steps, save_step):
+    step = 0
+    for i in range(self.last_step, max_steps):
+        print("training: %d" % i)
+        step += 1
+        summary, _ = self.session.run([self.summarised_result.summary, self.summarised_result.train_op]) # Run graph
+        print("training: %d" % i)
+        self.writer.add_summary(summary, i)
+        print("training: %d" % i)
+        if (i + 1) % save_step == 0:
+            print("training: %d" % i)
+            self.saver.save(self.session, os.path.join(self.summary_folder, 'model.ckpt'), global_step=i + 1)
+
 
 
   def load_saved_model(self):
@@ -99,28 +155,18 @@ class execution(object):
           self.saver.restore(self.session, ckpt.model_checkpoint_path)
           prev_step = extract_step(ckpt.model_checkpoint_path)
         else:
-          tf.gfile.DeleteRecursively(load_dir)
-          tf.gfile.MakeDirs(load_dir)
+          tf.gfile.DeleteRecursively(self.summary_folder)
+          tf.gfile.MakeDirs(self.summary_folder)
           prev_step = 0
     else:
-        tf.gfile.MakeDirs(load_dir)
+        tf.gfile.MakeDirs(self.summary_folder)
         prev_step = 0
     return prev_step
 
-  def __exit__(self):
-    self.writer.close()
-
+  def __exit__(self, exception_type, exception_value, traceback):
+    print("Exectioner exitted")
+    #self.writer.close() # not valid for eager execution
   # Task - Training
-  def training(self, max_steps, save_step):
-    step = 0
-    for i in range(self.last_step, max_steps):
-        print("training: %d" % i)
-        step += 1
-        summary, _ = self.session.run([self.result.summary, self.result.train_op]) # Run graph
-        self.writer.add_summary(summary, i)
-        if (i + 1) % save_step == 0:
-          self.saver.save(self.session, os.path.join(self.summary_folder, 'model.ckpt'), global_step=i + 1)
-
 
   # Task - Evaluation
 
