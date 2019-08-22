@@ -10,16 +10,16 @@ class Data(object):
             return np.shape(self.test_data[0:self.validation_size]), np.shape(self.test_data_labels[0:self.validation_size])
         elif(self.num_gpus>1):
             return np.shape(self.test_data[gpu][0:self.validation_size]), np.shape(self.test_data_labels[gpu][0:self.validation_size])
-        
+
     def get_validation_data(self, gpu=0):
         # returns validation set on the gpu'th GPU
         if(self.validation_size==None):
             raise ValueError()
         if(self.num_gpus==1):
-            return self.test_data[0:self.validation_size], self.test_data_labels[0:self.validation_siz]
+            return self.test_data[0:self.validation_size], self.test_data_labels[0:self.validation_size]
         elif(self.num_gpus>1):
             return self.test_data[gpu][0:self.validation_size], self.test_data_labels[gpu][0:self.validation_size]
-    
+
     def set_validation_dataset(self, validation_size=None):
         self.validation_size = validation_size if (validation_size != None) else self.validation_size
         if(self.validation_size<1):
@@ -35,13 +35,13 @@ class Data(object):
                 self.test_data[gpu] = self.test_data[gpu][0:self.validation_size]
                 self.test_data_labels[gpu] = self.test_data_labels[gpu][0:self.validation_size]
             self.dataset_size_validation = self.validation_size * self.num_gpus
-    
+
     def __init__(self, data_loader, num_gpus=1, validation_size=1):
         # data_loader is a function that returns :
         # train_data, train_data_labels, test_data, test_data_labels
         self.dataset_split_size = None
         self.mini_batch_size=None
-        self.validation_size=1
+        self.validation_size=validation_size
         if(data_loader != None):
             self.train_data, self.train_data_labels, self.test_data, self.test_data_labels = data_loader() # must be np tensors
             self.mode = None
@@ -59,7 +59,7 @@ class Data(object):
             self.train_data = self.train_data[0:max_size]
             self.train_data_labels = self.train_data_labels[0:max_size]
             self.dataset_size_train = max_size
-            
+
         elif(self.num_gpus>1):
             for gpu in range(self.num_gpus):
                 this_size = self.train_data[gpu].shape[0]
