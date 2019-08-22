@@ -20,7 +20,7 @@ class multi_gpu_model(learning_core):
         else:
             print(" ... Time to load architecture ... ")
 
-    def run_multi_gpu(self, DataObject, num_gpus=1, train_data=None, validation_data=None):
+    def run_multi_gpu(self, DataObject, num_gpus=1, data=None, validation_graph=False):
         DataObject.set_num_gpus(num_gpus)
         self._tmp_DataObject = DataObject
         print(">>>>Using %d GPUs" % num_gpus)
@@ -47,7 +47,11 @@ class multi_gpu_model(learning_core):
             print('>>>Data Shapes')
             print(input_data_shape)
             print(input_labels_shape)
-            tower_output = self._single_tower(i, input_data_shape, input_labels_shape,  validation_input_data_shape, validation_input_labels_shape, extra_data_shapes, validation_extra_data_shapes, train_data, validation_data)
+            if validation_graph is False:
+                this_data = data[i]
+            else:
+                this_data = data
+            tower_output = self._single_tower(i, input_data_shape, input_labels_shape,  validation_input_data_shape, validation_input_labels_shape, extra_data_shapes, validation_extra_data_shapes, this_data, validation_graph=validation_graph)
 
             print(">>>Grad shapes")
             results.append(tower_output.result)
@@ -61,7 +65,7 @@ class multi_gpu_model(learning_core):
         print('>> Return results from all towers')
         return summarized_results, results, ground_truths, input_data
 
-    def _single_tower(self, tower_ind, input_data_shape, input_labels_shape, validation_input_data_shape, validation_input_labels_shape, extra_data_shapes,validation_extra_data_shapes, train_data, validation_data, num_targets=1):
+    def _single_tower(self, tower_ind, input_data_shape, input_labels_shape, validation_input_data_shape, validation_input_labels_shape, extra_data_shapes,validation_extra_data_shapes, data, validation_graph=False, num_targets=1):
         if(self.ArchitectureObject is None):
             raise Exception('problem with architecture: not loaded')
 
@@ -112,7 +116,7 @@ class multi_gpu_model(learning_core):
                 #print(input_data.get_shape().as_list())
                 print(".")
                 #input_labels = tf.convert_to_tensor(input_labels, dtype=tf.float32)
-                output, loss, diagnostics, output_weights = self.ArchitectureObject.loss_func(train_data, validation_data)
+                output, loss, diagnostics, output_weights = self.ArchitectureObject.loss_func(data, validation_graph=validation_graph)
                 grads_and_vars  = self._optimizer.compute_gradients(loss) # [] [unfinished] why
             else:
                 #grads_and_vars  = self._optimizer.compute_gradients(losses_func)
