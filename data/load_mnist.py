@@ -45,7 +45,7 @@ def load_data():
     return mnist_train_data, mnist_train_labels, mnist_test_data, mnist_test_labels
 
 
-def load_data_light(tr=4,te=2):
+def load_data_light(tr=1,te=2):
     dir_path = os.path.dirname(os.path.realpath(__file__))
     filename= dir_path + '/rmnist_expanded_10.pkl'
     print("Loading data")
@@ -80,5 +80,6 @@ def load_data_light(tr=4,te=2):
     mnist_test_data = np.reshape(mnist_test_data,[te, 28, 28])
 
     print("Finished loading reduced-size MNIST dataset (%d training, %d test)" % (tr, te))
+    print(mnist_train_data.dtype)
 
     return mnist_train_data, mnist_train_labels, mnist_test_data, mnist_test_labels

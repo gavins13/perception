@@ -1,13 +1,17 @@
 from lib.multi_gpu_frame import multi_gpu_model as resources_model
-from capsules.architectures.test import architecture as test_caps_architecture
+from capsules.architectures.baseline import architecture as architecture
 from lib.data_frame import Data
 
-from data.load_mnist import load_data_light as load_data
-from lib.execution import execution
-
+import os, sys
 import tensorflow as tf
 
-import os, sys
+
+#from data.load_mnist import load_data_light as load_data
+sys.path.insert(0, '/homes/kgs13/biomedic/PhD/sunnybrook-data-dicom/')
+from sunnybrook-data-dicom import load_data
+
+from lib.execution import execution
+
 ''' Config here '''
 project_path = '/vol/biomedic/users/kgs13/PhD/capsule_networks/first_model'
 cpu_only = False
@@ -46,7 +50,7 @@ try:
   print("Start resource manager...")
   System = resources_model(cpu_only=cpu_only,eager=eager)
   print("Create Network Architecture...")
-  CapsuleNetwork = test_caps_architecture()
+  CapsuleNetwork = architecture()
   print("Strap Architecture to Resource Manager")
   System.strap_architecture(CapsuleNetwork)
 
