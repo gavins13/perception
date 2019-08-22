@@ -5,12 +5,12 @@ import variables
 from functools import reduce
 
 class LocalisedCapsuleLayer(object): # LocalCaps
-    def __init__(self, k=3, kernel_height=None, kernel_width=None, output_vec_dim=8, strides=[1,1], num_output_channels=8, type="SAME", num_routing=3, use_matrix_bias=True, use_squash_bias=True, supplied_squash_biases=None, squash_He=False, squash_relu=False, convolve=False):
+    def __init__(self, k=3, kernel_height=None, kernel_width=None, output_vec_dim=8, strides=[1,1], num_output_channels=8, type="SAME", num_routing=3, use_matrix_bias=True, use_squash_bias=True, supplied_squash_biases=None, squash_He=False, squash_relu=False, convolve=False, matrix_tanh=False, routing_softmax_opposite=False):
         kernel_height = k if(kernel_height==None) else kernel_height
         kernel_width =  k if(kernel_width== None) else kernel_width
         self.params = {"k_h": kernel_height, "k_w": kernel_width, "strides": strides, "num_routing": num_routing}
         self.output = {"channels": num_output_channels, "vec_dim": output_vec_dim, 'x': None, 'y': None}
-        self.options= {"type": type, "use_matrix_bias": use_matrix_bias, "use_squash_bias": use_squash_bias, "supplied_squash_biases": supplied_squash_biases, "squash_He": squash_He,"squash_relu": squash_relu, "convolve": convolve}
+        self.options= {"type": type, "use_matrix_bias": use_matrix_bias, "use_squash_bias": use_squash_bias, "supplied_squash_biases": supplied_squash_biases, "squash_He": squash_He,"squash_relu": squash_relu, "convolve": convolve, "matrix_tanh": matrix_tanh, "routing_softmax_opposite": routing_softmax_opposite}
         self.scope_name='LocalCaps'
     def transform(self, input_tensor):  # [batch, vec_dim, num_ch, h, w] ---> [M, x, y, v_d^l+1, |T^l|, |T^l+1|]
         input_tensor_shape = input_tensor.get_shape().as_list()
@@ -26,13 +26,24 @@ class LocalisedCapsuleLayer(object): # LocalCaps
           tmp = tf.transpose(tmp, [0,6, 2,3,4,1, 5]) # [M, 1, T^l, x, y, v_d, 1]
           with tf.variable_scope(self.scope_name):
               with tf.variable_scope('matrix_transform'):
-                  matrix_bias =  variables.bias_variable(matrix_bias_shape)
+                  if(self.options["use_matrix_bias"]==True):
+                      matrix_bias = variables.bias_variable(matrix_bias_shape)
                   matrix = variables.weight_variable(matrix_shape)
-          votes = tf.add(tf.matmul(tf.tile(matrix, [its[0],1,1,self.output["x"],self.output["y"],1,1]), tf.tile(tmp, [1,self.output["channels"],1,1,1,1,1])), matrix_bias)
+          if(self.options["matrix_tanh"] == True):
+              matrix = tf.nn.tanh(matrix)
+          votes = tf.matmul(tf.tile(matrix, [its[0],1,1,self.output["x"],self.output["y"],1,1]), tf.tile(tmp, [1,self.output["channels"],1,1,1,1,1]))
+          votes = tf.add(votes, matrix_bias) if(self.options["use_matrix_bias"]==True) else votes
           # [M, T^l+1, T^l, x,y, v_d+1, 1]
           votes = tf.transpose(tf.squeeze(votes,axis=6), [0, 3, 4, 5, 2, 1]) # [M, x, y, v_d^l+1, |T^l|, |T^l+1|]
         else:
           raise NotImplementedError()
+          '''for input_channel_number in range(its[2]):
+              tmp = its[:]
+              tmp[2] =1
+              this_channel = tf.slice(input_tensor, [0,0,input_channel_number,0,0], tmp) # [batch, vec_dim, 1(a channel), h, w]
+              this_channel = tf.squeeze(tf.transpose(this_channel, [0,3,4,1,2]), axis=4) # [batch, x, y, vec_dim]
+              for conv_it in range(1):
+                  this_channel = tf.layers.conv2d(this_channel, its[1], k, padding='same', activation)'''
         return votes
     def localise(self, input_tensor): # [M, x, y, v_d^l+1, |T^l|, |T^l+1|] ---> [M,v_d^l+1, |T^l+1|,p, k_h*k_w*|T^l|]
         votes_shape = input_tensor.get_shape().as_list()
@@ -81,7 +92,7 @@ class LocalisedCapsuleLayer(object): # LocalCaps
 
 
         print(">>>>> Perform routing")
-        routed_output = route_votes(votes, squash_biases=squash_biases,  num_routing=self.params["num_routing"], squash_relu=self.options["squash_relu"])
+        routed_output = route_votes(votes, squash_biases=squash_biases,  num_routing=self.params["num_routing"], squash_relu=self.options["squash_relu"], softmax_opposite=self.options["routing_softmax_opposite"])
         print(">>>>> Finished Routing")
         # M, v_d^l+1, |T^l+1|, x'*y', 1
         routed_output_shape = routed_output.get_shape().as_list()
