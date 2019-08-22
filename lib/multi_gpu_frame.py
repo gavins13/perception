@@ -9,20 +9,21 @@ from learning_core import learning_core
 
 import collections
 TowerResult = collections.namedtuple('TowerResult', ('result', 'almost',
-                                                     'correct', 'grads'))
+                                                     'correct', 'grads', 'loss'))
 
 
 JoinedResult = collections.namedtuple('JoinedResult', ('summary', 'train_op',
-                                                       'correct', 'almost'))
+                                                       'correct', 'almost', 'total_loss'))
 
 
 class Namespace: pass
 
 
 class multi_gpu_model(learning_core):
-  def __init__(self, ArchitectureObject=None, cpu_only=False):
+  def __init__(self, ArchitectureObject=None, cpu_only=False, eager=False):
     self.ArchitectureObject = None
     self.cpu_only = cpu_only
+    self.eager=eager
     if(ArchitectureObject is not None):
       self.strap_architecture(ArchitectureObject)
     else:
@@ -46,6 +47,7 @@ class multi_gpu_model(learning_core):
       summary and a list of inferred outputs of each tower.
     """
 
+
     DataObject.set_num_gpus(num_gpus)
     print(">>>>Using %d GPUs" % num_gpus)
 
@@ -55,6 +57,7 @@ class multi_gpu_model(learning_core):
     corrects = []
     tower_grads = []
     results = []
+    losses = []
     with tf.variable_scope(tf.get_variable_scope()):
       for i in range(num_gpus):
         print('>>Assignment of data to tower/GPU %d' % i)
@@ -68,9 +71,10 @@ class multi_gpu_model(learning_core):
         almosts.append(tower_output.almost)
         corrects.append(tower_output.correct)
         tower_grads.append(tower_output.grads)
+        losses.append(tower_output.loss)
 
     print('>> Sumarise results from all towers')
-    summarized_results = self._summarize_towers(almosts, corrects, tower_grads)
+    summarized_results = self._summarize_towers(almosts, corrects, tower_grads, losses)
     print('>> Return results from all towers')
     return summarized_results, results
 
@@ -103,7 +107,7 @@ class multi_gpu_model(learning_core):
         tf.get_variable_scope().reuse_variables()
         #main_res, main_almost, main_correct = [],[] , []
         ns = Namespace()
-        def losses_func(the_model_object, input_images, the_target,  margin=0.4, downweight=0.5):
+        def losses_func(the_model_object=self.ArchitectureObject, input_images=input_data, the_target=input_labels,  margin=0.4, downweight=0.5):
 
             print(">>>Start Building Architecture.")
             res = the_model_object.build(input_images)
@@ -138,10 +142,18 @@ class multi_gpu_model(learning_core):
             print(">>>>> Return loss")
             class_loss= tf.add(tf.multiply( 0.5, positive_cost),  tf.multiply(tf.multiply(downweight,0.5), negative_cost))
             batch_loss = tf.reduce_mean(class_loss)
+
             return batch_loss
-        #grads = self._optimizer.compute_gradients(losses_func) # [] [unfinished] why
-        grad_function = tf.contrib.eager.implicit_value_and_gradients(losses_func)
-        loss_value, grads_and_vars = grad_function(self.ArchitectureObject, input_data, input_labels)
+        print(">>> Use AdamOptimizer built in gradient finder")
+        if(self.eager==False):
+          with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
+            loss = losses_func()
+            grads_and_vars  = self._optimizer.compute_gradients(loss) # [] [unfinished] why
+        else:
+            #grads_and_vars  = self._optimizer.compute_gradients(losses_func)
+            #print(">>> Use contrib.eager gradient finder")
+            grad_function = tf.contrib.eager.implicit_value_and_gradients(losses_func)
+            loss, grads_and_vars = grad_function(self.ArchitectureObject, input_data, input_labels)
         print("-----grads and vars shape----")
         print(np.shape(grads_and_vars))
         '''grads = grads_and_vars
@@ -150,9 +162,9 @@ class multi_gpu_model(learning_core):
         print(grads[0])
         print(np.shape(grads[1]))
         print(grads[1][5])'''
-    return TowerResult(ns.res, ns.almost, ns.correct, grads_and_vars)
+    return TowerResult(ns.res, ns.almost, ns.correct, grads_and_vars, loss)
 
-  def _summarize_towers(self, almosts, corrects, tower_grads):
+  def _summarize_towers(self, almosts, corrects, tower_grads, losses):
       # []  need to go over and rewrite
     """Aggregates the results and gradients over all towers.
 
@@ -167,12 +179,13 @@ class multi_gpu_model(learning_core):
     print("....")
     grads = self._average_gradients(tower_grads)
     print("....")
-    train_op = self._optimizer.apply_gradients(
-        grads, global_step=self._global_step)
+    #train_op = self._optimizer.apply_gradients(grads, global_step=self._global_step, name="ApplyGradientsTF")
+    train_op = self._optimizer.apply_gradients(grads,name="ApplyGradientsTF")
     print("....")
     summaries = tf.get_collection(tf.GraphKeys.SUMMARIES)
     print("....")
-    summary = tf.summary.merge(summaries)
+    #summary = tf.contrib.summary.merge(summaries)
+    summary = tf.contrib.summary.all_summary_ops()
     print("....")
     stacked_corrects = tf.stack(corrects)
     print("....")
@@ -182,4 +195,5 @@ class multi_gpu_model(learning_core):
     print("....")
     summed_almosts = tf.reduce_sum(stacked_almosts, 0)
     print("....")
-    return JoinedResult(summary, train_op, summed_corrects, summed_almosts)
+    summed_losses = tf.reduce_sum(losses)
+    return JoinedResult(summary, train_op, summed_corrects, summed_almosts, summed_losses)
