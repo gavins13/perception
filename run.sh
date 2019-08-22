@@ -8,7 +8,7 @@ echo $LD_LIBRARY_PATH
 export TF_CPP_MIN_LOG_LEVEL=0
 export TF_CPP_MIN_VLOG_LEVEL=0 # usually = 1 is okay for debugging
 #python3 -m memory_profiler experiment.py
-export CUDA_VISIBLE_DEVICES=2
+export CUDA_VISIBLE_DEVICES=4,5,6,7
 if [ "$1" = 'memory' ]; then
   echo "memory testing"
   python3 -m memory_profiler experiment.py

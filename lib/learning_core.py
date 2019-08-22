@@ -46,6 +46,7 @@ class learning_core(object):
         full_diagnostics[key] = tf.convert_to_tensor(vals)
         #full_diagnostics[key] = vals
         this_shape = full_diagnostics[key].get_shape().as_list()
+        print(">>>>>>>>> Averaging Diagostics")
         print(this_shape)
         if(len(this_shape)>1):
             this_shape_first = this_shape[0]

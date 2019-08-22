@@ -6,3 +6,7 @@ logs/
 debug.txt
 less
 thislogcopy.txt
+.nfs*
+*.swp
+*__pycache__*
+experiment.py
