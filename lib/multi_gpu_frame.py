@@ -21,7 +21,7 @@ class multi_gpu_model(learning_core):
             print(" ... Time to load architecture ... ")
 
     def run_multi_gpu(self, DataObject, num_gpus=1, data=None, validation_graph=False):
-        DataObject.set_num_gpus(num_gpus)
+        #DataObject.set_num_gpus(num_gpus) # Commented out since Dataset API
         self._tmp_DataObject = DataObject
         print(">>>>Using %d GPUs" % num_gpus)
         if(self.ArchitectureObject is None):
