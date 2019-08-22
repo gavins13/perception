@@ -13,8 +13,8 @@ SystemConfiguration = collections.namedtuple("SystemConfiguration", ["cpu_only",
 
 ''' Config here '''
 from capsules.architectures.v0_rev0_1 import architecture as Architecture
-from capsules.architectures.v0_rev12_2_simple_1_residual_highres import architecture as TestArchitecture
-experiment_name = 'caps_v0_rev12_2_simple_1_residual_highres'
+from capsules.architectures.v0_rev13_1_verylowparams_9_residual_highres import architecture as TestArchitecture
+experiment_name = 'v0_rev13_1_verylowparams_9_residual_highres'
 data_config = DataConfiguration(project_path='/vol/biomedic/users/kgs13/PhD/capsule_networks/first_model',execution_type='train',
     model_load_dir=None)
 system_config = SystemConfiguration(cpu_only=False, num_gpus=1, eager=False, mini_batch_size=4, test_architecture=True)
