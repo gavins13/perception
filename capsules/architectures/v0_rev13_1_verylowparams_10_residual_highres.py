@@ -105,7 +105,7 @@ class architecture(object):
         return result
 
 
-    def loss_func(self, input_images, ground_truth):
+    def loss_func(self, input_images, ground_truth, validation_input_images=None, validation_ground_truth=None):
         input_images = tf.expand_dims(input_images, axis=3)
         ground_truth = tf.expand_dims(ground_truth, axis=3)
         mini_batch_size = input_images.get_shape().as_list()[0]

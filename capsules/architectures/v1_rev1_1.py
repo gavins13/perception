@@ -110,15 +110,23 @@ class architecture(architecture_base):
     def loss_func(self, input_images, ground_truth, validation_input_images, validation_ground_truth):
         input_images = tf.expand_dims(input_images, axis=3)
         ground_truth = tf.expand_dims(ground_truth, axis=3)
+        validation_input_images = tf.expand_dims(validation_input_images, axis=3)
+        validation_ground_truth = tf.expand_dims(validation_ground_truth, axis=3)
         mini_batch_size = input_images.get_shape().as_list()[0]
+        validation_mini_batch_size = validation_input_images.get_shape().as_list()[0]
         #input_images = tf.image.crop_and_resize(input_images, [[0.25,0.25, 0.75,0.75]]*mini_batch_size, list(range(mini_batch_size)), [64,64]  )
         #ground_truth = tf.image.crop_and_resize(ground_truth, [[0.25,0.25, 0.75,0.75]]*mini_batch_size, list(range(mini_batch_size)), [64,64]  )
         #input_images = tf.image.crop_and_resize(input_images, [[0.375,0.375,0.625,0.625]]*mini_batch_size, list(range(mini_batch_size)), [64,64]  )
         #ground_truth = tf.image.crop_and_resize(ground_truth, [[0.375,0.375,0.625,0.625]]*mini_batch_size, list(range(mini_batch_size)), [64,64]  )
         input_images = tf.image.crop_and_resize(input_images, [[0.25,0.25,0.75,0.75]]*mini_batch_size, list(range(mini_batch_size)), [128,128]  )
         ground_truth = tf.image.crop_and_resize(ground_truth, [[0.25,0.25,0.75,0.75]]*mini_batch_size, list(range(mini_batch_size)), [128,128]  )
+        validation_input_images = tf.image.crop_and_resize(validation_input_images, [[0.25,0.25,0.75,0.75]]*validation_mini_batch_size, list(range(validation_mini_batch_size)), [128,128]  )
+        validation_ground_truth = tf.image.crop_and_resize(validation_ground_truth, [[0.25,0.25,0.75,0.75]]*validation_mini_batch_size, list(range(validation_mini_batch_size)), [128,128]  )
         input_images = tf.squeeze(input_images, axis=3)
         ground_truth = tf.squeeze(ground_truth, axis=3)
+        validation_input_images = tf.squeeze(validation_input_images, axis=3)
+        validation_ground_truth = tf.squeeze(validation_ground_truth, axis=3)
+
 
         print(">>>Start Building Architecture.")
         res = self.build(input_images)
