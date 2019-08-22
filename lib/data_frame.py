@@ -22,34 +22,47 @@ class Data(object):
         self.num_gpus = num
 
         def splitN(N, d):
-            ans = float(N) / float(d)
+            ans = np.float(N) / np.float(d)
             Nn = np.ceil(ans)
-            if(ans == float(int(ans))):
+            print(">>>>>>>>>>>>> Check divisor:  %d, %d" % (N,d))
+            if(ans != np.float(np.int(ans))):
                 # not a perfect divisor
+                print(">>>>>>>>>>>>>>> Not a perfect divisor")
+                ans = np.float(N) / np.float(d-1)
+                Nn = np.ceil(ans)
                 r = N - ( Nn*(d-1) )
             else:
-                r=None
+                print(">>>>>>>>>>>>>>> Perfect divisor")
+                r=Nn
+            print([Nn, d,r, N])
             assert(Nn*(d-1) + r == N)
-            return int(Nn), int(r)
+            r = None if(r==Nn) else np.int(r)
+            return np.int(Nn), r
 
         def split_data(data, labels, d):
             if(d==1):
                 return data, labels
             else:
-                N_train = np.size(labels)
+                N_train = len(labels)
                 N_train_split_size, N_train_final_split = splitN(N_train, d)
                 print(">>>>>>>> Time to split data tensor across GPUs")
                 print(">>>>>>>> Data first...")
-                N_train_dataset_split = tf.split(data[0:N_train_split_size*d], d)
+                N_train_dataset_split = np.split(np.asarray(data[0:N_train_split_size*d]), d)
                 print(">>>>>>>> Labels second...")
-                N_train_dataset_labels_split = tf.split(labels[0:N_train_split_size*d], d)
+                N_train_dataset_labels_split = np.split(np.asarray(labels[0:N_train_split_size*d]), d)
                 print(">>>>>>>> Makes these into a list..")
-                N_train_dataset_split = list(N_train_dataset_split)
-                N_train_dataset_labels_split = list(N_train_dataset_labels_split)
-
+                print(np.asarray(N_train_dataset_labels_split).shape)
+                N_train_dataset_split = np.asarray(N_train_dataset_split)
+                N_train_dataset_labels_split = np.asarray(N_train_dataset_labels_split)
+                #N_train_dataset_split = list(N_train_dataset_split)
+                #N_train_dataset_labels_split = list(N_train_dataset_labels_split)
+                print(">>>>>>>> Finished Making these into a list..")
                 if(N_train_final_split!=None):
-                    N_train_dataset_split.append(data[N_train_split_size*d:N_train_split_size*d +N_train_final_split, :])
-                    N_train_dataset_labels_split.append(labels[N_train_split_size*d:N_train_split_size*d +N_train_final_split])
+                    #N_train_dataset_split.append(data[N_train_split_size*d:N_train_split_size*d +N_train_final_split, :])
+                    #N_train_dataset_labels_split.append(labels[N_train_split_size*d:N_train_split_size*d +N_train_final_split])
+                    np.append(N_train_dataset_split, [data[N_train_split_size*d:N_train_split_size*d +N_train_final_split, :]])
+                    np.append(N_train_dataset_split, [labels[N_train_split_size*d:N_train_split_size*d +N_train_final_split]])
+                print(np.asarray(N_train_dataset_labels_split).shape)
                 return N_train_dataset_split, N_train_dataset_labels_split
 
         self.train_data, self.train_data_labels = split_data(self.train_data, self.train_data_labels, self.num_gpus)
@@ -75,10 +88,17 @@ class Data(object):
             n_splits = np.ceil(self.get_size()/np.float(mb_size_approx)) # no of splits on each gpu
             self.n_splits = n_splits
             self.mini_batch_splits = []
-            for i in range(self.num_gpus):
-                thissize = np.size(self.train_data[gpu])
-                this_mini_batch_size = np.float(this_size)/np.float(n_splits)
+            for gpu in range(self.num_gpus):
+                if(self.mode=='train'):
+                    thissize = self.train_data[gpu].shape[0]
+                elif(self.mode=='test'):
+                    thissize = self.test_data[gpu].shape[0]
+                print(thissize)
+                this_mini_batch_size = np.float(thissize)/np.float(n_splits)
                 first_size = thissize - (np.floor(this_mini_batch_size)*(n_splits-1))
+
+                first_size = np.int(first_size)
+                this_mini_batch_size = np.int(this_mini_batch_size)
 
                 thissplit_starts=[0] + list(range(first_size,thissize, this_mini_batch_size))
                 thissplit_ends = [first_size] + list(range(first_size+this_mini_batch_size, thissize+this_mini_batch_size, this_mini_batch_size))
