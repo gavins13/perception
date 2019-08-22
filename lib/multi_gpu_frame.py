@@ -20,8 +20,9 @@ class multi_gpu_model(learning_core):
         else:
             print(" ... Time to load architecture ... ")
 
-    def run_multi_gpu(self, DataObject, num_gpus=1):
+    def run_multi_gpu(self, DataObject, num_gpus=1, train_data=None, validation_data=None):
         DataObject.set_num_gpus(num_gpus)
+        self._tmp_DataObject = DataObject
         print(">>>>Using %d GPUs" % num_gpus)
         if(self.ArchitectureObject is None):
             raise Exception('problem with architecture: not loaded')
@@ -46,7 +47,7 @@ class multi_gpu_model(learning_core):
             print('>>>Data Shapes')
             print(input_data_shape)
             print(input_labels_shape)
-            tower_output = self._single_tower(i, input_data_shape, input_labels_shape,  validation_input_data_shape, validation_input_labels_shape, extra_data_shapes, validation_extra_data_shapes)
+            tower_output = self._single_tower(i, input_data_shape, input_labels_shape,  validation_input_data_shape, validation_input_labels_shape, extra_data_shapes, validation_extra_data_shapes, train_data, validation_data)
 
             print(">>>Grad shapes")
             results.append(tower_output.result)
@@ -60,7 +61,7 @@ class multi_gpu_model(learning_core):
         print('>> Return results from all towers')
         return summarized_results, results, ground_truths, input_data
 
-    def _single_tower(self, tower_ind, input_data_shape, input_labels_shape, validation_input_data_shape, validation_input_labels_shape, extra_data_shapes,validation_extra_data_shapes, num_targets=1):
+    def _single_tower(self, tower_ind, input_data_shape, input_labels_shape, validation_input_data_shape, validation_input_labels_shape, extra_data_shapes,validation_extra_data_shapes, train_data, validation_data, num_targets=1):
         if(self.ArchitectureObject is None):
             raise Exception('problem with architecture: not loaded')
 
@@ -70,32 +71,48 @@ class multi_gpu_model(learning_core):
             device_name_prefix = 'gpu'
 
         with tf.device('/' + device_name_prefix + ':%d' % tower_ind):
-          input_data = tf.placeholder(tf.complex64, shape=input_data_shape, name="InputDataGPU"+str(tower_ind))
-          input_labels = tf.placeholder(tf.float32, shape=input_labels_shape, name="InputLabelsGPU"+str(tower_ind))
-
-          validation_input_data = tf.placeholder(tf.complex64, shape=validation_input_data_shape, name="ValidationInputDataGPU"+str(tower_ind))
-          validation_input_labels = tf.placeholder(tf.float32, shape=validation_input_labels_shape, name="ValidationInputLabelsGPU"+str(tower_ind))
-
+          print(".")
           extra_data = {}
           for key in self.extra_data_keys:
-              extra_data[key] = tf.placeholder(tf.complex128, shape=extra_data_shapes[key], name="ExtraData_"+key+"GPU"+str(tower_ind))
+              extra_data[key] = tf.placeholder(tf.complex128, shape=[1575, 30, 8192], name="ExtraData_"+key+"GPU"+str(tower_ind))
+              #self.tf_dataset = tf.data.Dataset.from_tensor_slices((extra_data[key]))
+              #self.tf_dataset_batched = self.tf_dataset.batch(1)
 
+          print(".")
 
           validation_extra_data = {}
           for key in self.extra_data_keys:
-              validation_extra_data[key] = tf.placeholder(tf.complex128, shape=validation_extra_data_shapes[key], name="ValidationExtraData_"+key+"GPU"+str(tower_ind))
+              validation_extra_data[key] = tf.placeholder(tf.complex128, shape=[1575, 30, 8192], name="ValidationExtraData_"+key+"GPU"+str(tower_ind)) # 675
+              #self.tf_dataset_validation = tf.data.Dataset.from_tensor_slices((validation_extra_data[key]))
+              #self.tf_dataset_batched = self.tf_dataset.batch(1)
+
+          print(".")
+          #self.tf_dataset = tf.data.Dataset.from_tensor_slices((extra_data["image_data_complex"], validation_extra_data["image_data_complex"]))
+          '''self.tf_dataset = tf.data.Dataset.from_tensor_slices((self._tmp_DataObject.extra_data.image_data_complex.train, self._tmp_DataObject.extra_data.image_data_complex.train))
+
+          self.iterator = self.tf_dataset.make_initializable_iterator()
+          sessio
+          a,b = iterator.
+          extra_data["image_data_complex"]
+
+          self.tf_dataset = self.tf_dataset.batch(1)
+          self.handle = tf.placeholder(tf.string, shape=[])
+          self.tf_dataset_iterator = tf.data.Iterator.from_string_handle(self.handle, self.tf_dataset.output_types, self.tf_dataset.output_shapes)'''
+          print(".")
 
 
+          print(".")
           with tf.name_scope('tower_%d' % (tower_ind)) as scope:
 
 
             tf.get_variable_scope().reuse_variables()
             if(self.eager==False):
               with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
-                input_data = tf.convert_to_tensor(input_data, dtype=tf.complex64)
-                print(input_data.get_shape().as_list())
-                input_labels = tf.convert_to_tensor(input_labels, dtype=tf.float32)
-                output, loss, diagnostics, output_weights = self.ArchitectureObject.loss_func(input_images=input_data, ground_truth=input_labels, validation_input_images=validation_input_data, validation_ground_truth=validation_input_labels, extra_data=extra_data, validation_extra_data=validation_extra_data)
+                #input_data = tf.convert_to_tensor(input_data, dtype=tf.complex64)
+                #print(input_data.get_shape().as_list())
+                print(".")
+                #input_labels = tf.convert_to_tensor(input_labels, dtype=tf.float32)
+                output, loss, diagnostics, output_weights = self.ArchitectureObject.loss_func(train_data, validation_data)
                 grads_and_vars  = self._optimizer.compute_gradients(loss) # [] [unfinished] why
             else:
                 #grads_and_vars  = self._optimizer.compute_gradients(losses_func)
@@ -104,6 +121,8 @@ class multi_gpu_model(learning_core):
                 loss, grads_and_vars = grad_function(self.ArchitectureObject, input_data, input_labels)
             print("-----grads and vars shape----")
             print(np.shape(grads_and_vars))
+        input_data = None
+        input_labels = None
         return TowerResult(output, grads_and_vars, loss, diagnostics, input_labels, input_data, output_weights)
 
     def _summarize_towers(self, tower_grads, losses, diagnostics, output_weights):
