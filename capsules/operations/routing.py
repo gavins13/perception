@@ -460,7 +460,7 @@ def patch_based_routing_for_convcaps(input_tensor, squash_biases,  num_routing=3
     output_shape[-1] = 1
 
     logits = tf.fill(logit_shape, 0.)
-    voting_tensors = tf.TensorArray(size=num_routing, dtype=tf.float32, clear_after_read=False,
+    voting_tensors = tf.TensorArray(size=num_routing, dtype=tf.float32, clear_after_read=True,
     element_shape=output_shape) # do not clear after read as we want to investigate
     #voting_tensors = tf.fill(input_tensor_shape[0:4]+[1], 0., name="v_j_init")
 
