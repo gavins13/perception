@@ -228,7 +228,7 @@ kernel_is_vector=False):
 
 def convolutional_capsule_layer(input_tensor, kernel_height, kernel_width, scope_name,output_kernel_vec_dim=8, strides=[1, 1],
 num_output_channels=None,
-kernel_is_vector=False):
+kernel_is_vector=False, upsampling_factor=None):
     with tf.name_scope(scope_name):
         input_tensor_shape = input_tensor.get_shape().as_list()
         print("input tensor shape")
@@ -238,10 +238,18 @@ kernel_is_vector=False):
             num_output_channels=input_tensor_shape[2]
 
         def produce_tensor_Vl(channel_number):
-            stacked_slices = []
             i_slices = range(0, input_tensor_shape[3]-kernel_height, strides[0])
             j_slices = range(0, input_tensor_shape[4]-kernel_width, strides[1])
+            print(list(i_slices))
+            print(list(j_slices))
+            print(input_tensor_shape)
+            i_slices_len = len(list(i_slices))
+            j_slices_len = len(list(j_slices))
             print("Start stack creation")
+
+
+
+            '''stacked_slices=[]
             for i in i_slices:
                 for j in j_slices:
                     begin = [0,0,channel_number,i,j]
@@ -250,7 +258,55 @@ kernel_is_vector=False):
                     strided_slice = tf.slice(input_tensor,begin, this_size)
                     #print(strided_slice.get_shape().as_list())
                     stacked_slices.append(strided_slice)
-            stacked_slices = tf.stack(stacked_slices, axis=5)
+            stacked_slices = tf.stack(stacked_slices, axis=5)'''
+            def _stack(ii,jj,stacked_slices):
+                i_slicess = tf.constant(list(i_slices))
+                j_slicess = tf.constant(list(j_slices))
+                i = i_slicess[ii]
+                j = j_slicess[jj]
+                #ii = tf.Print(ii, [ii,jj,i,j], 'This done')
+                begin = [0,0,channel_number,i,j]
+                #end=list(np.array(input_tensor_shape[0:3])+1)+[i+kernel_height, j+kernel_width]
+                this_size = input_tensor_shape[0:2]+[1, kernel_height, kernel_width]
+                strided_slice = tf.slice(input_tensor,begin, this_size)
+                #print(strided_slice.get_shape().as_list())
+                #stacked_slices.append(strided_slice)
+                ind = tf.add(tf.multiply(ii,j_slices_len), jj)
+                ind = tf.Print(ind, [ind,ii,jj,i,j], 'This done')
+                stacked_slices=stacked_slices.write(ind,strided_slice)
+                def incrementii():
+                    tmp = ii +1
+                    tmp2 = tf.constant(0)
+                    return tmp, tmp2
+                def incrementjj():
+                    tmp = tf.add(jj, 1)
+                    tmp2 = ii
+                    return tmp2, tmp
+                ii,jj = tf.cond(tf.equal(jj, (j_slices_len-1)), incrementii, incrementjj)
+                #if(tf.equal(jj, (j_slices_len-1))):
+                #    ii=ii+1
+                #    jj=tf.constant(0)
+                #else:
+                #    jj=jj+1
+                return ii,jj,stacked_slices
+
+            stacked_slices=tf.TensorArray(dtype=tf.float32, size=i_slices_len*j_slices_len, clear_after_read=True)
+            current_i=tf.constant(0)
+            current_j=tf.constant(0)
+            _,_,stacked_slices = tf.while_loop(lambda i,j,stacked_slices: i<i_slices_len,
+            _stack, loop_vars = [current_i,current_j,stacked_slices], swap_memory=True, parallel_iterations=1)
+            stacked_slices = stacked_slices.stack() # WILL STACK on axis=0, but we need to stack along axis = 5
+            stacked_slices = tf.Print(stacked_slices, [i_slices_len], 'Stacked success')
+            stacked_slices = tf.transpose(stacked_slices, [1,2,3,4,5,0])
+            stacked_slices_new_shape = input_tensor_shape[0:2] + [1] + [kernel_height, kernel_width, i_slices_len*j_slices_len]
+            stacked_slices.set_shape(stacked_slices_new_shape)
+
+
+
+
+
+
+
             print("End stack list creation")
             print(stacked_slices.get_shape().as_list())
             # [batch, vec_dim, 1, k_h, k_w, SLICES]
@@ -264,34 +320,80 @@ kernel_is_vector=False):
             new_shape = new_shape[0:5] + [new_shape[5]*new_shape[6]]
             stacked_slices = tf.reshape(stacked_slices, shape=new_shape) # [M, x', y',  1, vec_dim, k_h*k_w]
             print(stacked_slices.get_shape().as_list())
+            if(upsampling_factor!=None):
+                stacked_slices = tf.tile(stacked_slices, [1, upsampling_factor, upsampling_factor, 1, 1, 1])
             return stacked_slices
 
-        def produce_matrix_Ml(stacked_tensor_shape):
-            matrix_weights_shape = [num_output_channels, output_kernel_vec_dim, stacked_tensor_shape[4]]
-            with tf.variable_scope(scope_name):
-                with tf.variable_scope('chan'+str(channel_number)):
-                    matrix = variables.weight_variable(matrix_weights_shape)
-            matrix = tf.expand_dims(matrix, axis=0)
-            matrix = tf.expand_dims(matrix, axis=0)
-            matrix = tf.expand_dims(matrix, axis=0)
-            matrix = tf.tile(matrix, stacked_tensor_shape[0:3] + [1, 1, 1]) # [M, x', y',  num_out_ch, output_vec_dim, vec_dim]
-            return matrix
+
+
+        with tf.variable_scope(scope_name):
+            with tf.variable_scope('channel_weights'):
+                matrix_weights_shape = [num_output_channels, output_kernel_vec_dim, input_tensor_shape[1], input_tensor_shape[2]] #  num_out_ch, output_vec_dim, vec_dim, INPUT_CHANNELS]
+                matrix = variables.weight_variable(matrix_weights_shape)
+
+        def produce_matrix_Ml(stacked_tensor_shape, channel_number):
+            matrix_weights_shape_for_channel = [num_output_channels, output_kernel_vec_dim, stacked_tensor_shape[4]]
+            print(">>>>>>>>>>>>>>>> Matrix for this Channel Tensor")
+            print(channel_number)
+            #with tf.variable_scope(scope_name):
+            #    with tf.variable_scope('channel_weights', reuse=True):
+            #        matrix = variables.weight_variable(matrix_weights_shape)
+            this_matrix = tf.squeeze(tf.slice(matrix, [0,0,0,channel_number], matrix_weights_shape_for_channel+[1]), axis=3)
+            this_matrix = tf.expand_dims(this_matrix, axis=0)
+            this_matrix = tf.expand_dims(this_matrix, axis=0)
+            this_matrix = tf.expand_dims(this_matrix, axis=0)
+            this_matrix = tf.tile(this_matrix, stacked_tensor_shape[0:3] + [1, 1, 1]) # [M, x', y',  num_out_ch, output_vec_dim, vec_dim]
+            return this_matrix
         def prerouting(stacked_slices, matrix):
             stacked_slices = tf.tile(stacked_slices, [1,1,1,num_output_channels, 1, 1])
             output = tf.matmul(matrix, stacked_slices) # [M, x', y', num_out_ch, output_vec_dim, k_h*k_w]
             output = tf.transpose(output, [0,4,3,1,2,5]) # M, v_d^l+1, |T^l+1|, x', y', k_h*k_w
             return output
+
+
+        def _channel_generator(channel_number, prerouted_output):
+            print(">>>>>>> Produce tensor stack")
+            this_channel_tensor = produce_tensor_Vl(channel_number)
+            print(this_channel_tensor.get_shape().as_list())
+            print(">>>>>>> Produce matrix")
+            print(channel_number)
+            this_matrix_multiplier = produce_matrix_Ml(this_channel_tensor.get_shape().as_list(), channel_number)
+            print(this_matrix_multiplier.get_shape().as_list())
+            print(">>>>>>> Perform multiplication")
+            #prerouted_output.append(prerouting(this_channel_tensor, this_matrix_multiplier))
+            this_output=prerouting(this_channel_tensor, this_matrix_multiplier)
+            print(this_output.get_shape().as_list())
+            prerouted_output = prerouted_output.write(channel_number, this_output )
+            print(">>>>>>> Next channel")
+            return channel_number+ 1, prerouted_output
+        #prerouted_output = []
+        prerouted_output = tf.TensorArray(dtype=tf.float32,size=input_tensor_shape[2], clear_after_read=True) # [] double check clear_after_read
+        _, prerouted_output = tf.while_loop(lambda channel_number, prerouted_output: channel_number <input_tensor_shape[2],
+            _channel_generator, loop_vars = [tf.constant(0), prerouted_output],
+            swap_memory=True #parallel_iterations=1???
+        )
+        prerouted_output = prerouted_output.stack() # will stack along axis=0 but I need it on axis=6 (the last axis)
+        prerouted_output = tf.transpose(prerouted_output, [1,2,3,4,5,6,0])
+        tmp = prerouted_output.get_shape().as_list()
+        print(tmp)
+        prerouted_output.set_shape(tmp[0:6] + [input_tensor_shape[2]])
+        print(prerouted_output.get_shape().as_list())
+        '''
         prerouted_output = []
         for channel_number in list(range(input_tensor_shape[2])):
             print(">>>>>>> Produce tensor stack")
             this_channel_tensor = produce_tensor_Vl(channel_number)
             print(">>>>>>> Produce matrix")
-            this_matrix_multiplier = produce_matrix_Ml(this_channel_tensor.get_shape().as_list())
+            this_matrix_multiplier = produce_matrix_Ml(this_channel_tensor.get_shape().as_list(), channel_number)
             print(">>>>>>> Perform multiplication")
             prerouted_output.append(prerouting(this_channel_tensor, this_matrix_multiplier))
             print(">>>>>>> Next channel")
         print(">>>>>Finished channel extraction")
-        prerouted_output = tf.stack(prerouted_output, axis=6)
+        prerouted_output = tf.stack(prerouted_output, axis=6)'''
+
+
+
+        print(">>>>>Finished channel extraction")
         prerouted_output_shape = prerouted_output.get_shape().as_list()
         prerouted_output_shape = prerouted_output_shape[0:5] + [prerouted_output_shape[5]*prerouted_output_shape[6]]
         print(prerouted_output_shape)
