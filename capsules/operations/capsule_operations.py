@@ -9,7 +9,9 @@ def fc_capsule_layer(input_tensor,scope_name, apply_weights=True,    share_weigh
     '''Fully connected Capsule Layer '''
     with tf.name_scope(scope_name):
         with tf.name_scope('transform'):
-            input_tensor_shape = tf.shape(input_tensor)
+            print(">>>>>>> Initialise weights")
+            print(input_tensor.get_shape().as_list())
+            input_tensor_shape = input_tensor.get_shape().as_list()
             # [batch, vec, num_channels, height, width]
             if(apply_weights==True):
                 with tf.variable_scope(scope_name):
@@ -22,25 +24,51 @@ def fc_capsule_layer(input_tensor,scope_name, apply_weights=True,    share_weigh
                         weights = tf.tile(weights, [1,1,1, *input_tensor_shape[3::]])
                     # weights shape: [batch, vec, output_vec_dimension, num_channels, height, width]
 
+                print(">>>>>>> Setup matrix multiplication")
                 input_tensor = tf.expand_dims(input_tensor, 1)
                 # [batch, 1, vec, num_channels, height, width]
 
                 # swap first and third dimensions
-                dims = [1]*len(input_tensor_shape)
+                dims = list(range(len(input_tensor_shape)+1))
                 dims[0] = 2
                 dims[2] = 0
-                input_tensor = tf.transpose(input_tensor, dims)
+                print(">>>>>>>>> Transpose input")
+                print(input_tensor.get_shape().as_list())
+                print(dims)
+                input_tensor = tf.transpose(input_tensor, dims) # [vec, 1, batch, num_ch, height, width]
+                print(">>>>>>>>> Transpose weights")
+                print(weights.get_shape().as_list())
+                print(dims)
+                weights = tf.transpose(weights, dims) # [output_vec_dimsion, vec, batch, num_ch, height, width]
+                print(">>>>>>> Multiply with weight matrix")
+                print(">>>>>>>>>>> Transpose for multiplication")
+                dims = list(range(len(input_tensor_shape)+1))
+                dims = list(range(2,len(dims))) + [0,1]
                 weights = tf.transpose(weights, dims)
-
-                input_tensor = tf.matmul(weights, input_tensor, name="Pose transformation")
-                # new shape: [output_vec_dimensions, 1, batch, num_channels, height, width]
                 input_tensor = tf.transpose(input_tensor, dims)
-                input_tensor_shape[2] = output_vec_dimension
+                print(weights.get_shape().as_list())
+                print(input_tensor.get_shape().as_list())
+                print(">>>>>>>>>>> Do Multiply!")
+                input_tensor = tf.matmul(weights, input_tensor, name="Pose transformation") # [batch, num_ch, height, weight, vec_dim_output, 1]
+                input_tensor = tf.squeeze(input_tensor, axis=-1) # [batch, num_ch, height, width, vec_dim_output]
+                print(input_tensor.get_shape().as_list())
+                print(">>>>>>>>>>> Undo Transpose")
+                dims = list(range(len(input_tensor_shape)))
+                dims = [dims[0], dims[-1]] + dims[1:len(dims)-1]
+                print(dims)
+                input_tensor = tf.transpose(input_tensor, dims)
+                # new shape: [output_vec_dimensions, 1, batch, num_channels, height, width]
+                ####print(">>>>>>> Transpose result")
+                ####input_tensor = tf.transpose(input_tensor, dims)
+                ####intput_tensor_shape = input_tensor.get_shape().as_list()
+                #input_tensor_shape[2] = output_vec_dimension
             # [] [unfinished] - havent add a bias term to Wx, - it should be Wx+b!
             #  NB/ in the original Sabour et al code, the '+b' they refer to in 'Wx_plus_b' is where the bias term, b, corresponds to the bias terms that are passed to the update_routing method
             if apply_bias == True:
                 raise NotImplemented
-    return input_tensor, input_tensor_shape
+    #return input_tensor, input_tensor_shape
+    print(input_tensor.get_shape().as_list())
+    return input_tensor
 
 
 def init_conv_2d(input_images, num_f_maps, scope_name, kernel_size=5):
@@ -102,11 +130,14 @@ kernel_is_vector=False):
         # input tensor=[batch, vec, num_dim, heigh, width]
 
         # strides such all be odd numbers
+        print(">>>>>>> Setup")
         if(np.mod(kernel_height, 2)==0 | np.mod(kernel_width, 2)==0):
             raise ValueError
+        strides_u = strides
         strides = [1,1] + strides[:] + [1]
 
-        input_tensor_shape = tf.shape(input_tensor)
+        input_tensor_shape = input_tensor.get_shape().as_list()
+        vec_dim = input_tensor_shape[1]
         #kernel_shape = [kernel_height, kernel_width, input_tensor_shape[1],
         #    output_kernel_vec_dim];
 
@@ -124,39 +155,66 @@ kernel_is_vector=False):
             _no_input_channels_for_conv = 1
             output_ch = input_tensor_shape[2]
         #initialise output tesnor of sape = [batch, output_vec, output_ch, height, width]
+        print(">>>>>>> Output Initialisation")
         output_tensor_shape = input_tensor_shape[:]
         output_tensor_shape[1] = output_kernel_vec_dim;
         output_tensor_shape[2] = output_ch;
+        '''
         output_tensor = tf.zeros(shape=output_tensor_shape, name="ConvCapInit")
+        '''
+        output_tensors = []
+
+        print(">>>>>>> Loop over channels")
         for o_chan_num in range(output_ch):
+            print(">>>>>>>>> Channel %d" % o_chan_num)
             if(convolve_across_channels==True):
                 channel_tensor = input_tensor
             else:
                 channel_tensor = input_tensor[:,:,:,:,o_chan_num]
-
+            print(channel_tensor.get_shape().as_list())
             with tf.variable_scope(scope_name):
                 if(kernel_is_vector==True):
                     kernel_shape = [vec_dim, kernel_height, kernel_width,
-                        _no_input_channels_for_conv, output_vec_dimension]
+                        _no_input_channels_for_conv, output_kernel_vec_dim]
                     kernel = variables.weight_variable(kernel_shape)
                 else:
                     kernel_shape = [1, kernel_height, kernel_width,
-                        _no_input_channels_for_conv, output_vec_dimension]
+                        _no_input_channels_for_conv, output_kernel_vec_dim]
                     kernel = variables.weight_variable(kernel_shape)
                     tmp_kernel_tiling = [1]*len(kernel_shape)
                     tmp_kernel_tiling[0] = input_tensor_shape[1]
                     kernel = tf.tile(kernel, tmp_kernel_tiling)
 
+            print(">>>>>>>>>>>>> Conv3D Setup")
             padding_size = np.array([kernel_height, kernel_width])
             padding_size = (padding_size-1)/2
-            padding = np.ones([len(input_tensor_shape), 2])
-            padding[2] = np.array([padding_size, padding_size])
-            padding[3] = padding[2]
+            padding = np.zeros([len(input_tensor_shape), 2])
+            padding[2] = np.array([padding_size[0], padding_size[0]])
+            padding[3] = np.array([padding_size[1], padding_size[1]])
+            #print(padding)
+            print(channel_tensor.get_shape().as_list())
             channel_tensor = tf.pad(channel_tensor,padding)
-
-            output_tensor_tmp = tf.nn.conv3d(channel_tensor,kernel, strides, "VALID", name="Conv3D")
+            print(padding)
+            print(channel_tensor.get_shape().as_list())
+            print(">>>>>>>>>>>>> run convolution")
+            #output_tensor_tmp = tf.nn.conv3d(channel_tensor,kernel, strides, "VALID")
+            ''' # TEMP: '''
+            print(channel_tensor.get_shape().as_list())
+            print(output_kernel_vec_dim)
+            print([vec_dim, kernel_height, kernel_width])
+            print([1] + strides_u)
+            output_tensor_tmp = tf.layers.conv3d(channel_tensor,output_kernel_vec_dim,[vec_dim, kernel_height, kernel_width], [1] + strides_u, "VALID", "channels_last")
+            print(output_tensor_tmp.get_shape().as_list())
+            ''' END TEMP'''
+            #output_tensor_tmp = tf.layers.conv3d(channel_tensor,kernel, strides, "VALID", name="Conv3D")
             # ^[batch, 1, height, width, output_vec_dimension]
+            print(">>>>>>>>>>>>> run convolution: transpose")
             output_tensor_tmp = tf.transpose(output_tensor_tmp, [0,4,1,2,3])
-            output_tensor[:,:,o_chan_num,:,:] = output_tensor_tmp[:]
+            print(">>>>>>>>>>>>> output for channel to overall output")
+            #output_tensor[:,:,o_chan_num,:,:] = output_tensor_tmp[:]
+            print(output_tensor_tmp.get_shape().as_list())
+            output_tensors.append(output_tensor_tmp)
+        output_tensor = tf.concat(output_tensors, axis=2)
+
 
     return output_tensor

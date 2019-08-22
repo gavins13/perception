@@ -49,7 +49,7 @@ def weight_variable(shape, stddev=0.1, verbose=False):
   return weights
 
 
-def bias_variable(shape, verbose=False):
+def bias_variable(shape, verbose=False, init=0.1):
   """Creates a CPU variable with constant initialization. Adds summaries.
 
   Args:
@@ -64,7 +64,7 @@ def bias_variable(shape, verbose=False):
       biases = tf.get_variable(
           'biases',
           shape,
-          initializer=tf.constant_initializer(0.1),
+          initializer=tf.constant_initializer(init),
           dtype=tf.float32)
   variable_summaries(biases, verbose)
   return biases
