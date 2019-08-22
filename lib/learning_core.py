@@ -6,7 +6,7 @@ class learning_core(object):
 
   def strap_architecture(self, ArchitectureObject):
     self.ArchitectureObject = ArchitectureObject
-    hparams = ArchitectureObject.hparam
+    hparams = ArchitectureObject.hparams
 
     with tf.device('/cpu:0'):
       self._global_step = tf.get_variable(
@@ -48,34 +48,34 @@ class learning_core(object):
   def evaluate_classification(model_output, gt_output, this_tower_scope, num_targets=1, loss_type='margin'):
     # [] - would be good to rewrite this in the future [unfinished]
     # [] to delete num_targets? - num targets is the number of classifications made per label
-  with tf.name_scope('loss'):
-    if loss_type == 'margin':
-      classification_loss = _margin_loss(gt_output, model_output)
-    else:
-      raise NotImplementedError('Not implemented')
+    with tf.name_scope('loss'):
+        if loss_type == 'margin':
+          classification_loss = _margin_loss(gt_output, model_output)
+        else:
+          raise NotImplementedError('Not implemented')
 
     with tf.name_scope('total'):
       batch_classification_loss = tf.reduce_mean(classification_loss, axis=0)
       tf.add_to_collection('losses', batch_classification_loss)
-  tf.summary.scalar('batch_classification_cost', batch_classification_loss)
+      tf.summary.scalar('batch_classification_cost', batch_classification_loss)
 
-  all_losses = tf.get_collection('losses', this_tower_scope) # list of tensors returned
-  total_loss = tf.add_n(all_losses, name='total_loss') # element-wise addition of the list of tensors
-  tf.summary.scalar('total_loss', total_loss)
+    all_losses = tf.get_collection('losses', this_tower_scope) # list of tensors returned
+    total_loss = tf.add_n(all_losses, name='total_loss') # element-wise addition of the list of tensors
+    tf.summary.scalar('total_loss', total_loss)
 
-  with tf.name_scope('accuracy'):
-    with tf.name_scope('correct_prediction'):
-      _, targets = tf.nn.top_k(gt_output, k=num_targets)
-      _, predictions = tf.nn.top_k(model_output, k=num_targets)
-      missed_targets = tf.sets.set_difference(targets, predictions) # i.e. return only the values which are different (not the same as minus!)
-      num_missed_targets = tf.sets.set_size(missed_targets)
-      correct = tf.equal(num_missed_targets, 0)
-      almost_correct = tf.less(num_missed_targets, num_targets)
-      correct_sum = tf.reduce_sum(tf.cast(correct, tf.float32))
-      almost_correct_sum = tf.reduce_sum(tf.cast(almost_correct, tf.float32))
     with tf.name_scope('accuracy'):
-      accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
-  tf.summary.scalar('accuracy', accuracy)
-  tf.summary.scalar('correct_prediction_batch', correct_sum)
-  tf.summary.scalar('almost_correct_batch', almost_correct_sum)
-  return total_loss, correct_sum, almost_correct_sum
+        with tf.name_scope('correct_prediction'):
+            _, targets = tf.nn.top_k(gt_output, k=num_targets)
+            _, predictions = tf.nn.top_k(model_output, k=num_targets)
+            missed_targets = tf.sets.set_difference(targets, predictions) # i.e. return only the values which are different (not the same as minus!)
+            num_missed_targets = tf.sets.set_size(missed_targets)
+            correct = tf.equal(num_missed_targets, 0)
+            almost_correct = tf.less(num_missed_targets, num_targets)
+            correct_sum = tf.reduce_sum(tf.cast(correct, tf.float32))
+            almost_correct_sum = tf.reduce_sum(tf.cast(almost_correct, tf.float32))
+    with tf.name_scope('accuracy'):
+        accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
+        tf.summary.scalar('accuracy', accuracy)
+        tf.summary.scalar('correct_prediction_batch', correct_sum)
+        tf.summary.scalar('almost_correct_batch', almost_correct_sum)
+    return total_loss, correct_sum, almost_correct_sum

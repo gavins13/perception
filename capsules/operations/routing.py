@@ -33,7 +33,7 @@ def _patch_based_routing(input_tensor, scope_name, squash_biases=None,  num_rout
 
     # End Config #
 
-    if(deconvolution_factors!==None && len(deconvolution_factors)==3): # None is the same as [0,0,0] ideally
+    if((deconvolution_factors!=None) & (len(deconvolution_factors)==3)): # None is the same as [0,0,0] ideally
         input_tensor_shape = tf.shape(input_tensor)
         new_input_tensor_shape = np.multiply(np.array(input_tensor_shape[2::]), np.array(deconvolution_factors)+1);
         new_input_tensor_shape = new_input_tensor_shape + np.array(deconvolution_factors)
@@ -41,12 +41,19 @@ def _patch_based_routing(input_tensor, scope_name, squash_biases=None,  num_rout
         new_input_tensor_shape = input_tensor_shape[0:3] + new_input_tensor_shape[:]
         new_input_tensor = np.zeros((*new_input_tensor_shape))
 
+        input_tensor = np.transpose(input_tensor, 2,3,4,0,1)
+        new_input_tensor = np.transpose(new_input_tensor, 2,3,4,0,1)
         for i in range(input_tensor_shape[2]):
             for j in range(input_tensor_shape[3]):
                 for k in range(input_tensor_shape[4]):
                     this_slice_pos = np.multiply(np.array([i,j,k]), np.array(deconvolution_factors))
-                    this_slice_pos = input_tensor_shape[0:2] + list(this_slice_pos)
-                    new_input_tensor[*this_slice_pos] = input_tensor[3::]
+                    #this_slice_pos = input_tensor_shape[0:2] + list(this_slice_pos)
+                    this_slice_pos = tuple([i,j,k])
+                    this_slice_data = input_tensor[this_slice_pos]
+                    new_input_tensor[this_slice_pos] = this_slice_data
+                    #new_input_tensor[*this_slice_pos] = input_tensor[3::]
+        input_tensor = np.transpose(input_tensor, 3,4,0,1,2)
+        new_input_tensor = np.transpose(new_input_tensor, 3,4,0,1,2)
 
         del input_tensor
         input_tensor = new_input_tensor
@@ -100,10 +107,10 @@ def _patch_based_routing(input_tensor, scope_name, squash_biases=None,  num_rout
 
         vec_dim = input_tensor_shape[1]
 
-        if(squash_biases === None):
+        if(squash_biases == None):
             with tf.variable_scope(scope_name):
                 bias_dimensions = output_dimensions[:]
-                if(bias_channel_sharing===True): # wish to share bias terms across all channels
+                if(bias_channel_sharing==True): # wish to share bias terms across all channels
                     bias_dimensions[0] = 1
                     squash_biases = variables.new_bias_variable(shape=bias_dimensions, init=0.1)
                     tiling_term = [1] * tf.size(output_dimensions)
@@ -202,10 +209,10 @@ def _routing(input_tensor, scope_name, output_dimensions=None, squash_biases=Non
     vec_dim = input_tensor_shape[1]
 
     with tf.name_scope(scope_name):
-        if(squash_biases === None):
+        if(squash_biases == None):
             with tf.variable_scope(scope_name):
                 bias_dimensions = output_dimensions[:]
-                if(bias_channel_sharing===True): # wish to share bias terms across all channels
+                if(bias_channel_sharing==True): # wish to share bias terms across all channels
                     bias_dimensions[0] = 1
                     squash_biases = variables.new_bias_variable(shape=bias_dimensions)
                     tiling_term = [1] * tf.size(output_dimensions)

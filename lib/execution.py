@@ -2,16 +2,20 @@ import tensorflow as tf
 
 import os, sys
 
+from datetime import datetime
+
 # Object is a context manager!
 class execution(object):
   def __init__(self, project_path, model, data_strap, type='train', load=None, experiment_name=None):
     # Set Saving Directories
-    if(name===None):
-      experiment_name = raw_input("Name of experiment: ")
-    self.foldername = experiment_name + '_' + str(datetime.now())
+    if(experiment_name==None):
+      experiment_name = input("Name of experiment: ")
+    datetimestr = str(datetime.now())
+    datetimestr = datetimestr.replace(" ", "-")
+    self.foldername = experiment_name + '_' + datetimestr
     self.foldername_full = project_path + '/experimental_results/' + self.foldername
-    os.mkdir(foldername_full, 0755  );
-    print("Results will be saved to %s" % self.train_foldername_full)
+    print("Results will be saved to %s" % self.foldername_full)
+    os.mkdir( self.foldername_full, 0o755 );
     self.summary_folder = self.foldername_full + '/' +type + '/'
 
     # Set up the data
@@ -22,7 +26,7 @@ class execution(object):
     elif(type=='evaluate'):
         self.experiment = self.evaluate
         self.data_strap.will_test()
-        if(load===None):
+        if(load==None):
             raise Exception('The Model Saved directory is not set!')
         self.load_folder = self.foldername_full + '/' + load + '/'
     else:
@@ -31,6 +35,7 @@ class execution(object):
     # Set up the retrieval of the results (I.e. Build the Summarisd results, and results Graph)
     with tf.Graph().as_default():
     #   -->  Build model
+        print(">> Time to build TF Graph!")
         self.summarised_result, self.results = model.run_multi_gpu(data_strap)
     #   -->  Print stats
     self.param_stats = tf.contrib.tfprof.model_analyzer.print_model_analysis(
@@ -40,15 +45,20 @@ class execution(object):
     sys.stdout.write('total_params: %d\n' % self.param_stats.total_parameters)
 
   def __enter__(self):
+      print(">Create TF FileWriter")
       self.writer = tf.summary.FileWriter(self.summary_folder)
 
   def run_task(self, max_steps, save_step=1, max_steps_to_save=1000):
       # save_step defines the increment amount before saving a new checkpoint
+      print(">Create TF session")
       self.session = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
       init_op = tf.group(tf.global_variables_initializer(),
                          tf.local_variables_initializer())
+      print(">Initialise sesssion with variables")
       self.session.run(init_op) # Initialise graph with variables
+      print(">Create TF Saver")
       self.saver = tf.train.Saver(max_to_keep=max_steps_to_save)
+      print(">Load last saved model")
       self.last_step = self.load_saved_model()
       coord = tf.train.Coordinator()
       threads = tf.train.start_queue_runners(sess=session, coord=coord)
@@ -82,17 +92,17 @@ class execution(object):
       return int(file_name.split('-')[-1])
 
     if tf.gfile.Exists(self.summary_folder):
-    ckpt = tf.train.get_checkpoint_state(self.summary_folder)
-    if ckpt and ckpt.model_checkpoint_path:
-      self.saver.restore(self.session, ckpt.model_checkpoint_path)
-      prev_step = extract_step(ckpt.model_checkpoint_path)
+        ckpt = tf.train.get_checkpoint_state(self.summary_folder)
+        if ckpt and ckpt.model_checkpoint_path:
+          self.saver.restore(self.session, ckpt.model_checkpoint_path)
+          prev_step = extract_step(ckpt.model_checkpoint_path)
+        else:
+          tf.gfile.DeleteRecursively(load_dir)
+          tf.gfile.MakeDirs(load_dir)
+          prev_step = 0
     else:
-      tf.gfile.DeleteRecursively(load_dir)
-      tf.gfile.MakeDirs(load_dir)
-      prev_step = 0
-    else:
-    tf.gfile.MakeDirs(load_dir)
-    prev_step = 0
+        tf.gfile.MakeDirs(load_dir)
+        prev_step = 0
     return prev_step
 
   def __exit__(self):
@@ -102,6 +112,7 @@ class execution(object):
   def training(self, max_steps, save_step):
     step = 0
     for i in range(self.last_step, max_steps):
+        print("training: %d" % i)
         step += 1
         summary, _ = self.session.run([self.result.summary, self.result.train_op]) # Run graph
         self.writer.add_summary(summary, i)
