@@ -349,7 +349,7 @@ def patch_based_routing_for_convcaps_BAD(input_tensor, squash_biases,  num_routi
     return tf.cast(resulting_votes, dtype="float32")
 
 
-def patch_based_routing_for_convcaps(input_tensor, squash_biases,  num_routing=3 ):
+def patch_based_routing_for_convcaps(input_tensor, squash_biases,  num_routing=3 , squash_relu=False):
     # Start Config [config] #
     clear_after_read_for_votes = True
     its = input_tensor.get_shape().as_list()
@@ -376,6 +376,17 @@ def patch_based_routing_for_convcaps(input_tensor, squash_biases,  num_routing=3
 
     vec_dim = input_tensor_shape[1]
     batch_n = input_tensor_shape[0]
+
+    def _squash_relu(input_tensor): # provided: [batch, vec_dim, num_ch, h_o, w_o]; same out
+        '''norm = tf.norm(input_tensor, axis=1, keepdims=True)
+        norm_squared = tf.multiply(norm ,norm)
+        part_b = tf.divide( input_tensor, norm)
+        denom = tf.add(1., norm_squared)
+        part_a = tf.divide(norm_squared , denom)
+        res = tf.multiply( part_a, part_b  )
+        return tf.nn.relu(part_b)'''
+        return tf.nn.relu(input_tensor)
+
 
     print(">>>>>>>>> Dynamic Routing: Start Iterating...")
     def _algorithm(i, logits, voting_tensors):
@@ -429,7 +440,10 @@ def patch_based_routing_for_convcaps(input_tensor, squash_biases,  num_routing=3
         print(s_j.get_shape().as_list())
 
         print(">>>>>>>>>>>>>>>>> Squashing")
-        v_j = _squash(s_j) # provided: [batch, vec_dim, num_ch, h_o, w_o]; same out
+        if(squash_relu==False):
+            v_j = _squash(s_j) # provided: [batch, vec_dim, num_ch, h_o, w_o]; same out
+        else:
+            v_j = _squash_relu(s_j)
         #v_j dimensions = [batch, vec_dim, num_channels_output, height_output, width_output]
         # # [batch, o_vec, o_num_channels, o_h*o_w]
         print(v_j.get_shape().as_list())
