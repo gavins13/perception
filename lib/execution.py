@@ -63,7 +63,7 @@ class execution(object):
       #print(self.graph)
 
       config = tf.ConfigProto(allow_soft_placement=True) #[] True is better
-      config.gpu_options.allow_growth = True
+      #config.gpu_options.allow_growth = True
 
       with tf.Session(graph=self.graph, config=config) as self.session:
           init_op = tf.group(tf.global_variables_initializer(),
@@ -87,8 +87,6 @@ class execution(object):
       for j in range(self.last_step, max_steps):
           for i in range(self.data_strap.n_splits):
               print("training epoch: %d" % j)
-              print("data split: %d of %d" % (i, self.data_strap.n_splits))
-              print("step: %d" % step)
               step += 1
               feed_dict = {}
               for gpu in range(self.data_strap.num_gpus):
@@ -96,6 +94,8 @@ class execution(object):
                   feed_dict["InputDataGPU" + str(gpu) + ":0"] = train_data
                   feed_dict["InputLabelsGPU" + str(gpu) + ":0"] = train_labels
               #sess.run(y, {tf.get_default_graph().get_operation_by_name('x').outputs[0]: [1, 2, 3]})
+              print("data split: %d of %d" % (i, self.data_strap.n_splits))
+              print("step: %d" % step)
               summary, _ = session.run([self.summarised_result.summary, self.summarised_result.train_op], feed_dict=feed_dict) # Run graph
               self.writer.add_summary(summary, step)
               if (step + 1) % save_step == 0:
