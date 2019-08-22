@@ -84,7 +84,7 @@ class LocalisedCapsuleLayer(object): # LocalCaps
                   with tf.variable_scope('squash'):
                       squash_biases = variables.bias_variable(squash_bias_shape) if(self.options["squash_He"]==False) else variables.weight_variable(squash_bias_shape,He=True, He_nl=np.int(np.prod(squash_bias_shape)))
           else:
-              squash_biases = tf.fill(squash_bias_shape, 0.)
+              squash_biases = False
           # [v_d^l+1, |T^l+1|, x'*y', 1]
         else:
           squash_biases = self.options["supplied_squash_biases"]
@@ -92,7 +92,7 @@ class LocalisedCapsuleLayer(object): # LocalCaps
 
 
         print(">>>>> Perform routing")
-        routed_output = route_votes(votes, squash_biases=squash_biases,  num_routing=self.params["num_routing"], squash_relu=self.options["squash_relu"], softmax_opposite=self.options["routing_softmax_opposite"])
+        routed_output = route_votes(votes, squash_biases=squash_biases,  num_routing=self.params["num_routing"], squash_relu=self.options["squash_relu"], softmax_opposite=self.options["routing_softmax_opposite"], use_squash_bias=self.options["use_squash_bias"])
         print(">>>>> Finished Routing")
         # M, v_d^l+1, |T^l+1|, x'*y', 1
         routed_output_shape = routed_output.get_shape().as_list()

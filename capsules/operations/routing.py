@@ -6,17 +6,18 @@ from capsule_functions import _squash
 import variables
 import sys
 
-def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False, squash_relu_leaky=False, softmax_opposite=False):
+def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False, squash_relu_leaky=False, softmax_opposite=False, use_squash_bias=True):
     # Start Config [config] #
     its = input_tensor.get_shape().as_list()
 
     # input tensor has form: [batch, o_vec, o_num_channels, o_h*o_w, TOBEROUTED]  [M, v_d^l+1, |T^l+1|, x'*y', VOTES]
-    print("begining on patch based conv caps routing")
-    print(squash_biases.get_shape().as_list())
-    #squash biases has form: # [o_vec_dim, o_num_channel, o_h*o_w, 1]
-    print(squash_biases.get_shape().as_list()) # [v_d^l+1, |T^l+1|, x'*y', 1])
-    squash_biases = tf.transpose(squash_biases, [3,0,1,2]) # [1, v_d^l+1, |T^l+1|, x'*y'])
-    squash_biases = tf.tile(squash_biases, [its[0], 1, 1, 1])
+    if(use_squash_bias==True):
+        print("begining on patch based conv caps routing")
+        print(squash_biases.get_shape().as_list())
+        #squash biases has form: # [o_vec_dim, o_num_channel, o_h*o_w, 1]
+        print(squash_biases.get_shape().as_list()) # [v_d^l+1, |T^l+1|, x'*y', 1])
+        squash_biases = tf.transpose(squash_biases, [3,0,1,2]) # [1, v_d^l+1, |T^l+1|, x'*y'])
+        squash_biases = tf.tile(squash_biases, [its[0], 1, 1, 1])
 
     input_tensor_shape = input_tensor.get_shape().as_list()
     print(input_tensor_shape)
@@ -41,6 +42,7 @@ def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False,
         part_a = tf.divide(norm_squared , denom)
         res = tf.multiply( part_a, part_b  )
         return tf.nn.relu(part_b)'''
+        input_tensor = _squash(input_tensor)
         if(leaky==True):
             return tf.nn.leaky_relu(input_tensor)
         else:
@@ -97,7 +99,7 @@ def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False,
         print(">>>>>>>>>>>>>>>>>>> Add")
         #s_j = tf.add(s_j, tf.transpose(tf.tile(tf.expand_dims(squash_biases, 3), [1,1,1, batch_n]), [3,0,1, 2])) # [] [unfinished] - the [1,1,1] needs to be done generically
         # squash bisaes: [1,o_vec_dim, o_num_channel, o_h*o_w]
-        s_j = tf.add(s_j, squash_biases)
+        s_j = tf.add(s_j, squash_biases) if (use_squash_bias==True) else s_j
 
         print(s_j.get_shape().as_list())
 
