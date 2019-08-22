@@ -1,5 +1,6 @@
 from lib.multi_gpu_frame import multi_gpu_model as resources_model
 from capsules.architectures.v0_rev0_1 import architecture as architecture
+from capsules.architectures.v0_rev1_2_test import architecture as test_architecture
 from lib.data_frame import Data
 
 import os, sys
@@ -17,6 +18,8 @@ project_path = '/vol/biomedic/users/kgs13/PhD/capsule_networks/first_model'
 cpu_only = False
 num_gpus=1
 eager=False
+test=True
+mini_batch_size=4
 
 ''' Logging '''
 import logging
@@ -50,14 +53,18 @@ try:
   print("Start resource manager...")
   System = resources_model(cpu_only=cpu_only,eager=eager)
   print("Create Network Architecture...")
-  CapsuleNetwork = architecture()
+  if(test==True):
+      print("Runnin Test Architecture... *** MAIN ARCHITECTURE NOT BEING USED ***")
+      CapsuleNetwork = test_architecture()
+  else:
+      CapsuleNetwork = architecture()
   print("Strap Architecture to Resource Manager")
   System.strap_architecture(CapsuleNetwork)
 
   print("Strap Managed Architecture to a training scheme `Executer`")
   #with execution(project_path, System, DataModel, experiment_name="test") as Executer:
   #    Executer.run_task(max_steps=1000, save_step=0)
-  Executer = execution(project_path, System, DataModel, experiment_name="test", max_steps_to_save=1000, mini_batch_size=4)
+  Executer = execution(project_path, System, DataModel, experiment_name="test", max_steps_to_save=1000, mini_batch_size=mini_batch_size)
   Executer.__enter__()
   Executer.run_task(max_steps=1000, save_step=1)
   Executer.__exit__(None,None,None)
