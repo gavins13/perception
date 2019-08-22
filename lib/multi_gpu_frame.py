@@ -47,10 +47,11 @@ class multi_gpu_model(learning_core):
             print('>>>Data Shapes')
             print(input_data_shape)
             print(input_labels_shape)
-            if validation_graph is False:
-                this_data = data[i]
-            else:
-                this_data = data
+
+            this_data = {}
+            for key in data.keys():
+                this_data[key] = data[key][i]
+
             tower_output = self._single_tower(i, input_data_shape, input_labels_shape,  validation_input_data_shape, validation_input_labels_shape, extra_data_shapes, validation_extra_data_shapes, this_data, validation_graph=validation_graph)
 
             print(">>>Grad shapes")
@@ -116,7 +117,7 @@ class multi_gpu_model(learning_core):
                 #print(input_data.get_shape().as_list())
                 print(".")
                 #input_labels = tf.convert_to_tensor(input_labels, dtype=tf.float32)
-                output, loss, diagnostics, output_weights = self.ArchitectureObject.loss_func(data, validation_graph=validation_graph)
+                output, loss, diagnostics, output_weights = self.ArchitectureObject.loss_func(data["input"], data["labels"], data["extra_data"], validation_graph=validation_graph)
                 grads_and_vars  = self._optimizer.compute_gradients(loss) # [] [unfinished] why
             else:
                 #grads_and_vars  = self._optimizer.compute_gradients(losses_func)
