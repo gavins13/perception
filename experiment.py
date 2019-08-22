@@ -32,9 +32,9 @@ try:
   CapsuleNetwork = test_caps_architecture()
   System.strap_architecture(CapsuleNetwork)
 
-  Executer = execution(project_path, System, DataModel)
-  Executer.strap_data(DataObject)
-  Executer.exit()
+  with execution(project_path, System, DataModel) as Executer:
+      Executer.strap_data(DataObject)
+
 
 
 
