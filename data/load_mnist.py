@@ -1,12 +1,17 @@
 import pickle as cpk
 import numpy as np
 import random
+import os
 
-filename= 'data/rmnist_expanded_10.pkl'
 
 def load_data():
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    filename= dir_path + '/rmnist_expanded_10.pkl'
+    print("Loading data")
     with open(filename, 'rb') as fname:
-        mnist = cpk.load(fname)
+        print("Opened data successfully")
+        mnist = cpk.load(fname, encoding='latin1') # latin1 due to incompatibility between pickle in python2 and python3
+
 
     mnist_data = np.array(mnist[0][0]) # (900, 784)
     mnist_labels = np.array(mnist[0][1]) # (900,)
@@ -23,8 +28,9 @@ def load_data():
     mnist_test_data = mnist_data[test_data_idx, :]
     mnist_test_labels = mnist_data[test_data_idx]
 
-    mnist_train_data = np.reshape([200, 28, 28])
-    mnist_test_data = np.reshape([50, 28, 28])
+    mnist_train_data = np.reshape(mnist_train_data, [200, 28, 28])
+    mnist_test_data = np.reshape(mnist_test_data,[50, 28, 28])
 
+    print("Finished loading reduced-size MNIST dataset (200 training, 50 test)")
 
     return mnist_train_data, mnist_train_labels, mnist_test_data, mnist_test_labels
