@@ -15,3 +15,4 @@ def architecture(input_images):
         layer4 = tf.squeeze(layer3b, axis=[3,4])
         layer4 = tf.tranpose(layer4, [0,2,1])
         output = tf.norm(layer4, axis=2)
+    return output
