@@ -90,7 +90,7 @@ class execution(object):
       print(">Create TF session")
       #print(self.graph)
 
-      config = tf.ConfigProto(allow_soft_placement=False) #[] True is better
+      config = tf.ConfigProto(allow_soft_placement=True) #[] True is better
       #[]config.gpu_options.allow_growth = True
 
       with tf.Session(graph=self.graph, config=config) as self.session:
