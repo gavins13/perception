@@ -37,7 +37,7 @@ try:
 
   print("Strap Managed Architecture to a training scheme `Executer`")
   with execution(data_config.project_path, System, DataModel, experiment_name=experiment_name, max_steps_to_save=5, mini_batch_size=system_config.mini_batch_size, type=data_config.execution_type, load=data_config.model_load_dir) as Executer:
-        Executer.run_task(max_steps=1000, save_step=1)
+        Executer.run_task(max_epochs=1000, save_step=1)
 except Exception as e:
   err_message = e.args
   print("Exception thrown, see below:")
