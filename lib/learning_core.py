@@ -21,7 +21,11 @@ class learning_core(object):
       learning_rate = tf.maximum(learning_rate, self.hparams.maximum_learning_rate)
       self.learning_rate = learning_rate
 
-      self._optimizer = tf.train.AdamOptimizer(learning_rate)
+      if(hasattr(self.ArchitectureObject, 'AdamEpsilon')):
+          AdamEpsilon = self.ArchitectureObject.AdamEpsilon
+      else:
+          AdamEpsilon = 1.e-8
+      self._optimizer = tf.train.AdamOptimizer(learning_rate, epsilon=AdamEpsilon)
 
 
   def _average_diagnostics(self, diagnostics_all_towers):
@@ -40,6 +44,16 @@ class learning_core(object):
         else:
             diagnostics[key] = tf.reduce_mean(vals)
         full_diagnostics[key] = tf.convert_to_tensor(vals)
+        #full_diagnostics[key] = vals
+        this_shape = full_diagnostics[key].get_shape().as_list()
+        print(this_shape)
+        if(len(this_shape)>1):
+            this_shape_first = this_shape[0]
+            del(this_shape[0])
+            this_shape[0] = this_shape[0] * this_shape_first
+            full_diagnostics[key] = tf.reshape(full_diagnostics[key], this_shape )
+        this_shape = full_diagnostics[key].get_shape().as_list()
+        print(this_shape)
     return diagnostics, full_diagnostics
 
 
