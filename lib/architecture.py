@@ -3,14 +3,14 @@ import tensorflow as tf
 
 
 class architecture_base(ABC):
-    def __init__(self):
+    def __init__(self, evaluate=False):
         self.hparams = tf.contrib.training.HParams(
           decay_rate=0.9,
           decay_steps=1000.,
           learning_rate=1.e-5,  # 0.001
           maximum_learning_rate=1.e-7,  # 1.e-7
         )
-        self.evaluate = False
+        self.evaluate = evaluate
         self.__config__()
 
     @abstractmethod
