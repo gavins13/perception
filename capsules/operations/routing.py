@@ -57,6 +57,8 @@ def patch_based_routing(input_tensor, scope_name, squash_biases=None,  num_routi
     print(">>>>>>>>> Formulate Input tensor with patch channels")
     input_patch_based_tensor_shape = input_tensor_shape[0:2] + patch_shape + output_dimensions
     #input_patch_based_tensor = np.zeros(input_patch_based_tensor_shape)
+
+    '''
     input_patch_based_tensor = []
     print(">>>>>>>>>>> Enter loop")
     for i in range(int(output_heightwise)):
@@ -87,6 +89,49 @@ def patch_based_routing(input_tensor, scope_name, squash_biases=None,  num_routi
     input_patch_based_tensor = tf.concat(input_patch_based_tensor, axis=5)
     print(input_patch_based_tensor.get_shape().as_list())
     print(input_patch_based_tensor_shape)
+    '''
+    def _patching(i,j,k,input_patch_based_tensor):
+        ii = i*patch_stride[1]
+        jj = j*patch_stride[2]
+        kk = k*patch_stride[0]
+        #this_patch = input_tensor[:,:,kk:kk+patch_shape[0],ii:ii+patch_shape[1],jj:jj+patch_shape[2]]
+        begin=[0,0,kk,ii,jj]
+        size=[input_patch_based_tensor_shape[0], input_patch_based_tensor_shape[1]] + patch_shape
+        this_patch = tf.slice(input_tensor, begin, size)
+        # ^ [batch, vec, patch_shape[0](numchannels), patch_shape[1](width), patch_shape[2](height)]
+        this_patch_shape = this_patch.get_shape().as_list()
+        #this_patch = tf.expand_dims(this_patch, axis=-1) # [batch, vec,patchshape[0], patchshape[1], patchshape[2],
+                                                         # 1]
+        ind =  i*(int(output_widthwise)*int(output_channelwise)) + (j*int(output_channelwise)) + k
+        input_patch_based_tensor = input_patch_based_tensor.write(ind, this_patch)
+        #input_patch_based_tensor.append(this_patch)
+        def incrementk():
+            tmp = tf.add(k,1)
+            return i,j,tmp
+        def incrementj():
+            tmp=tf.add(j,1)
+            return i, tmp, tf.constant(0)
+        def incrementi():
+            tmp = tf.constant(0)
+            tmp2 = tf.add(i,1)
+            return tmp2, tmp, tf.constant(0)
+        def incrementIorJ():
+            tmp_i,tmp_j,tmp_k = tf.cond(tf.equal(j, int(output_widthwise)-1), incrementi, incrementj)
+            return tmp_i,tmp_j,tmp_k
+        new_i,new_j,new_k = tf.cond(tf.equal(k, int(output_channelwise)-1), incrementIorJ, incrementk)
+        return new_i,new_j,new_k, input_patch_based_tensor
+    input_patch_based_tensor=tf.TensorArray(dtype=tf.float32, size=output_channelwise*output_heightwise*output_widthwise, clear_after_read=True)
+    current_i=tf.constant(0)
+    current_j=tf.constant(0)
+    current_k=tf.constant(0)
+    _,_,_,input_patch_based_tensor = tf.while_loop(lambda i,j,k,input_patch_based_tensor: i<output_heightwise,
+    _patching, loop_vars = [current_i,current_j,current_k,input_patch_based_tensor], swap_memory=True, parallel_iterations=1)
+    input_patch_based_tensor = input_patch_based_tensor.stack() # WILL STACK on axis=0, but we need to stack along axis = 5
+    #stacked_slices = tf.Print(stacked_slices, [i_slices_len], 'Stacked success')
+    input_patch_based_tensor = tf.transpose(input_patch_based_tensor, [1,2,3,4,5,0])
+    input_patch_based_tensor_new_shape = input_tensor_shape[0:2] + patch_shape + [output_channelwise*output_heightwise*output_widthwise]
+    input_patch_based_tensor.set_shape(input_patch_based_tensor_new_shape)
+
     print(">>>>>>>>> Reshape concat")
     input_patch_based_tensor = tf.reshape(input_patch_based_tensor, input_patch_based_tensor_shape)
 
@@ -190,7 +235,7 @@ def patch_based_routing(input_tensor, scope_name, squash_biases=None,  num_routi
             lambda i, logits, voting_tensors: i < num_routing,
             _algorithm,
             loop_vars = [i, logits, voting_tensors],
-            swap_memory=True
+            swap_memory=True, parallel_iterations=1
         )
         #for i in range(num_routing):
         #    _, logits, voting_tensors = _algorithm(i, logits, voting_tensors)
@@ -347,7 +392,7 @@ def routing(input_tensor, scope_name, output_dimensions=None, squash_biases=None
             lambda i, logits, voting_tensors: i < num_routing,
             _algorithm,
             loop_vars = [i, logits, voting_tensors],
-            swap_memory=gpu_cpu_swap
+            swap_memory=gpu_cpu_swap, parallel_iterations=1
         )
         #for i in range(num_routing):
         #    _, logits, voting_tensors = _algorithm(i, logits, voting_tensors)
@@ -520,6 +565,6 @@ def patch_based_routing_OLD(input_tensor, scope_name, squash_biases=None,  num_r
             lambda i, logits, voting_tensors: i < num_routing,
             _algorithm,
             loop_vars = [i, logits, voting_tensors],
-            swap_memory=gpu_cpu_swap
+            swap_memory=gpu_cpu_swap, parallel_iterations=1
         )
     return voting_tensors.read(num_routing-1)
