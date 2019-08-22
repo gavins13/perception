@@ -1,4 +1,8 @@
 #!/bin/bash
+
+export TF_CPP_MIN_LOG_LEVEL=0
+export TF_CPP_MIN_VLOG_LEVEL=0 # usually = 1 is okay for debugging
+
 for i in "$@"
 do
 case $i in
@@ -26,6 +30,10 @@ case $i in
     NO_EMAIL=YES
     shift # past argument with no value
     ;;
+    -d=*|--debug=*)
+    export TF_CPP_MIN_VLOG_LEVEL="${i#*=}"
+    shift # past argument=value
+    ;;
     # --default)
     #DEFAULT=YES
     #shift # past argument with no value
@@ -51,8 +59,6 @@ else
   echo $LD_LIBRARY_PATH
 fi
 
-export TF_CPP_MIN_LOG_LEVEL=0
-export TF_CPP_MIN_VLOG_LEVEL=0 # usually = 1 is okay for debugging
 #python3 -m memory_profiler experiment.py
 
 
