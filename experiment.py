@@ -33,8 +33,7 @@ try:
   System.strap_architecture(CapsuleNetwork)
 
   with execution(project_path, System, DataModel) as Executer:
-      Executer.strap_data(DataObject)
-
+      Executer.run_task(max_steps=1000, save_step=0)
 
 
 
