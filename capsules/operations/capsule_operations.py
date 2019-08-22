@@ -445,7 +445,7 @@ kernel_is_vector=False, upsampling_factor=None, type="SAME", num_routing=3):
 
 
 
-def convolutional_capsule_layer_v2(input_tensor, kernel_height, kernel_width, scope_name,output_kernel_vec_dim=8, strides=[1, 1], num_output_channels=None, type="SAME", num_routing=3, split_routing=False, use_matrix_bias=True, use_squash_bias=True, supplied_squash_biases=None):
+def convolutional_capsule_layer_v2(input_tensor, kernel_height, kernel_width, scope_name,output_kernel_vec_dim=8, strides=[1, 1], num_output_channels=None, type="SAME", num_routing=3, split_routing=False, use_matrix_bias=True, use_squash_bias=True, supplied_squash_biases=None, squash_He=False):
     print(">>>> %s START" % scope_name)
     with tf.name_scope(scope_name):
         '''if(type=="SAME"):
@@ -577,7 +577,11 @@ def convolutional_capsule_layer_v2(input_tensor, kernel_height, kernel_width, sc
             print(squash_bias_shape)
             if(use_squash_bias==True):
                 with tf.variable_scope(scope_name):
-                    squash_biases = variables.bias_variable(squash_bias_shape)
+                    if(squash_He==False):
+                        squash_biases = variables.bias_variable(squash_bias_shape)
+                    else:
+                        with tf.variable_scope('squash'):
+                            squash_biases = variables.weight_variable(squash_bias_shape,He=True, He_nl=np.int(np.prod(squash_bias_shape)))
             else:
                     squash_biases = tf.fill(squash_bias_shape, 0.)
             print([1, 1, prerouted_output_shape2[3], 1])
