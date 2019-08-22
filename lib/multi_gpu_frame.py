@@ -34,7 +34,7 @@ class multi_gpu_model(learning_core):
       for i in range(num_gpus):
         print('>>Assignment of data to tower/GPU %d' % i)
         input_data_shape, input_labels_shape = DataObject.get_data_shape(gpu=i)
-        validation_input_data_shape, validation_input_labels_shape = DataObject.get_data_validation_shape(gpu=i)
+        validation_input_data_shape, validation_input_labels_shape = DataObject.get_validation_data_shape(gpu=i)
         print('>>>Data Shapes')
         print(input_data_shape)
         print(input_labels_shape)

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import tensorflow as tf
 
 class architecture_base(ABC):
     def __init__(self):
