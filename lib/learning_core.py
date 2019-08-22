@@ -37,12 +37,34 @@ class learning_core(object):
       averaged across all towers.
     """
     average_grads = []
-    for grads_and_vars in zip(*tower_grads):
-      grads = tf.stack([g for g, _ in grads_and_vars])
-      grad = tf.reduce_mean(grads, 0)
+    def replace_none_with_zero(l):
+        '''If None: There is no connection from input to output.
+        There is a connection, but it's through a discrete variable with meaningless gradients.
+        There is a connection, but it's through an op that doesn't have an implemented gradient.
+        '''
+        pass
+    for grads_and_vars in tower_grads: # for each tower
+        this_shape = np.shape(grads_and_vars)
+        for x, y in grads_and_vars:
+            if(x!=None and hasattr(x, 'name')):
+                print('x' + x.name)
 
-      v = grads_and_vars[0][1]
-      grad_and_var = (grad, v)
+            if(y!=None and hasattr(y, 'name')):
+                print('variable name: ' + y.name)
+    #stop()
+    # if you use `in tower_grads` then it will loop over each Tower
+    # but if you use `in zip(*tower_grads)`, it will loop over the variables
+    for grads_and_vars in zip(*tower_grads): # for each tower
+      gs = [variable_gradient for variable_gradient, variable_value in grads_and_vars if variable_gradient != None]
+      grads = tf.stack(gs)# for each pair in the e.g. (32, 2) list
+      # [] [unfinished] [check if it right to use gradients only not equal to None]
+
+      grad = tf.reduce_mean(grads, 0)
+      v = grads_and_vars[0][1] # i.e. the variable value # i.e Tower 0, element 1=variable   (becaus element 0 = gradient)
+      print("====== %s" % v.name)
+      print(grad.get_shape().as_list())
+      print(v.get_shape().as_list())
+      grad_and_var = (grad, v) # (average_grad_across_all_tower, the variable value)
       average_grads.append(grad_and_var)
     return average_grads
 
