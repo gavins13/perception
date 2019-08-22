@@ -4,7 +4,7 @@ import sys
 
 import collections
 TowerResult = collections.namedtuple('TowerResult', ('result', 'grads', 'loss', 'diagnostics', 'ground_truth', 'input_data'))
-JoinedResult = collections.namedtuple('JoinedResult', ('summary', 'train_op','total_loss', 'diagnostics'))
+JoinedResult = collections.namedtuple('JoinedResult', ('summary', 'train_op','total_loss', 'diagnostics', 'full_diagnostics'))
 
 sys.path.insert(0, 'lib/')
 from learning_core import learning_core
@@ -91,7 +91,7 @@ class multi_gpu_model(learning_core):
     print("....")
     grads = self._average_gradients(tower_grads)
     print("....")
-    diag = self._average_diagnostics(diagnostics)
+    diag, full_diag = self._average_diagnostics(diagnostics)
     print("....")
     #train_op = self._optimizer.apply_gradients(grads, global_step=self._global_step, name="ApplyGradientsTF")
     train_op = self._optimizer.apply_gradients(grads,name="ApplyGradients")
@@ -101,4 +101,4 @@ class multi_gpu_model(learning_core):
     summary = tf.summary.merge(summaries)
     print("....")
     summed_losses = tf.reduce_sum(losses)
-    return JoinedResult(summary, train_op, summed_losses, diag)
+    return JoinedResult(summary, train_op, summed_losses, diag, full_diag)

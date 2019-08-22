@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 
 import skimage.transform
 
+import pickle
+
 # Object is a context manager!
 class execution(object):
   def __init__(self, project_path, model, data_strap, type='train', load=None, experiment_name=None, max_steps_to_save=1000, mini_batch_size=4):
@@ -276,8 +278,10 @@ class execution(object):
                     the_file.write(str(val))
                     the_file.write(',')
                 the_file.write('\n')
-
-
+          
+        pickle.dump(main_results, open(self.summary_folder + '/image_results.p', "wb"))
+        pickle.dump(diag, open(self.summary_folder + '/all_diagnostics.p', "wb"))
+        pickle.dump(zipped_diag, open(self.summary_folder + '/main_diagnostics.p', "wb"))
 
 
         print("Test results:")
