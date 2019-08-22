@@ -73,8 +73,8 @@ class multi_gpu_model(learning_core):
           input_data = tf.placeholder(tf.complex64, shape=input_data_shape, name="InputDataGPU"+str(tower_ind))
           input_labels = tf.placeholder(tf.float32, shape=input_labels_shape, name="InputLabelsGPU"+str(tower_ind))
 
-          validation_input_data = tf.placeholder(tf.complex64, shape=input_data_shape, name="ValidationInputDataGPU"+str(tower_ind))
-          validation_input_labels = tf.placeholder(tf.float32, shape=input_labels_shape, name="ValidationInputLabelsGPU"+str(tower_ind))
+          validation_input_data = tf.placeholder(tf.complex64, shape=validation_input_data_shape, name="ValidationInputDataGPU"+str(tower_ind))
+          validation_input_labels = tf.placeholder(tf.float32, shape=validation_input_labels_shape, name="ValidationInputLabelsGPU"+str(tower_ind))
 
           extra_data = {}
           for key in self.extra_data_keys:
