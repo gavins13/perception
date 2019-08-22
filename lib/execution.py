@@ -41,6 +41,10 @@ class execution(object):
     if(type=='train'):
         self.experiment = self.training
         self.data_strap.will_train()
+    elif(type=="overfit"):
+        self.experiment = self.training
+        self.data_strap.will_train()
+        self.data_strap.reduce_dataset()
     elif((type=='evaluate') or (type=='test')):
         if (load==None): raise Exception('The Model Saved directory is not set!')
         self.experiment = self.evaluate
@@ -61,7 +65,7 @@ class execution(object):
     print(">> Finished analysing")
     return self
 
-  def run_task(self, max_steps, save_step=1, max_steps_to_save=1000):
+  def run_task(self, max_epochs, save_step=1, max_steps_to_save=1000):
       print(">Create TF session")
 
       config = tf.ConfigProto(allow_soft_placement=True)
@@ -77,20 +81,20 @@ class execution(object):
           coord = tf.train.Coordinator()
           threads = tf.train.start_queue_runners(sess=self.session, coord=coord)
           try:
-            self.experiment(max_steps=max_steps,save_step=save_step, session=self.session) # experiment = training() or evaluate()
+            self.experiment(max_epochs=max_epochs,save_step=save_step, session=self.session) # experiment = training() or evaluate()
           except tf.errors.OutOfRangeError:
             tf.logging.info('Finished experiment.')
           finally:
             coord.request_stop()
           coord.join(threads)
       self.session.close()
-  def training(self, max_steps, save_step, session):
+  def training(self, max_epochs, save_step, session):
       step = 0
       last_epoch = int(self.last_global_step / self.data_strap.n_splits)
       last_mini_batch = self.last_global_step - (last_epoch * self.data_strap.n_splits)
       step = (last_epoch*self.data_strap.n_splits)+last_mini_batch
       print("Saving to: cd %s; tensorboard --logdir=./ --port=6394" % self.summary_folder)
-      for j in range(last_epoch, max_steps):
+      for j in range(last_epoch, max_epochs):
           n_splits_list = range(last_mini_batch, self.data_strap.n_splits)
           last_mini_batch = 0
           for i in n_splits_list:
