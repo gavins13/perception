@@ -61,11 +61,12 @@ class execution(object):
         print(">> Finished analysing")
         return self
 
-    def run_task(self, max_epochs, save_step=1, max_steps_to_save=1000):
+    def run_task(self, max_epochs, save_step=1, max_steps_to_save=1000, memory_growth=False):
           print(">Create TF session")
 
           config = tf.ConfigProto(allow_soft_placement=True)
-          #config.gpu_options.allow_growth = True
+          if(memory_growth is True):
+              config.gpu_options.allow_growth = True
 
           with tf.Session(graph=self.graph, config=config) as self.session:
               init_op = tf.group(tf.global_variables_initializer(),
@@ -114,7 +115,7 @@ class execution(object):
                       for key in self.data_strap.extra_data._fields:
                           feed_dict["ExtraData_"+key+"GPU"+str(gpu)+":0"] = self.data_strap.fetch_data('train',key,gpu,i)
                       for key in self.data_strap.extra_data._fields:
-                          feed_dict["ValidationExtraData_"+key+"GPU"+str(gpu)+":0"] = self.data_strap.fetch_data('test',key,gpu,0) # needs fixing to a proper validation set
+                          feed_dict["ValidationExtraData_"+key+"GPU"+str(gpu)+":0"] = self.data_strap.fetch_data('validation',key,gpu,0) # needs fixing to a proper validation set
                   #sess.run(y, {tf.get_default_graph().get_operation_by_name('x').outputs[0]: [1, 2, 3]})
 
                   print("training epoch: %d" % j, end=";")
@@ -124,9 +125,9 @@ class execution(object):
                   print("step: %d" % step, end=";")
                   print("loss: " + str(diagnostics["total_loss"]), end=";")
                   print("Learning rate: " + str(learn_rate), end='                                  \r')
-                  self.writer.add_summary(summary, step)
                   if (step + 1) % save_step == 0:
-                      self.saver.save(self.session, os.path.join(self.summary_folder, 'model.ckpt'), global_step=step + 1)
+                      self.writer.add_summary(summary, step)
+                  self.saver.save(self.session, os.path.join(self.summary_folder, 'model.ckpt'), global_step=step + 1)
 
     def load_saved_model(self):
         def extract_step(path):
@@ -247,9 +248,6 @@ class execution(object):
                 #print(np.split(input_data[0], result[0].shape[0])[0].shape)
                 input_datas = map_reduce(input_datas, input_data)
                 all_diagnostics.append(this_split_full_diagnostics)
-                print(this_split_full_diagnostics['mse'])
-                tmp = list(this_split_full_diagnostics['mse'])
-                print(np.array(tmp))
             def _average_diagnostics(summaries):
                 n = len(summaries)
                 keys=list(summaries[0].keys())
@@ -270,7 +268,7 @@ class execution(object):
             reduced_summaries, user_summaries = _average_diagnostics(summaries)
             reduced_diagnostics, user_diagnostics = _average_diagnostics(all_diagnostics)
 
-            main_results = {"x": [], "y": [], "gt": []}
+            '''main_results = {"x": [], "y": [], "gt": []}
             for i in range(len(results)):  # loop over results and store in dict
                 print("Saving results %s of %s" % (i, len(results)))
                 print(np.squeeze(input_datas[i]).shape)
@@ -279,15 +277,10 @@ class execution(object):
                 main_results["x"].append(np.squeeze(input_datas[i]))
                 main_results["y"].append(np.squeeze(results[i]))
                 main_results["gt"].append(np.squeeze(ground_truths[i]))
-
             pickle.dump(main_results, open(self.summary_folder + '/main_results.p', "wb"))
             pickle.dump(user_diagnostics, open(self.summary_folder + '/user_diagnostics.p', "wb"))
-            pickle.dump(user_summaries, open(self.summary_folder + '/user_summaries.p', "wb"))
-
-            self.model.ArchitectureObject.analyse(main_results, full_diagnostics,
-                                                  user_diagnostics,
-                                                  self.summary_folder)
-
+            pickle.dump(user_summaries, open(self.summary_folder + '/user_summaries.p', "wb"))'''
+            self.model.ArchitectureObject.analyse(user_diagnostics, reduced_diagnostics, self.summary_folder)
             print("Test results:")
             print(reduced_diagnostics)
             #tf.logging.info(json.dumps(reduced_diagnostics))
