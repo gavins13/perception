@@ -382,7 +382,7 @@ def patch_based_routing_for_convcaps(input_tensor, squash_biases,  num_routing=3
         print(">>>>>>>>>>>>> Iteration: ")
         print(i)
         print(">>>>>>>>>>>>>>>>> Softmax")
-        i=tf.Print(i, [i], ": Iteration")
+        #i=tf.Print(i, [i], ": Iteration")
 
 
         logits_prep = tf.transpose(logits, [0,1,4, 2,3])#[batch, 1, TOBEROUTED, o_num_channel, o_h*o_w,]
