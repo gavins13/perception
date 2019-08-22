@@ -6,7 +6,7 @@ from datetime import datetime
 
 # Object is a context manager!
 class execution(object):
-  def __init__(self, project_path, model, data_strap, type='train', load=None, experiment_name=None, max_steps_to_save=1000):
+  def __init__(self, project_path, model, data_strap, type='train', load=None, experiment_name=None, max_steps_to_save=1000, mini_batch_size=4):
     # Set Saving Directories
     if(experiment_name==None):
       experiment_name = input("Name of experiment: ")
@@ -39,6 +39,7 @@ class execution(object):
         self.load_folder = self.foldername_full + '/' + load + '/'
     else:
         raise Exception('experiment stage-type not valid')
+    self.data_strap.set_mini_batch(mini_batch_size)
   def __enter__(self):
     # Set up the retrieval of the results (I.e. Build the Summarisd results, and results Graph)
     self.graph = tf.Graph() # [] [unfinished]
@@ -54,36 +55,7 @@ class execution(object):
         self.saver = tf.train.Saver(max_to_keep=self.max_steps_to_save)
     #   -->  Print stats
     print(">> Let's analyse the model parameters")
-    #self.param_stats = tf.contrib.tfprof.model_analyzer.print_model_analysis(
-    #    tf.get_default_graph(),
-    #    tfprof_options=tf.contrib.tfprof.model_analyzer.
-    #    TRAINABLE_VARS_PARAMS_STAT_OPTIONS)
-    #[] [unfinished]
-    #opts = (tf.profiler.ProfileOptionBuilder.trainable_variables_parameter())
-    #self.param_stats = tf.profiler.profile(tf.get_default_graph(),options=opts, cmd='scope')
-    #print(">>>Number:")
-    #sys.stdout.write('total_params: %d\n' % self.param_stats.total_parameters)
-    #print(self.param_stats)
-    '''total_parameters = 0
-    for variable in tf.trainable_variables():
-      # shape is an array of tf.Dimension
-      shape = variable.get_shape()
-      #print(shape)
-      #print(len(shape))
-      variable_parameters = 1
-      for dim in shape:
-        #print(dim)
-        variable_parameters *= dim.value
-      #print(variable_parameters)
-      total_parameters += variable_parameters
-    print(total_parameters)'''
     print(">> Finished analysing")
-  #def __enter__(self):
-  #    print(">Create TF FileWriter")
-  #    #self.writer = tf.summary.FileWriter(self.summary_folder)
-  #    self.writer = tf.contrib.summary.create_file_writer(self.summary_folder)
-  #    self.writer.set_as_default()
-  #    self.contrib.summary.always_record_summaries()
 
   def run_task(self, max_steps, save_step=1, max_steps_to_save=1000):
       # save_step defines the increment amount before saving a new checkpoint
@@ -98,15 +70,6 @@ class execution(object):
                              tf.local_variables_initializer())
           print(">Initialise sesssion with variables")
           graph_res_fetches = self.session.run(init_op) # Initialise graph with variables
-
-          '''for i in range(max_steps):
-            print("Train Iteration #%d" % i)
-            self.model._global_step +=1
-            graph_res_fetches = self.session.run(self.train_op)
-            if(self.model._global_step>max_steps):
-              raise tf.errors.OutOfRangeError()
-          #[]print(">Create TF Saver")'''
-          #[]self.saver = tf.train.Saver(max_to_keep=max_steps_to_save)
           print(">Load last saved model")
           self.last_step = self.load_saved_model()
           coord = tf.train.Coordinator()
@@ -120,16 +83,38 @@ class execution(object):
           coord.join(threads)
       self.session.close()
   def training(self, max_steps, save_step, session):
+      step = 0
+      for j in range(self.last_step, max_steps):
+          for i in range(self.data_strap.n_splits):
+              print("training epoch: %d" % j)
+              print("data split: %d of %d" % (i, self.data_strap.n_splits))
+              print("step: %d" % step)
+              step += 1
+              feed_dict = {}
+              for gpu in range(self.data_strap.num_gpus):
+                  train_data, train_labels = self.data_strap.get_data(gpu=gpu, mb_ind=i)
+                  feed_dict["InputDataGPU" + str(gpu) + ":0"] = train_data
+                  feed_dict["InputLabelsGPU" + str(gpu) + ":0"] = train_labels
+              #sess.run(y, {tf.get_default_graph().get_operation_by_name('x').outputs[0]: [1, 2, 3]})
+              summary, _ = session.run([self.summarised_result.summary, self.summarised_result.train_op], feed_dict=feed_dict) # Run graph
+              self.writer.add_summary(summary, step)
+              if (step + 1) % save_step == 0:
+                  self.saver.save(self.session, os.path.join(self.summary_folder, 'model.ckpt'), global_step=step + 1)
+
+  def training_old(self, max_steps, save_step, session):
     step = 0
     for i in range(self.last_step, max_steps):
         print("training: %d" % i)
         step += 1
-        summary, _ = session.run([self.summarised_result.summary, self.summarised_result.train_op]) # Run graph
-        print("training: %d" % i)
+        feed_dict = {}
+        for gpu in range(self.data_strap.num_gpus):
+            train_data, train_labels = self.data_strap.get_data(gpu=gpu)
+            feed_dict["InputDataGPU" + str(gpu) + ":0"] = train_data
+            feed_dict["InputLabelsGPU" + str(gpu) + ":0"] = train_labels
+        #sess.run(y, {tf.get_default_graph().get_operation_by_name('x').outputs[0]: [1, 2, 3]})
+        summary, _ = session.run([self.summarised_result.summary, self.summarised_result.train_op], feed_dict=feed_dict) # Run graph
         self.writer.add_summary(summary, i)
-        print("training: %d" % i)
         if (i + 1) % save_step == 0:
-            print("training: %d" % i)
             self.saver.save(self.session, os.path.join(self.summary_folder, 'model.ckpt'), global_step=i + 1)
 
 

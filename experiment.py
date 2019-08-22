@@ -57,7 +57,7 @@ try:
   print("Strap Managed Architecture to a training scheme `Executer`")
   #with execution(project_path, System, DataModel, experiment_name="test") as Executer:
   #    Executer.run_task(max_steps=1000, save_step=0)
-  Executer = execution(project_path, System, DataModel, experiment_name="test", max_steps_to_save=1000)
+  Executer = execution(project_path, System, DataModel, experiment_name="test", max_steps_to_save=1000, mini_batch_size=4)
   Executer.__enter__()
   Executer.run_task(max_steps=1000, save_step=1)
   Executer.__exit__(None,None,None)
