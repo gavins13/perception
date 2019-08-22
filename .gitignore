@@ -13,3 +13,4 @@ experiment.py
 experiment*.py
 run_*.sh
 tb
+*DS_Store
