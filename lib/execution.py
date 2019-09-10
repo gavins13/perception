@@ -18,9 +18,9 @@ class execution(object):
 
         if(load==None):
             self.foldername = experiment_name + '_' + datetimestr
-            self.foldername_full = project_path + '/experimental_results/' + self.foldername
+            self.foldername_full = project_path + '/experimental_results/' + self.foldername + '/'
         else:
-            self.foldername_full = project_path + '/experimental_results/' + load
+            self.foldername_full = project_path + '/experimental_results/' + load + '/'
             print("Load Dir being used.")
 
         print("Results will be saved to %s" % self.foldername_full)
@@ -189,7 +189,7 @@ class execution(object):
           last_epoch = int(self.last_global_step / self.data_strap.n_splits_per_gpu_train[0]) # [] This is cheating and needs to be fixed
           last_mini_batch = self.last_global_step - (last_epoch * self.data_strap.n_splits_per_gpu_train[0]) # [] This is cheating and needs to be fixed
           step = (last_epoch*self.data_strap.n_splits_per_gpu_train[0])+last_mini_batch # [] This is cheating and needs to be fixed
-          print("Saving to: cd %s; tensorboard --logdir=./ --port=6394" % self.summary_folder)
+          print("Saving to: cd %s; CUDA_VISIBLE_DEVICES= taskset -c 9,10 tensorboard --logdir=./ --port=6394" % self.summary_folder)
           print(last_mini_batch, last_epoch, max_epochs, self.last_global_step, self.data_strap.n_splits_per_gpu_train, self.data_strap.num_gpus)
           for j in range(last_epoch, max_epochs):
               n_splits_list = range(last_mini_batch, self.data_strap.n_splits_per_gpu_train[0]) # [] This is cheating and needs to be fixed
@@ -372,14 +372,20 @@ class execution(object):
                 # Run Evaluation!
                 run_evaluation(last_checkpoint_path)
 
-                if len(sys.argv) == 4:
-                    save_dir = self.summary_folder
-                    while save_dir[-1] == '/':
-                        save_dir = save_dir[:-1]
-                    print('Save to: ' + save_dir)
-                    # then rename the directory where saving occurs
-                    os.rename(save_dir, save_dir + '_MAIN_'  + str(sys.argv[2]))
-                    print('Rename successful')
+                for i in range(len(sys.argv)):
+                    this_arg = sys.argv[i]
+                    if 'undersampling_factor=' in this_arg:
+                        undersampled_factor = this_arg.split('undersampling_factor=')
+                        undersampled_factor = undersampled_factor[-1]
+                        print("undersampled_factor CMD ARG DETECTED")
+                        print(undersampled_factor)
 
+                        save_dir = self.summary_folder
+                        while save_dir[-1] == '/':
+                            save_dir = save_dir[:-1]
+                        print('Save to: ' + save_dir)
+                        # then rename the directory where saving occurs
+                        os.rename(save_dir, save_dir + '_MAIN_'  + str(undersampled_factor))
+                        print('Rename successful')
                 if checkpoint:
                     break
