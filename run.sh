@@ -22,6 +22,10 @@ case $i in
     TF_ROLL_VERSION="${i#*=}"
     shift # past argument=value
     ;;
+    -w=*|--tf_while_loop_version=*)
+    TF_WHILE_LOOP_VERSION="${i#*=}"
+    shift # past argument=value
+    ;;
     -o=*|--old=*)
     OLD="${i#*=}"
     shift # past argument=value
@@ -75,7 +79,7 @@ else
   echo "no memory testing"
   echo "TF_ROLL_VERSION"
   echo $TF_ROLL_VERSION
-  python3 experiment.py tf_roll_version=$TF_ROLL_VERSION
+  python3 experiment.py tf_roll_version=$TF_ROLL_VERSION tf_while_loop_version=$TF_WHILE_LOOP_VERSION
 fi
 if [ "$NO_EMAIL" = '' ]; then
   curl -s "https://www.doc.ic.ac.uk/~kgs13/sendemail.php?name="$EXP_NAME"&desc="$EXP_DESC
