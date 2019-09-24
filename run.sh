@@ -38,6 +38,22 @@ case $i in
     export TF_CPP_MIN_VLOG_LEVEL="${i#*=}"
     shift # past argument=value
     ;;
+    -u=*|--undersampling_rate=*)
+    MERUP_UNDERSAMPLING_RATE="${i#*=}"
+    shift # past argument=value
+    ;;
+    -p=*|--eval_folder_prefix=*)
+    EVAL_FOLDER_PREFIX="${i#*=}"
+    shift # past argument=value
+    ;;
+    --type=*)
+    TYPE="${i#*=}"
+    shift # past argument=value
+    ;;
+    --experiment_id=*)
+    EXPERIMENT_ID="${i#*=}"
+    shift # past argument=value
+    ;;
     # --default)
     #DEFAULT=YES
     #shift # past argument with no value
@@ -65,7 +81,32 @@ fi
 
 #python3 -m memory_profiler experiment.py
 
+if [ "$MERUP_UNDERSAMPLING_RATE" = '' ]; then
+  MERUP_UNDERSAMPLING_RATE=''
+else
+  MERUP_UNDERSAMPLING_RATE='undersampling_factor='$MERUP_UNDERSAMPLING_RATE
+fi
 
+
+if [ "$EVAL_FOLDER_PREFIX" = '' ]; then
+  EVAL_FOLDER_PREFIX=''
+else
+  EVAL_FOLDER_PREFIX='eval_folder_prefix='$EVAL_FOLDER_PREFIX
+fi
+
+
+if [ "$EXPERIMENT_ID" = '' ]; then
+  EXPERIMENT_ID=''
+else
+  EXPERIMENT_ID='experiment_id='$EXPERIMENT_ID
+fi
+
+
+if [ "$TYPE" = '' ]; then
+  TYPE=''
+else
+  TYPE='type='$TYPE
+fi
 
 
 if [ "$CUDA_VISIBLE_DEVICES" = '' ]; then
@@ -79,7 +120,7 @@ else
   echo "no memory testing"
   echo "TF_ROLL_VERSION"
   echo $TF_ROLL_VERSION
-  python3 experiment.py tf_roll_version=$TF_ROLL_VERSION tf_while_loop_version=$TF_WHILE_LOOP_VERSION
+  python3 experiment.py tf_roll_version=$TF_ROLL_VERSION tf_while_loop_version=$TF_WHILE_LOOP_VERSION $MERUP_UNDERSAMPLING_RATE $EVAL_FOLDER_PREFIX $TYPE $EXPERIMENT_ID
 fi
 if [ "$NO_EMAIL" = '' ]; then
   curl -s "https://www.doc.ic.ac.uk/~kgs13/sendemail.php?name="$EXP_NAME"&desc="$EXP_DESC

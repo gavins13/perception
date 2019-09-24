@@ -372,6 +372,19 @@ class execution(object):
                 # Run Evaluation!
                 run_evaluation(last_checkpoint_path)
 
+                rename = False
+                
+                eval_folder_prefix = ''   
+                for i in range(len(sys.argv)):
+                    this_arg = sys.argv[i]
+                    if 'eval_folder_prefix=' in this_arg:
+                        eval_folder_prefix = this_arg.split('eval_folder_prefix=')
+                        eval_folder_prefix = '_' + str(eval_folder_prefix[-1]) + ''
+                        print("eval_folder_prefix CMD ARG DETECTED: %s" % eval_folder_prefix)
+                        rename = True
+
+
+                undersampled_factor =  ''
                 for i in range(len(sys.argv)):
                     this_arg = sys.argv[i]
                     if 'undersampling_factor=' in this_arg:
@@ -379,13 +392,16 @@ class execution(object):
                         undersampled_factor = undersampled_factor[-1]
                         print("undersampled_factor CMD ARG DETECTED")
                         print(undersampled_factor)
+                        undersampled_factor = '_' + str(undersampled_factor)
+                        rename = True
 
-                        save_dir = self.summary_folder
-                        while save_dir[-1] == '/':
-                            save_dir = save_dir[:-1]
-                        print('Save to: ' + save_dir)
-                        # then rename the directory where saving occurs
-                        os.rename(save_dir, save_dir + '_MAIN_'  + str(undersampled_factor))
-                        print('Rename successful')
+                if rename is True:
+                      save_dir = self.summary_folder
+                      while save_dir[-1] == '/':
+                          save_dir = save_dir[:-1]
+                      print('Save to: ' + save_dir)
+                      # then rename the directory where saving occurs
+                      os.rename(save_dir, save_dir  + eval_folder_prefix  + undersampled_factor)
+                      print('Rename successful')
                 if checkpoint:
                     break
