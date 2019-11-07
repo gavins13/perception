@@ -13,6 +13,7 @@ class execution(object):
         # Set Saving Directories
         if(experiment_name==None):
           experiment_name = input("Name of experiment: ")
+        self.experiment_name = experiment_name
         datetimestr = str(datetime.now())
         datetimestr = datetimestr.replace(" ", "-")
 
@@ -189,7 +190,7 @@ class execution(object):
           last_epoch = int(self.last_global_step / self.data_strap.n_splits_per_gpu_train[0]) # [] This is cheating and needs to be fixed
           last_mini_batch = self.last_global_step - (last_epoch * self.data_strap.n_splits_per_gpu_train[0]) # [] This is cheating and needs to be fixed
           step = (last_epoch*self.data_strap.n_splits_per_gpu_train[0])+last_mini_batch # [] This is cheating and needs to be fixed
-          print("Saving to: cd %s; CUDA_VISIBLE_DEVICES= taskset -c 9,10 tensorboard --logdir=./ --port=6394" % self.summary_folder)
+          print("Saving to: train=%s; CUDA_VISIBLE_DEVICES= taskset -c 9,10 tensorboard --logdir=%s:$train" % (self.summary_folder, self.experiment_name))
           print(last_mini_batch, last_epoch, max_epochs, self.last_global_step, self.data_strap.n_splits_per_gpu_train, self.data_strap.num_gpus)
           for j in range(last_epoch, max_epochs):
               n_splits_list = range(last_mini_batch, self.data_strap.n_splits_per_gpu_train[0]) # [] This is cheating and needs to be fixed
