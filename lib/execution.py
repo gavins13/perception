@@ -97,6 +97,8 @@ class execution(object):
                 for j, key in enumerate(self.data_strap.extra_data._fields):
                     extra_data[key] = graph_data[j+2]
                     extra_data[key].set_shape([self.data_strap.mini_batch_size] + list(getattr(getattr(self.data_strap.extra_data, key), type).shape[1::]))
+                    print(extra_data[key].get_shape().as_list())
+
                 extra_data_gpus.append(extra_data)
 
 
@@ -131,6 +133,7 @@ class execution(object):
                 for j, key in enumerate(self.data_strap.validation_extra_data.keys()):
                     validation_extra_data[key] = graph_data[j+2]
                     validation_extra_data[key].set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.validation_extra_data[key].shape[1::]))
+                    print(validation_extra_data[key].get_shape().as_list())
                 validation_extra_data_gpus.append(validation_extra_data)
 
 
@@ -160,6 +163,7 @@ class execution(object):
               type = 'test' if self.execution_type == 'evaluate' else 'train'
               for key in self.data_strap.extra_data._fields:
                   train_feed_dict[self.extra_data_placeholders[key]] = getattr(getattr(self.data_strap.extra_data, key), type)
+                  print(getattr(getattr(self.data_strap.extra_data, key), type).shape)
               #self.session.run(self.train_data_iterator.initializer, feed_dict=train_feed_dict)
               print(".")
               validation_feed_dict = { self.validation_data_placeholder: self.data_strap.validation_data, self.validation_data_labels_placeholder: self.data_strap.validation_data_labels }
@@ -199,7 +203,7 @@ class execution(object):
                   step += 1
                   print("training epoch: %d" % j, end=";")
                   learn_rate = 'NaN'
-                  _ = session.run([self.summarised_result.train_op])
+                  #_ = session.run([self.summarised_result.train_op])
                   #summary, _, learn_rate, diagnostics = session.run([self.summarised_result.summary, self.summarised_result.train_op, self.model._optimizer._lr, self.summarised_result.diagnostics])
                   print("data split: %d of %d" % (i+1, self.data_strap.n_splits_per_gpu_train[0]), end=";")# [] This is cheating and needs to be fixed
                   print("step: %d" % step, end=";")
@@ -209,8 +213,12 @@ class execution(object):
                   #  self.writer.add_summary(summary, step)
                   if (step + 1) % validation_step == 0:
                       #summary, diagnostics = session.run([self.validation_summarised_result.summary, self.validation_summarised_result.diagnostics]) # [] CHECK !!!!
-                      summary= session.run(self.validation_summarised_result.summary)
-                      self.writer.add_summary(summary, step)
+                      #summary= session.run(self.validation_summarised_result.summary)
+                      _, validation_summary, training_summary= session.run([self.summarised_result.train_op, self.validation_summarised_result.summary, self.summarised_result.summary])
+                      self.writer.add_summary(validation_summary, step)
+                      self.writer.add_summary(training_summary, step)
+                  else:
+                      _ = session.run([self.summarised_result.train_op])
                   if (step + 1) % save_step == 0:
                       self.saver.save(self.session, os.path.join(self.summary_folder, 'model.ckpt'), global_step=step + 1)
 
