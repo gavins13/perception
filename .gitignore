@@ -12,6 +12,8 @@ thislogcopy.txt
 experiment.py
 experiment*.py
 run_*.sh
+!run_new.sh
 tb
 *DS_Store
 experiments_archive.txt
+archive/
