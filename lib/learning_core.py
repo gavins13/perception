@@ -11,9 +11,9 @@ class learning_core(object):
     self.hparams = ArchitectureObject.hparams
   def initialise_training(self):
     with tf.device('/cpu:0'):
-      self._global_step = tf.get_variable('global_step', [], initializer=tf.constant_initializer(0), trainable=False) # [] [unfinished]
+      self._global_step = tf.compat.v1.get_variable('global_step', [], initializer=tf.compat.v1.constant_initializer(0), trainable=False) # [] [unfinished]
       #self._global_step=np.array(0)
-      learning_rate = tf.train.exponential_decay(
+      learning_rate = tf.compat.v1.train.exponential_decay(
           learning_rate=self.hparams.learning_rate,
           global_step=self._global_step,
           decay_steps=self.hparams.decay_steps,
@@ -25,7 +25,7 @@ class learning_core(object):
           AdamEpsilon = self.ArchitectureObject.AdamEpsilon
       else:
           AdamEpsilon = 1.e-8
-      self._optimizer = tf.train.AdamOptimizer(learning_rate, epsilon=AdamEpsilon)
+      self._optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate, epsilon=AdamEpsilon)
 
 
   def _average_diagnostics(self, diagnostics_all_towers):
@@ -38,12 +38,12 @@ class learning_core(object):
         for i in range(n):
             vals.append(diagnostics_all_towers[i][key])
         if('min' in key):
-            diagnostics[key] = tf.reduce_min(vals)
+            diagnostics[key] = tf.reduce_min(input_tensor=vals)
         elif('max' in key):
-            diagnostics[key] = tf.reduce_max(vals)
+            diagnostics[key] = tf.reduce_max(input_tensor=vals)
         else:
-            diagnostics[key] = tf.reduce_mean(vals)
-        full_diagnostics[key] = tf.convert_to_tensor(vals)
+            diagnostics[key] = tf.reduce_mean(input_tensor=vals)
+        full_diagnostics[key] = tf.convert_to_tensor(value=vals)
         #full_diagnostics[key] = vals
         this_shape = full_diagnostics[key].get_shape().as_list()
         print(">>>>>>>>> Averaging Diagostics")
@@ -93,7 +93,7 @@ class learning_core(object):
       grads = tf.stack(gs)# for each pair in the e.g. (32, 2) list
       # [] [unfinished] [check if it right to use gradients only not equal to None]
 
-      grad = tf.reduce_mean(grads, 0)
+      grad = tf.reduce_mean(input_tensor=grads, axis=0)
       v = grads_and_vars[0][1] # i.e. the variable value # i.e Tower 0, element 1=variable   (becaus element 0 = gradient)
       print("====== %s" % v.name)
       print(grad.get_shape().as_list())

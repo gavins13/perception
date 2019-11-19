@@ -18,7 +18,7 @@ SystemConfiguration = collections.namedtuple(
 def run_model(load_data, Architecture, system_config, data_config, experiment_name, save_step=1, validation_step=5):
     try:
         if system_config.eager is True:
-            tf.enable_eager_execution()
+            tf.compat.v1.enable_eager_execution()
         DataModel = Data(load_data, num_gpus=system_config.num_gpus,
                          validation_size=system_config.validation_size)
         print("Start resource manager...")

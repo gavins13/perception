@@ -16,7 +16,7 @@ def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False,
         print(squash_biases.get_shape().as_list())
         #squash biases has form: # [o_vec_dim, o_num_channel, o_h*o_w, 1]
         print(squash_biases.get_shape().as_list()) # [v_d^l+1, |T^l+1|, x'*y', 1])
-        squash_biases = tf.transpose(squash_biases, [3,0,1,2]) # [1, v_d^l+1, |T^l+1|, x'*y'])
+        squash_biases = tf.transpose(a=squash_biases, perm=[3,0,1,2]) # [1, v_d^l+1, |T^l+1|, x'*y'])
         squash_biases = tf.tile(squash_biases, [its[0], 1, 1, 1])
 
     input_tensor_shape = input_tensor.get_shape().as_list()
@@ -56,7 +56,7 @@ def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False,
         #i=tf.Print(i, [i], ": Iteration")
 
 
-        logits_prep = tf.transpose(logits, [0,1,4, 2,3])#[batch, 1, TOBEROUTED, o_num_channel, o_h*o_w,]
+        logits_prep = tf.transpose(a=logits, perm=[0,1,4, 2,3])#[batch, 1, TOBEROUTED, o_num_channel, o_h*o_w,]
         logits_prep = tf.reshape(logits_prep, [ls[0], ls[1], ls[4], ls[2]*ls[3], 1]) #[batch, 1, TOBEROUTED, o_num_channel*o_h*o_w, 1]
         if(softmax_opposite==True):
             print("NB/ Not the same softmax as in paper")
@@ -64,7 +64,7 @@ def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False,
         else:
             c_i = tf.nn.softmax(logits_prep, axis=3)#[batch, 1, TOBEROUTED, o_num_channel*o_h*o_w, 1]
         c_i = tf.reshape(c_i, [ls[0], ls[1], ls[4], ls[2],ls[3]])#[batch, 1, TOBEROUTED, o_num_channel, o_h*o_w,]
-        c_i = tf.transpose(c_i, [0,1,3,4,2])#[batch, 1,  o_num_channel, o_h*o_w,TOBEROUTED]
+        c_i = tf.transpose(a=c_i, perm=[0,1,3,4,2])#[batch, 1,  o_num_channel, o_h*o_w,TOBEROUTED]
 
 
         '''logits = tf.reshape(logits, shape=reduced_logit_shape) # flatten end dimensions of shape
@@ -94,7 +94,7 @@ def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False,
         s_j = tf.multiply(input_tensor, c_i)  # [batch, o_vec, o_num_channels, o_h*o_w, TOBEROUTED]
         print(s_j.get_shape().as_list())
         print(">>>>>>>>>>>>>>>>>>> Reduce Sum")
-        s_j = tf.reduce_sum(s_j, axis=4) # [batch, o_vec, o_num_channels, o_h*o_w]
+        s_j = tf.reduce_sum(input_tensor=s_j, axis=4) # [batch, o_vec, o_num_channels, o_h*o_w]
         print(s_j.get_shape().as_list())
         print(">>>>>>>>>>>>>>>>>>> Add")
         #s_j = tf.add(s_j, tf.transpose(tf.tile(tf.expand_dims(squash_biases, 3), [1,1,1, batch_n]), [3,0,1, 2])) # [] [unfinished] - the [1,1,1] needs to be done generically
@@ -120,7 +120,7 @@ def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False,
         #dot_product  = tf.tile(v_j, [1,1,1,1,input_tensor_shape[4]])
         print(dot_product.get_shape().as_list())
         #  # [batch, o_vec, o_num_channels, o_h*o_w, TOBEROUTED]
-        dot_product = tf.reduce_sum(dot_product, axis=1, keepdims=True)
+        dot_product = tf.reduce_sum(input_tensor=dot_product, axis=1, keepdims=True)
         # dimensions of dot product:  [batch,1, o_num_channels, o_h*o_w, TOBEROUTED]
         print(dot_product.get_shape().as_list())
 
@@ -146,8 +146,8 @@ def route_votes(input_tensor, squash_biases,  num_routing=3 , squash_relu=False,
     #voting_tensors = tf.zeros(input_tensor_shape[0:2] + output_dimensions, dtype=tf.float32, name="voting_init")
     i=tf.constant(0)
     _, logits, voting_tensors = tf.while_loop(
-        lambda i, logits, voting_tensors: i < num_routing,
-        _algorithm,
+        cond=lambda i, logits, voting_tensors: i < num_routing,
+        body=_algorithm,
         loop_vars = [i, logits, voting_tensors],
         swap_memory=True
     )
@@ -201,9 +201,9 @@ def routing(input_tensor, scope_name, output_dimensions=None, squash_biases=None
 
 
     print(">>>>>>> Squash")
-    with tf.name_scope(scope_name):
+    with tf.compat.v1.name_scope(scope_name):
         if(squash_biases == None):
-            with tf.variable_scope(scope_name):
+            with tf.compat.v1.variable_scope(scope_name):
                 bias_dimensions = output_dimensions[:]
                 if(bias_channel_sharing==True): # wish to share bias terms across all channels
                     bias_dimensions[0] = 1 # [1, o_h, o_w]
@@ -246,8 +246,8 @@ def routing(input_tensor, scope_name, output_dimensions=None, squash_biases=None
             batch = input_tensor_shape[0]
             s_j = tf.multiply(c_i, tmp_tensor, name="indv_vote")
             dim_to_sum = list(range(2, len(input_tensor_shape)))
-            s_j = tf.reduce_sum(s_j, axis=dim_to_sum, name="vote_res")
-            s_j = tf.add(s_j, tf.transpose(tf.tile(squash_biases, [1,1,1, batch, vec_dim]), [3,4,0,1,2])) # [] [unfinished] - the [1,1,1] needs to be done generically
+            s_j = tf.reduce_sum(input_tensor=s_j, axis=dim_to_sum, name="vote_res")
+            s_j = tf.add(s_j, tf.transpose(a=tf.tile(squash_biases, [1,1,1, batch, vec_dim]), perm=[3,4,0,1,2])) # [] [unfinished] - the [1,1,1] needs to be done generically
             # : [batch, vec_dim, num_ch, h, w]
             print(">>>>>>>>>>>>>>>>> Squashing")
 
@@ -278,13 +278,13 @@ def routing(input_tensor, scope_name, output_dimensions=None, squash_biases=None
             tmp_vj_tensor = tf.transpose(tmp_vj_tensor, tmp_vj_transposer) # dimensoins: [batch, vec_dim, num_channels, height, width,,,, num_channels_output, height_output, width_output]'''
             dims = list(range(len(tmp_vj_tensor.get_shape().as_list())))
             dims = dims[0:2] + dims[-3::] + dims[-6:-3]
-            tmp_vj_tensor = tf.transpose(tmp_vj_tensor, dims)# dimensoins: [batch, vec_dim, num_channels, height, width,,,, num_channels_output, height_output, width_output]
+            tmp_vj_tensor = tf.transpose(a=tmp_vj_tensor, perm=dims)# dimensoins: [batch, vec_dim, num_channels, height, width,,,, num_channels_output, height_output, width_output]
             print(">>>>>>>>>>>>>>>>> Cosine similarity")
             print(tmp_input_tensor.get_shape().as_list())
             print(tmp_vj_tensor.get_shape().as_list())
             dot_product = tf.multiply(tmp_input_tensor, tmp_vj_tensor, name="dot_prod_multiply")
             # dimensions of dot product: [batch, vec_dim, num_channels, height, width,,,, num_channels_output, height_output, width_output]
-            dot_product = tf.reduce_sum(dot_product, axis=[1], keepdims=True,  name="dot_prod_add")
+            dot_product = tf.reduce_sum(input_tensor=dot_product, axis=[1], keepdims=True,  name="dot_prod_add")
             # dimensions of dot product: [batch,    1   , num_channels, height, width,,,, num_channels_output, height_output, width_output]
 
             print(">>>>>>>>>>>>>>>>> Logit update")
@@ -305,8 +305,8 @@ def routing(input_tensor, scope_name, output_dimensions=None, squash_biases=None
         voting_tensors = tf.TensorArray(size=num_routing, dtype=tf.float32, clear_after_read=clear_after_read_for_votes) # do not clear after read as we want to investigate
         i = tf.constant(0)
         _, logits, voting_tensors = tf.while_loop(
-            lambda i, logits, voting_tensors: i < num_routing,
-            _algorithm,
+            cond=lambda i, logits, voting_tensors: i < num_routing,
+            body=_algorithm,
             loop_vars = [i, logits, voting_tensors],
             swap_memory=True, parallel_iterations=10
         )

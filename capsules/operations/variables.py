@@ -37,14 +37,14 @@ def weight_variable(shape, stddev=0.1, verbose=False, He=False, He_nl=None):
   Returns:
     Weight variable tensor of shape=shape.
   """
-  n = tf.reduce_prod(shape) if(He_nl==None) else He_nl
+  n = tf.reduce_prod(input_tensor=shape) if(He_nl==None) else He_nl
   stddev=tf.sqrt(tf.divide(2., n)) if(He==True) else stddev
   with tf.device('/cpu:0'):
-    with tf.name_scope('weights'):
-      weights = tf.get_variable(
+    with tf.compat.v1.name_scope('weights'):
+      weights = tf.compat.v1.get_variable(
           'weights',
           shape,
-          initializer=tf.truncated_normal_initializer(
+          initializer=tf.compat.v1.truncated_normal_initializer(
               stddev=stddev, dtype=tf.float32),
           dtype=tf.float32, trainable=True)
   variable_summaries(weights, verbose)
@@ -62,16 +62,16 @@ def bias_variable(shape, verbose=False, init=0.1, He=False, He_nl=None):
     Bias variable tensor with shape=shape.
   """
   with tf.device('/cpu:0'):
-    with tf.name_scope('biases'):
+    with tf.compat.v1.name_scope('biases'):
       if(He==True):
-        n = tf.reduce_prod(shape) if(He_nl==None) else tf.reduce_prod(He_nl)
+        n = tf.reduce_prod(input_tensor=shape) if(He_nl==None) else tf.reduce_prod(input_tensor=He_nl)
         limit=tf.sqrt(tf.divide(6., n))
-        biases = tf.get_variable('biases', shape, initialiser=tf.random_uniform_initializer(-limit, limit, dtype=tf.float32), dtype=tf.float32, trainable=True)
+        biases = tf.compat.v1.get_variable('biases', shape, initialiser=tf.compat.v1.random_uniform_initializer(-limit, limit, dtype=tf.float32), dtype=tf.float32, trainable=True)
       else:
-        biases = tf.get_variable(
+        biases = tf.compat.v1.get_variable(
           'biases',
           shape,
-          initializer=tf.constant_initializer(init),
+          initializer=tf.compat.v1.constant_initializer(init),
           dtype=tf.float32, trainable=True)
   variable_summaries(biases, verbose)
   return biases
@@ -85,16 +85,16 @@ def variable_summaries(var, verbose):
     verbose: if set add histograms.
   """
   if verbose:
-    with tf.name_scope('summaries'):
-      mean = tf.reduce_mean(var)
-      tf.summary.scalar('mean', mean)
+    with tf.compat.v1.name_scope('summaries'):
+      mean = tf.reduce_mean(input_tensor=var)
+      tf.compat.v1.summary.scalar('mean', mean)
 
-      with tf.name_scope('stddev'):
-        stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
-      tf.summary.scalar('stddev', stddev)
-      tf.summary.scalar('max', tf.reduce_max(var))
-      tf.summary.scalar('min', tf.reduce_min(var))
-      tf.summary.histogram('histogram', var)
+      with tf.compat.v1.name_scope('stddev'):
+        stddev = tf.sqrt(tf.reduce_mean(input_tensor=tf.square(var - mean)))
+      tf.compat.v1.summary.scalar('stddev', stddev)
+      tf.compat.v1.summary.scalar('max', tf.reduce_max(input_tensor=var))
+      tf.compat.v1.summary.scalar('min', tf.reduce_min(input_tensor=var))
+      tf.compat.v1.summary.histogram('histogram', var)
   else:
     pass
 
@@ -109,7 +109,7 @@ def activation_summary(x, verbose):
     verbose: if set add histograms.
   """
   if verbose:
-    tf.summary.histogram('activations', x)
-    tf.summary.scalar('sparsity', tf.nn.zero_fraction(x))
+    tf.compat.v1.summary.histogram('activations', x)
+    tf.compat.v1.summary.scalar('sparsity', tf.nn.zero_fraction(x))
   else:
     pass

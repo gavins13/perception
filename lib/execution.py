@@ -28,7 +28,7 @@ class execution(object):
         if load==None: os.mkdir( self.foldername_full, 0o755 )
         self.summary_folder = self.foldername_full + '/' +type + '/'
         print(">Create TF FileWriter")
-        self.writer = tf.summary.FileWriter(self.summary_folder)
+        self.writer = tf.compat.v1.summary.FileWriter(self.summary_folder)
 
         self.model = model
         self.data_strap = data_strap
@@ -66,21 +66,21 @@ class execution(object):
                 self.data_strap.train_data_labels = self.data_strap.test_data_labels
                 #self.data_strap.test_data = _tmp_[0]
                 #self.data_strap.test_data_labels = _tmp_[1]
-            self.train_data_placeholder = tf.placeholder(tf.as_dtype(self.data_strap.train_data.dtype), shape=self.data_strap.train_data.shape)
-            self.train_data_labels_placeholder = tf.placeholder(tf.as_dtype(self.data_strap.train_data_labels.dtype), shape=self.data_strap.train_data_labels.shape)
+            self.train_data_placeholder = tf.compat.v1.placeholder(tf.as_dtype(self.data_strap.train_data.dtype), shape=self.data_strap.train_data.shape)
+            self.train_data_labels_placeholder = tf.compat.v1.placeholder(tf.as_dtype(self.data_strap.train_data_labels.dtype), shape=self.data_strap.train_data_labels.shape)
             tensor_slices = [self.train_data_placeholder, self.train_data_labels_placeholder]
             self.extra_data_placeholders = {}
             print(">>>> Build placeholders")
             for key in self.data_strap.extra_data._fields:
                 this_data = getattr(getattr(self.data_strap.extra_data, key), type)
-                self.extra_data_placeholders[key] = tf.placeholder(tf.as_dtype(this_data.dtype), shape=this_data.shape)
+                self.extra_data_placeholders[key] = tf.compat.v1.placeholder(tf.as_dtype(this_data.dtype), shape=this_data.shape)
                 tensor_slices.append(self.extra_data_placeholders[key])
             self.tf_train_dataset = tf.data.Dataset.from_tensor_slices(tuple(tensor_slices))
             self.tf_train_dataset = self.tf_train_dataset.batch(self.data_strap.mini_batch_size)
             self.tf_train_dataset = self.tf_train_dataset.repeat(None) # number of epochs = None = infinity
             #self.tf_train_dataset = self.tf_train_dataset.cache()
             self.tf_train_dataset = self.tf_train_dataset.prefetch(buffer_size=self.data_strap.mini_batch_size)
-            self.train_data_iterator = self.tf_train_dataset.make_initializable_iterator()
+            self.train_data_iterator = tf.compat.v1.data.make_initializable_iterator(self.tf_train_dataset)
             train_data_gpus = []
             train_data_labels_gpus = []
             extra_data_gpus = []
@@ -103,19 +103,19 @@ class execution(object):
 
 
             print(">>> Build validation datasets and iterators")
-            self.validation_data_placeholder = tf.placeholder(tf.as_dtype(self.data_strap.validation_data.dtype), shape=self.data_strap.validation_data.shape)
-            self.validation_data_labels_placeholder = tf.placeholder(tf.as_dtype(self.data_strap.validation_data_labels.dtype), shape=self.data_strap.validation_data_labels.shape)
+            self.validation_data_placeholder = tf.compat.v1.placeholder(tf.as_dtype(self.data_strap.validation_data.dtype), shape=self.data_strap.validation_data.shape)
+            self.validation_data_labels_placeholder = tf.compat.v1.placeholder(tf.as_dtype(self.data_strap.validation_data_labels.dtype), shape=self.data_strap.validation_data_labels.shape)
             tensor_slices = [self.validation_data_placeholder, self.validation_data_labels_placeholder]
             self.validation_extra_data_placeholders = {}
             print(">>>> Build placeholders")
             for key in self.data_strap.validation_extra_data.keys():
                 this_data = self.data_strap.validation_extra_data[key]
-                self.validation_extra_data_placeholders[key] = tf.placeholder(tf.as_dtype(this_data.dtype), shape=this_data.shape)
+                self.validation_extra_data_placeholders[key] = tf.compat.v1.placeholder(tf.as_dtype(this_data.dtype), shape=this_data.shape)
                 tensor_slices.append(self.validation_extra_data_placeholders[key])
             self.tf_validation_dataset = tf.data.Dataset.from_tensor_slices(tuple(tensor_slices))
             self.tf_validation_dataset = self.tf_validation_dataset.batch(1)
             self.tf_validation_dataset = self.tf_validation_dataset.repeat(None) # number of epochs = None = infinity
-            self.validation_data_iterator = self.tf_validation_dataset.make_initializable_iterator()
+            self.validation_data_iterator = tf.compat.v1.data.make_initializable_iterator(self.tf_validation_dataset)
             validation_data_gpus = []
             validation_data_labels_gpus = []
             validation_extra_data_gpus = []
@@ -144,9 +144,9 @@ class execution(object):
             self.summarised_result, self.results, self.ground_truths, self.input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=self.data_strap.num_gpus, data=training, validation_graph=False)
             self.validation_summarised_result, self.validation_results, self.validation_ground_truths, self.validation_input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=validation_num_gpus, data=validation, validation_graph=True)
             print("Trainable variables list:")
-            var_list = tf.trainable_variables()
+            var_list = tf.compat.v1.trainable_variables()
             print(var_list)
-            self.saver = tf.train.Saver(max_to_keep=self.max_steps_to_save) # ! [] Added var_list var_list=var_list,
+            self.saver = tf.compat.v1.train.Saver(max_to_keep=self.max_steps_to_save) # ! [] Added var_list var_list=var_list,
         print(">> Let's analyse the model parameters")
         print(">> Finished analysing")
         return self
@@ -154,11 +154,11 @@ class execution(object):
     def run_task(self, max_epochs, save_step=1, max_steps_to_save=1000, memory_growth=False, validation_step=5):
           print(">Create TF session")
 
-          config = tf.ConfigProto(allow_soft_placement=True)# ,intra_op_parallelism_threads=2, inter_op_parallelism_threads=2, device_count={ "CPU": 2 }, log_device_placement=True
+          config = tf.compat.v1.ConfigProto(allow_soft_placement=True)# ,intra_op_parallelism_threads=2, inter_op_parallelism_threads=2, device_count={ "CPU": 2 }, log_device_placement=True
           if(memory_growth is True):
               config.gpu_options.allow_growth = True
 
-          with tf.Session(graph=self.graph, config=config) as self.session:
+          with tf.compat.v1.Session(graph=self.graph, config=config) as self.session:
               train_feed_dict = { self.train_data_placeholder: self.data_strap.train_data, self.train_data_labels_placeholder: self.data_strap.train_data_labels }
               type = 'test' if self.execution_type == 'evaluate' else 'train'
               for key in self.data_strap.extra_data._fields:
@@ -172,18 +172,18 @@ class execution(object):
               #self.session.run(self.validation_data_iterator.initializer, feed_dict=validation_feed_dict) #[0] because we want validation size = 1
               self.session.run([self.train_data_iterator.initializer, self.validation_data_iterator.initializer], feed_dict={**train_feed_dict, **validation_feed_dict})
 
-              init_op = tf.group(tf.global_variables_initializer(),
-                                 tf.local_variables_initializer())
+              init_op = tf.group(tf.compat.v1.global_variables_initializer(),
+                                 tf.compat.v1.local_variables_initializer())
               print(">Initialise sesssion with variables")
               graph_res_fetches = self.session.run(init_op) # Initialise graph with variables
               print(">Load last saved model")
               self.last_global_step = self.load_saved_model()
               coord = tf.train.Coordinator()
-              threads = tf.train.start_queue_runners(sess=self.session, coord=coord)
+              threads = tf.compat.v1.train.start_queue_runners(sess=self.session, coord=coord)
               try:
                 self.experiment(max_epochs=max_epochs,save_step=save_step, session=self.session, validation_step=validation_step) # experiment = training() or evaluate()
               except tf.errors.OutOfRangeError:
-                tf.logging.info('Finished experiment.')
+                tf.compat.v1.logging.info('Finished experiment.')
               finally:
                 coord.request_stop()
               coord.join(threads)
@@ -227,17 +227,17 @@ class execution(object):
           file_name = os.path.basename(path)
           return int(file_name.split('-')[-1])
 
-        if tf.gfile.Exists(self.summary_folder):
+        if tf.io.gfile.exists(self.summary_folder):
             ckpt = tf.train.get_checkpoint_state(self.summary_folder)
             if ckpt and ckpt.model_checkpoint_path:
               self.saver.restore(self.session, ckpt.model_checkpoint_path)
               prev_step = extract_step(ckpt.model_checkpoint_path)
             else:
-              tf.gfile.DeleteRecursively(self.summary_folder)
-              tf.gfile.MakeDirs(self.summary_folder)
+              tf.io.gfile.rmtree(self.summary_folder)
+              tf.io.gfile.makedirs(self.summary_folder)
               prev_step = 0
         else:
-            tf.gfile.MakeDirs(self.summary_folder)
+            tf.io.gfile.makedirs(self.summary_folder)
             prev_step = 0
         return prev_step
 

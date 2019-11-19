@@ -33,7 +33,7 @@ class multi_gpu_model(learning_core):
         diagnostics = []
         ground_truths = []
         input_data = []
-        with tf.variable_scope(tf.get_variable_scope()):
+        with tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope()):
           for i in range(num_gpus):
             print('>>Assignment of data to tower/GPU %d' % i)
             print('>>>> Train data shape')
@@ -79,7 +79,7 @@ class multi_gpu_model(learning_core):
           print(".")
           extra_data = {}
           for key in self.extra_data_keys:
-              extra_data[key] = tf.placeholder(tf.complex128, shape=[1575, 30, 8192], name="ExtraData_"+key+"GPU"+str(tower_ind))
+              extra_data[key] = tf.compat.v1.placeholder(tf.complex128, shape=[1575, 30, 8192], name="ExtraData_"+key+"GPU"+str(tower_ind))
               #self.tf_dataset = tf.data.Dataset.from_tensor_slices((extra_data[key]))
               #self.tf_dataset_batched = self.tf_dataset.batch(1)
 
@@ -87,7 +87,7 @@ class multi_gpu_model(learning_core):
 
           validation_extra_data = {}
           for key in self.extra_data_keys:
-              validation_extra_data[key] = tf.placeholder(tf.complex128, shape=[1575, 30, 8192], name="ValidationExtraData_"+key+"GPU"+str(tower_ind)) # 675
+              validation_extra_data[key] = tf.compat.v1.placeholder(tf.complex128, shape=[1575, 30, 8192], name="ValidationExtraData_"+key+"GPU"+str(tower_ind)) # 675
               #self.tf_dataset_validation = tf.data.Dataset.from_tensor_slices((validation_extra_data[key]))
               #self.tf_dataset_batched = self.tf_dataset.batch(1)
 
@@ -107,12 +107,12 @@ class multi_gpu_model(learning_core):
 
 
           print(".")
-          with tf.name_scope('tower_%d' % (tower_ind)) as scope:
+          with tf.compat.v1.name_scope('tower_%d' % (tower_ind)) as scope:
 
 
-            tf.get_variable_scope().reuse_variables()
+            tf.compat.v1.get_variable_scope().reuse_variables()
             if(self.eager==False):
-              with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
+              with tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope(), reuse=tf.compat.v1.AUTO_REUSE):
                 #input_data = tf.convert_to_tensor(input_data, dtype=tf.complex64)
                 #print(input_data.get_shape().as_list())
                 print(".")
@@ -139,9 +139,9 @@ class multi_gpu_model(learning_core):
         #train_op = self._optimizer.apply_gradients(grads, global_step=self._global_step, name="ApplyGradientsTF")
         train_op = self._optimizer.apply_gradients(grads,name="ApplyGradients")
         print("....")
-        summaries = tf.get_collection(tf.GraphKeys.SUMMARIES)
+        summaries = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.SUMMARIES)
         print("....")
-        summary = tf.summary.merge(summaries)
+        summary = tf.compat.v1.summary.merge(summaries)
         print("....")
-        summed_losses = tf.reduce_sum(losses)
+        summed_losses = tf.reduce_sum(input_tensor=losses)
         return JoinedResult(summary, train_op, summed_losses, diag, full_diag, output_weights)
