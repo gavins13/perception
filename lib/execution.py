@@ -80,7 +80,6 @@ class execution(object):
             self.tf_train_dataset = self.tf_train_dataset.repeat(None) # number of epochs = None = infinity
             #self.tf_train_dataset = self.tf_train_dataset.cache()
             self.tf_train_dataset = self.tf_train_dataset.prefetch(buffer_size=self.data_strap.mini_batch_size)
-            self.train_data_iterator = tf.compat.v1.data.make_initializable_iterator(self.tf_train_dataset)
             train_data_gpus = []
             train_data_labels_gpus = []
             extra_data_gpus = []
@@ -115,7 +114,6 @@ class execution(object):
             self.tf_validation_dataset = tf.data.Dataset.from_tensor_slices(tuple(tensor_slices))
             self.tf_validation_dataset = self.tf_validation_dataset.batch(1)
             self.tf_validation_dataset = self.tf_validation_dataset.repeat(None) # number of epochs = None = infinity
-            self.validation_data_iterator = tf.compat.v1.data.make_initializable_iterator(self.tf_validation_dataset)
             validation_data_gpus = []
             validation_data_labels_gpus = []
             validation_extra_data_gpus = []
@@ -382,8 +380,8 @@ class execution(object):
                 run_evaluation(last_checkpoint_path)
 
                 rename = False
-                
-                eval_folder_prefix = ''   
+
+                eval_folder_prefix = ''
                 for i in range(len(sys.argv)):
                     this_arg = sys.argv[i]
                     if 'eval_folder_prefix=' in this_arg:

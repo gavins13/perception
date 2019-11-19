@@ -108,22 +108,13 @@ class multi_gpu_model(learning_core):
 
           print(".")
           with tf.compat.v1.name_scope('tower_%d' % (tower_ind)) as scope:
-
-
             tf.compat.v1.get_variable_scope().reuse_variables()
-            if(self.eager==False):
-              with tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope(), reuse=tf.compat.v1.AUTO_REUSE):
-                #input_data = tf.convert_to_tensor(input_data, dtype=tf.complex64)
-                #print(input_data.get_shape().as_list())
-                print(".")
-                #input_labels = tf.convert_to_tensor(input_labels, dtype=tf.float32)
-                output, loss, diagnostics, output_weights = self.ArchitectureObject.loss_func(data["input"], data["labels"], data["extra_data"], validation_graph=validation_graph)
-                grads_and_vars  = self._optimizer.compute_gradients(loss) # [] [unfinished] why
-            else:
-                #grads_and_vars  = self._optimizer.compute_gradients(losses_func)
-                #print(">>> Use contrib.eager gradient finder")
-                grad_function = tf.contrib.eager.implicit_value_and_gradients(self.ArchitectureObject.loss_func)
-                loss, grads_and_vars = grad_function(self.ArchitectureObject, input_data, input_labels)
+              with tf.compat.v1.variable_scope(
+                tf.compat.v1.get_variable_scope(),
+                reuse=tf.compat.v1.AUTO_REUSE):
+                    output, loss, diagnostics, output_weights = self.ArchitectureObject.loss_func(data["input"], data["labels"], data["extra_data"], validation_graph=validation_graph)
+                    grads_and_vars  = self._optimizer.compute_gradients(loss)
+
             print("-----grads and vars shape----")
             print(np.shape(grads_and_vars))
         input_data = None

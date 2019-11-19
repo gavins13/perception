@@ -22,12 +22,8 @@ import os
 
 class architecture(architecture_base):
     def __init__(self):
-        self.hparams = tf.contrib.training.HParams(
-          decay_rate=0.9,
-          decay_steps=10000.,
-          learning_rate=1.e-3, # 0.001
-          maximum_learning_rate = 1.e-6, # 1.e-7
-        )
+        # Use __set_learning__() to set optimizer
+        self.hyperparameters.learning_rate = 1.e-4
 
     def __test_config__(self):
         pass
@@ -145,9 +141,7 @@ class architecture(architecture_base):
         result = Results(output_images, k_space_pred, _tmp_image_space_DC, _tmp_from_k_gt)
         print(">>>>> Graph Built!")
 
-        with tf.device('/cpu:0'):
-            global_step = tf.compat.v1.get_variable('global_step', [], initializer=tf.compat.v1.constant_initializer(0), trainable=False) # [] [unfinished]
-            global_step = tf.add(global_step, 1)
+
         return result
 
 

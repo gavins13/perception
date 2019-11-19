@@ -8,25 +8,9 @@ class learning_core(object):
 
   def strap_architecture(self, ArchitectureObject):
     self.ArchitectureObject = ArchitectureObject
-    self.hparams = ArchitectureObject.hparams
+    self.t = ArchitectureObject.hparams
   def initialise_training(self):
-    with tf.device('/cpu:0'):
-      self._global_step = tf.compat.v1.get_variable('global_step', [], initializer=tf.compat.v1.constant_initializer(0), trainable=False) # [] [unfinished]
-      #self._global_step=np.array(0)
-      learning_rate = tf.compat.v1.train.exponential_decay(
-          learning_rate=self.hparams.learning_rate,
-          global_step=self._global_step,
-          decay_steps=self.hparams.decay_steps,
-          decay_rate=self.hparams.decay_rate)
-      learning_rate = tf.maximum(learning_rate, self.hparams.maximum_learning_rate)
-      self.learning_rate = learning_rate
-
-      if(hasattr(self.ArchitectureObject, 'AdamEpsilon')):
-          AdamEpsilon = self.ArchitectureObject.AdamEpsilon
-      else:
-          AdamEpsilon = 1.e-8
-      self._optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate, epsilon=AdamEpsilon)
-
+      self._optimizer = self.ArchitectureObject.config.training.optimizer
 
   def _average_diagnostics(self, diagnostics_all_towers):
     n = len(diagnostics_all_towers)
