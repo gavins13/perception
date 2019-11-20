@@ -9,6 +9,78 @@ import pickle
 
 # Execution is a context manager!
 class execution(object):
+
+
+
+
+    def training(self):
+        '''
+        Config
+        '''
+        checkpoint_steps = 100
+        summary_steps = 20
+
+        '''
+        Prerequisites
+        '''
+        Model = self.model.ArchitectureObject(HYPERPARAMETERS,CONFIG)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3) # [] CAN RETRIEVE FROM THE ARCHITECUTRE OBJECT MODEL
+        # optimizer = self.model.ArchitectureObject.optimizer
+        steps = 1
+
+        '''
+        Build Checkpointer
+        '''
+        ckpt = tf.train.Checkpoint(step=tf.Variable(steps), optimizer=optimizer, net=Model)
+        manager = tf.train.CheckpointManager(ckpt, self.summary_folder + './tf_ckpts', max_to_keep=3)
+
+
+
+        '''
+        Restore from previous Checkpoint
+        '''
+        ckpt.restore(manager.latest_checkpoint)
+        if manager.latest_checkpoint:
+            print("Restored from {}".format(manager.latest_checkpoint))
+        else:
+            print("Initializing from scratch.")
+
+
+        epochs=0
+        while train is True: # Trains across epochs, NOT steps
+            dataset_keys = self.DataFrame.get_keys() # Keys list
+            for record_number, data_record in self.dataset.enumerate():
+                data = {key:value for i, key in enumerate(dataset_keys) for value in data_record[i]}
+                with self.summary_writer.as_default():
+                    with tf.summary_recordif(steps % summary_steps):
+                        with tf.GradientTape() as tape:
+                            loss = Model.loss_func(data)
+                grads = tape.gradient(loss, Model.trainable_weights)
+                optimizer.apply_gradients(zip(grads, Model.trainable_weights))
+                steps += 1
+
+                '''
+                Print to console and save checkpoint
+                '''
+                print("training epoch: %d" % epochs, end=";")
+                print("data split: %d of %d" % (record_number+1, self.data_strap.dataset_length), end=";")
+                print("step: %d" % steps, end=";")
+                ckpt.step.assign_add(1)
+                if int(ckpt.step) % checkpoint_steps == 0:
+                  save_path = manager.save()
+                  print("Saved checkpoint for step {}: {}".format(int(ckpt.step), save_path), end=";")
+                print("", end='                                        \r')
+            epochs += 1
+
+
+
+
+
+
+
+
+
+
     def __init__(self, project_path, model, data_strap, type='train', load=None, experiment_name=None, max_steps_to_save=1000, mini_batch_size=4, graph_mode=True):
         # Set Saving Directories
         if(experiment_name==None):
@@ -51,6 +123,23 @@ class execution(object):
 
         self.data_strap.mini_batch_size = mini_batch_size
         self.execution_type = type
+
+        self.dataset = None
+        self.validation_dataset = None
+
+    '''
+    Starts building the dataset, batching, etc...
+
+    Model gets created with Keras by ArchitectureObject() call. Assigned to
+    variable "Model"
+
+    The Checkpointer is initialised and attempts a restore from save directory
+
+    If training: ArchitectureObject.optimizer.minimize is call in training loop
+
+    If testing: The "Model" is called with the dataset in a loop and the
+    ArchitectureObject analyse() function (which performs saving, etc.)
+    '''
     def __enter__(self):
         self.graph = tf.Graph()
         with self.graph.as_default():
@@ -108,25 +197,37 @@ class execution(object):
                 validation_extra_data_gpus.append(validation_extra_data)
 
 
-            training = {"extra_data": extra_data_gpus}
-            validation = {"extra_data": validation_extra_data_gpus}
+            self.dataset = {"extra_data": extra_data_gpus}
+            self.validation_dataset = {"extra_data": validation_extra_data_gpus}
 
-            print(">> Time to build TF Graph!")
-            with self.writer.as_default():
-                with tf.summary.record_if()
-                    self.summarised_result, self.results, self.ground_truths, self.input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=self.data_strap.num_gpus, data=training, validation_graph=False)
-                    self.validation_summarised_result, self.validation_results, self.validation_ground_truths, self.validation_input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=validation_num_gpus, data=validation, validation_graph=True)
-                    self.writer.flush()
 
-            print("Trainable variables list:")
-            var_list = tf.compat.v1.trainable_variables()
-            print(var_list)
-            self.saver = tf.compat.v1.train.Saver(max_to_keep=self.max_steps_to_save) # ! [] Added var_list var_list=var_list,
-        print(">> Let's analyse the model parameters")
-        print(">> Finished analysing")
-        return self
 
-    def run_task(self, max_epochs, save_step=1, max_steps_to_save=1000, memory_growth=False, validation_step=5):
+
+    def run_task(self, max_epochs, save_step=60, max_steps_to_save=1000, memory_growth=False, validation_step=20):
+
+        print(">> Time to build TF Graph!")
+        with self.writer.as_default():
+            with tf.summary.record_if()
+                self.summarised_result, self.results, self.ground_truths, self.input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=self.data_strap.num_gpus, data=training, validation_graph=False)
+                self.validation_summarised_result, self.validation_results, self.validation_ground_truths, self.validation_input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=validation_num_gpus, data=validation, validation_graph=True)
+                self.writer.flush()
+
+        print("Trainable variables list:")
+        var_list = self.model.ArchitectureObject.trainable_variables()
+        print(var_list)
+        self.checkpointer = tf.train.Checkpoint(optimizer=self.model.ArchitectureObject.__perception__.optimizer, model=self.model.ArchitectureObject)
+
+
+
+tf.compat.v1.train.Saver(max_to_keep=self.max_steps_to_save) # ! [] Added var_list var_list=var_list,
+    print(">> Let's analyse the model parameters")
+    print(">> Finished analysing")
+    return self
+
+
+
+
+
           print(">Create TF session")
 
           config = tf.compat.v1.ConfigProto(allow_soft_placement=True)# ,intra_op_parallelism_threads=2, inter_op_parallelism_threads=2, device_count={ "CPU": 2 }, log_device_placement=True
@@ -134,17 +235,17 @@ class execution(object):
               config.gpu_options.allow_growth = True
 
           with tf.compat.v1.Session(graph=self.graph, config=config) as self.session:
-              train_feed_dict = { self.train_data_placeholder: self.data_strap.train_data, self.train_data_labels_placeholder: self.data_strap.train_data_labels }
+              train_feed_dict = { }
               type = 'test' if self.execution_type == 'evaluate' else 'train'
               for key in self.data_strap.extra_data._fields:
                   train_feed_dict[self.extra_data_placeholders[key]] = getattr(getattr(self.data_strap.extra_data, key), type)
                   print(getattr(getattr(self.data_strap.extra_data, key), type).shape)
               #self.session.run(self.train_data_iterator.initializer, feed_dict=train_feed_dict)
               print(".")
-              validation_feed_dict = { self.validation_data_placeholder: self.data_strap.validation_data, self.validation_data_labels_placeholder: self.data_strap.validation_data_labels }
+              validation_feed_dict = { }
               for key in self.data_strap.validation_extra_data.keys():
                   validation_feed_dict[self.validation_extra_data_placeholders[key]] = self.data_strap.validation_extra_data[key]
-              #self.session.run(self.validation_data_iterator.initializer, feed_dict=validation_feed_dict) #[0] because we want validation size = 1
+
               self.session.run([self.train_data_iterator.initializer, self.validation_data_iterator.initializer], feed_dict={**train_feed_dict, **validation_feed_dict})
 
               init_op = tf.group(tf.compat.v1.global_variables_initializer(),

@@ -13,7 +13,7 @@ class learning_core(object):
         self.ArchitectureObject = ArchitectureObject
 
     def initialise_training(self):
-        self._optimizer = self.ArchitectureObject.config.training.optimizer
+        self.optimizer = self.ArchitectureObject.config.training.optimizer
 
     def single_tower(self, tower_ind, data, validation_graph=False):
         device_name_prefix = 'cpu' if self.cpu_only is True else 'gpu'
