@@ -46,6 +46,10 @@ class architecture_base(ABC):
 
     @abstractmethod
     def loss_func(self, data):
+        '''
+        Return diagnostics (for later analysis by model analyse() function) and
+        loss value
+        '''
         pass
 
     @abstractmethod

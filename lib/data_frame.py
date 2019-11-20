@@ -117,50 +117,7 @@ class Data_V2(object):
             print(">> Assert 2")
             assert np.asarray(self.train_indices[0]).shape[1] == batch_size
         self.mini_batch_size = batch_size
-    def get_validation_data_shape(self, gpu=0):
-        # returns shape of the validation set on the gpu'th GPU
-        if(self.validation_size==None):
-            raise ValueError()
-        #if(self.num_gpus==1):
-        #    return [len(self.train_indices[0])] + np.shape(self.train_data[0]), [len(self.train_indices[0])] + np.shape(self.train_data_labels[0])
-        #elif(self.num_gpus>1):
-        #return [len(self.train_indices[gpu][0])] + list(np.asarray(self.train_data[0]).shape), [len(self.train_indices[gpu][0])] + list(np.asarray(self.train_data_labels[0]).shape)
-        # [] To check
-        print(">>>>>>>>>>>>>>>>>> self.validation_size =  ")
-        print(self.validation_size)
-        return [self.validation_size] + list(np.asarray(self.train_data[0]).shape), [self.validation_size] + list(np.asarray(self.train_data_labels[0]).shape)
 
-    def get_extra_data_shapes(self, gpu=0):
-        extra_data_shapes =  {}
-        print(">> Extra data shape searching....")
-        for key in list(self.extra_data._fields):
-            print(">>>> Key loop")
-            print(key)
-            if(self.num_gpus==1):
-                extra_data_shapes[key] =  [len(self.train_indices[0][0])] + list(np.asarray(getattr(self.extra_data, key)[0]).shape)[1::]
-            elif(self.num_gpus>1):
-                extra_data_shapes[key] =  [len(self.train_indices[gpu][0])] + list(np.asarray(getattr(self.extra_data, key)[0]).shape)[1::]  ## [] redundant code here.
-        print(">> Extra data shape found")
-        print(extra_data_shapes)
-        return extra_data_shapes
-    def get_validation_extra_data_shapes(self, gpu=0):
-        extra_data_shapes =  {}
-        print(">> Extra data shape searching....")
-        for key in list(self.extra_data._fields):
-            print(">>>> Key loop")
-            print(key)
-            if(self.num_gpus==1):
-                #extra_data_shapes[key] =  [len(self.test_indices[0][0])] + list(np.asarray(getattr(self.extra_data, key)[1]).shape)[1::]
-                extra_data_shapes[key] =  [self.validation_size] + list(np.asarray(getattr(self.extra_data, key)[1]).shape)[1::]
-            elif(self.num_gpus>1):
-                #extra_data_shapes[key] =  [len(self.test_indices[gpu][0])] + list(np.asarray(getattr(self.extra_data, key)[1]).shape)[1::]  ## [] redundant code here.
-                extra_data_shapes[key] =  [self.validation_size] + list(np.asarray(getattr(self.extra_data, key)[1]).shape)[1::]  ## [] redundant code here.
-
-        print(">>>>>>>>>> EXTRA VALIDATION SHAPE")
-        print(extra_data_shapes)
-        print(">> Extra data shape found")
-        print(extra_data_shapes)
-        return extra_data_shapes
 
     def fetch_data(self,set_type, key, gpu, batch_number):
         # set_type is one of 'train','test' and key is either 'input', 'labels' or a key from extra_data dictionary/collection
@@ -221,14 +178,7 @@ class Data_V2(object):
             return data[gpu] # returns [batch_number, --data-dims--...]
         else:
             return data[gpu][batch_number] # returns [--data-dims--...]'''
-    def get_validation_data(self, gpu=0):
-        # returns validation set on the gpu'th GPU
-        if(self.validation_size==None):
-            raise ValueError()
-        data=self.fetch_data('test','input', gpu,0)
-        labels=self.fetch_data('test','labels', gpu,0)
-        return data[0:self.validation_size], labels[0:self.validation_size]
-        #return self.fetch_data('test','input',gpu, mb_ind),self.fetch_data('test','labels',gpu, 0)
+
     def set_validation_dataset(self, validation_size=None):
         self.validation_size = validation_size if (validation_size != None) else self.validation_size
         # returns validation set on the gpu'th GPU
@@ -239,13 +189,8 @@ class Data_V2(object):
         self.validation_extra_data = {}
         for key in self.extra_data._fields:
             self.validation_extra_data[key] = getattr(getattr(self.extra_data, key), 'test')[0:self.validation_size]
-            
 
-    '''def set_validation_dataset(self, validation_size=None):
-        self.validation_size = validation_size if (validation_size != None) else self.validation_size
-        if(self.validation_size<1):
-            raise ValueError()
-        #self.validation_size = validation_size if(self.mini_batch_size>=validation_size) else self.mini_batch_size'''
+
 
     def reduce_dataset(self, max_size=1):
         # max_size sets the minimum size of the mini-batch. Hence, for a dataset size = 1, you will need to self.set_num_gpus(1).
@@ -265,33 +210,3 @@ class Data_V2(object):
         self.mode = 'train'
     def will_test(self):
         self.mode = 'test'
-    def get_data(self, gpu=0,mb_ind=None): # For use with just the trianing and test date (NOT THE EXTRA_DATA)
-        if(self.mini_batch_size!=None):
-            #if(mb_ind>self.n_splits):
-            #   raise OutOfBoundsError() [] Needs correcting!
-            return self.fetch_data(self.mode,'input',gpu, mb_ind),self.fetch_data(self.mode,'labels',gpu, mb_ind)
-        else:
-            raise NotImplementedError()
-            return self.fetch_data(self.mode,'input',gpu, 0),self.fetch_data(self.mode,'labels',gpu, 0)
-
-    def get_data_shape(self, gpu=0, mb_ind=0):
-        if(self.mini_batch_size!=None):
-            if(  ( (self.mode=='train') and (mb_ind+1>self.n_splits_per_gpu_train[gpu]))    or    ((self.mode=='test') and (mb_ind+1>self.n_splits_per_gpu_test[gpu]))  ):
-                raise OutOfBoundsError()
-            if(self.mode=='train'):
-                return [self.mini_batch_size]  + list(np.shape(self.train_data[0])),[self.mini_batch_size]  + list(np.shape(self.train_data_labels[0]))
-            elif(self.mode=='test'):
-                return [self.mini_batch_size]  + list(np.shape(self.test_data[0])),[self.mini_batch_size]  + list(np.shape(self.test_data_labels[0]))
-        else:
-            if(self.mode=='train'):
-                return [len(test_indices_for_gpu[gpu])]  + list(np.shape(self.test_data[0])),[len(test_indices_for_gpu[gpu])]  + list(np.shape(self.test_data_labels[0]))
-            elif(self.mode=='test'):
-                return [len(train_indices_for_gpu[gpu])]  + list(np.shape(self.train_data[0])),[len(train_indices_for_gpu[gpu])]  + list(np.shape(self.train_data_labels[0]))
-
-    def get_size(self):
-        if(self.mode=='train'):
-            return self.dataset_size_train
-        elif(self.mode=='test'):
-            return self.dataset_size_test
-        else:
-            raise Exception('unknown size of dataset for this mode')

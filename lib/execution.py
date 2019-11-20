@@ -7,9 +7,9 @@ import time
 import pickle
 
 
-# Object is a context manager!
+# Execution is a context manager!
 class execution(object):
-    def __init__(self, project_path, model, data_strap, type='train', load=None, experiment_name=None, max_steps_to_save=1000, mini_batch_size=4):
+    def __init__(self, project_path, model, data_strap, type='train', load=None, experiment_name=None, max_steps_to_save=1000, mini_batch_size=4, graph_mode=True):
         # Set Saving Directories
         if(experiment_name==None):
           experiment_name = input("Name of experiment: ")
@@ -27,8 +27,8 @@ class execution(object):
         print("Results will be saved to %s" % self.foldername_full)
         if load==None: os.mkdir( self.foldername_full, 0o755 )
         self.summary_folder = self.foldername_full + '/' +type + '/'
-        print(">Create TF FileWriter")
-        self.writer = tf.compat.v1.summary.FileWriter(self.summary_folder)
+        print("> Create TF Summaries Folder")
+        self.writer = tf.summary.create_file_writer(self.summary_folder)
 
         self.model = model
         self.data_strap = data_strap
@@ -48,7 +48,7 @@ class execution(object):
             self.model.ArchitectureObject.evaluate = True
         else:
             raise Exception('experiment stage-type not valid')
-        #self.data_strap.set_mini_batch(mini_batch_size) # [] Commented out since Dataset API
+
         self.data_strap.mini_batch_size = mini_batch_size
         self.execution_type = type
     def __enter__(self):
@@ -60,15 +60,7 @@ class execution(object):
 
             print(">>> Build training datasets and iterators")
             type = 'test' if self.execution_type == 'evaluate' else 'train'
-            if(self.execution_type == 'evaluate'):
-                _tmp_ = [self.data_strap.train_data, self.data_strap.train_data_labels]
-                self.data_strap.train_data = self.data_strap.test_data
-                self.data_strap.train_data_labels = self.data_strap.test_data_labels
-                #self.data_strap.test_data = _tmp_[0]
-                #self.data_strap.test_data_labels = _tmp_[1]
-            self.train_data_placeholder = tf.compat.v1.placeholder(tf.as_dtype(self.data_strap.train_data.dtype), shape=self.data_strap.train_data.shape)
-            self.train_data_labels_placeholder = tf.compat.v1.placeholder(tf.as_dtype(self.data_strap.train_data_labels.dtype), shape=self.data_strap.train_data_labels.shape)
-            tensor_slices = [self.train_data_placeholder, self.train_data_labels_placeholder]
+            tensor_slices = []
             self.extra_data_placeholders = {}
             print(">>>> Build placeholders")
             for key in self.data_strap.extra_data._fields:
@@ -80,31 +72,20 @@ class execution(object):
             self.tf_train_dataset = self.tf_train_dataset.repeat(None) # number of epochs = None = infinity
             #self.tf_train_dataset = self.tf_train_dataset.cache()
             self.tf_train_dataset = self.tf_train_dataset.prefetch(buffer_size=self.data_strap.mini_batch_size)
-            train_data_gpus = []
-            train_data_labels_gpus = []
             extra_data_gpus = []
             print(">>>> Build graph elements")
             for i in range(self.data_strap.num_gpus):
                 graph_data = self.train_data_iterator.get_next()
-                train_data = graph_data[0]
-                train_data_labels = graph_data[1]
-                train_data.set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.train_data.shape[1::]))
-                train_data_labels.set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.train_data_labels.shape[1::]))
-                train_data_gpus.append(train_data)
-                train_data_labels_gpus.append(train_data_labels)
                 extra_data = {}
                 for j, key in enumerate(self.data_strap.extra_data._fields):
-                    extra_data[key] = graph_data[j+2]
+                    extra_data[key] = graph_data[j]
                     extra_data[key].set_shape([self.data_strap.mini_batch_size] + list(getattr(getattr(self.data_strap.extra_data, key), type).shape[1::]))
                     print(extra_data[key].get_shape().as_list())
-
                 extra_data_gpus.append(extra_data)
 
 
             print(">>> Build validation datasets and iterators")
-            self.validation_data_placeholder = tf.compat.v1.placeholder(tf.as_dtype(self.data_strap.validation_data.dtype), shape=self.data_strap.validation_data.shape)
-            self.validation_data_labels_placeholder = tf.compat.v1.placeholder(tf.as_dtype(self.data_strap.validation_data_labels.dtype), shape=self.data_strap.validation_data_labels.shape)
-            tensor_slices = [self.validation_data_placeholder, self.validation_data_labels_placeholder]
+            tensor_slices = []
             self.validation_extra_data_placeholders = {}
             print(">>>> Build placeholders")
             for key in self.data_strap.validation_extra_data.keys():
@@ -115,32 +96,28 @@ class execution(object):
             self.tf_validation_dataset = self.tf_validation_dataset.batch(1)
             self.tf_validation_dataset = self.tf_validation_dataset.repeat(None) # number of epochs = None = infinity
             validation_data_gpus = []
-            validation_data_labels_gpus = []
-            validation_extra_data_gpus = []
             validation_num_gpus = 1
             print(">>>> Build graph elements")
             for i in range(validation_num_gpus): # only need to run on 1 gpu
                 graph_data = self.validation_data_iterator.get_next()
-                validation_data = graph_data[0]
-                validation_data_labels = graph_data[1]
-                validation_data.set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.validation_data.shape[1::]))
-                validation_data_labels.set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.validation_data_labels.shape[1::]))
-                validation_data_gpus.append(validation_data)
-                validation_data_labels_gpus.append(validation_data_labels)
                 validation_extra_data = {}
                 for j, key in enumerate(self.data_strap.validation_extra_data.keys()):
-                    validation_extra_data[key] = graph_data[j+2]
+                    validation_extra_data[key] = graph_data[j]
                     validation_extra_data[key].set_shape([self.data_strap.mini_batch_size] + list(self.data_strap.validation_extra_data[key].shape[1::]))
                     print(validation_extra_data[key].get_shape().as_list())
                 validation_extra_data_gpus.append(validation_extra_data)
 
 
-            training = {"input": train_data_gpus, "labels": train_data_labels_gpus, "extra_data": extra_data_gpus}
-            validation = {"input": validation_data_gpus, "labels": validation_data_labels_gpus, "extra_data": validation_extra_data_gpus}
+            training = {"extra_data": extra_data_gpus}
+            validation = {"extra_data": validation_extra_data_gpus}
 
             print(">> Time to build TF Graph!")
-            self.summarised_result, self.results, self.ground_truths, self.input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=self.data_strap.num_gpus, data=training, validation_graph=False)
-            self.validation_summarised_result, self.validation_results, self.validation_ground_truths, self.validation_input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=validation_num_gpus, data=validation, validation_graph=True)
+            with self.writer.as_default():
+                with tf.summary.record_if()
+                    self.summarised_result, self.results, self.ground_truths, self.input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=self.data_strap.num_gpus, data=training, validation_graph=False)
+                    self.validation_summarised_result, self.validation_results, self.validation_ground_truths, self.validation_input_data = self.model.run_multi_gpu(self.data_strap, num_gpus=validation_num_gpus, data=validation, validation_graph=True)
+                    self.writer.flush()
+
             print("Trainable variables list:")
             var_list = tf.compat.v1.trainable_variables()
             print(var_list)
@@ -212,9 +189,9 @@ class execution(object):
                   if (step + 1) % validation_step == 0:
                       #summary, diagnostics = session.run([self.validation_summarised_result.summary, self.validation_summarised_result.diagnostics]) # [] CHECK !!!!
                       #summary= session.run(self.validation_summarised_result.summary)
-                      _, validation_summary, training_summary= session.run([self.summarised_result.train_op, self.validation_summarised_result.summary, self.summarised_result.summary])
-                      self.writer.add_summary(validation_summary, step)
-                      self.writer.add_summary(training_summary, step)
+                      _, validation_summary, training_summary= session.run([self.summarised_result.train_op])
+                      #self.writer.add_summary(validation_summary, step)
+                      #self.writer.add_summary(training_summary, step)
                   else:
                       _ = session.run([self.summarised_result.train_op])
                   if (step + 1) % save_step == 0:
