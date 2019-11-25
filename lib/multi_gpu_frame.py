@@ -3,12 +3,10 @@ import numpy as np
 import sys
 
 import collections
-TowerResult = collections.namedtuple('TowerResult', ('result', 'grads', 'loss', 'diagnostics', 'ground_truth', 'input_data', 'output_weights'))
-JoinedResult = collections.namedtuple('JoinedResult', ('summary', 'train_op', 'total_loss', 'diagnostics', 'full_diagnostics', 'output_weights'))
-
 sys.path.insert(0, 'lib/')
 from learning_core import learning_core
 
+JoinedResult = collections.namedtuple('JoinedResult', ('summary', 'train_op', 'total_loss', 'diagnostics', 'full_diagnostics', 'output_weights'))
 
 class multi_gpu_model(learning_core):
     def __init__(self, ArchitectureObject=None, cpu_only=False, eager=False):
@@ -18,130 +16,47 @@ class multi_gpu_model(learning_core):
         if(ArchitectureObject is not None):
             self.strap_architecture(ArchitectureObject)
         else:
-            print(" ... Time to load architecture ... ")
+            printt(" ... Time to load architecture ... ")
 
     def run_multi_gpu(self, DataObject, num_gpus=1, data=None, validation_graph=False):
-        #DataObject.set_num_gpus(num_gpus) # Commented out since Dataset API
-        self._tmp_DataObject = DataObject
-        print(">>>>Using %d GPUs" % num_gpus)
+        printt(">>>>Using %d GPUs" % num_gpus)
         if(self.ArchitectureObject is None):
             raise Exception('problem with architecture: not loaded')
+
         self.extra_data_keys = list(DataObject.extra_data._fields)
         tower_grads = []
-        results = []
         losses = []
         diagnostics = []
-        ground_truths = []
-        input_data = []
-        with tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope()):
-          for i in range(num_gpus):
-            print('>>Assignment of data to tower/GPU %d' % i)
-            print('>>>> Train data shape')
-            input_data_shape, input_labels_shape = DataObject.get_data_shape(gpu=i)
-            print('>>>> Validation data shape')
-            validation_input_data_shape, validation_input_labels_shape = DataObject.get_validation_data_shape(gpu=i)
-            print('>>>> Extra data shape')
-            extra_data_shapes = DataObject.get_extra_data_shapes(gpu=i)
-            print('>>>> Validation Extra data shape')
-            validation_extra_data_shapes = DataObject.get_validation_extra_data_shapes(gpu=i)
-            print('>>>Data Shapes')
-            print(input_data_shape)
-            print(input_labels_shape)
 
-            this_data = {}
+        for i in range(num_gpus):
+            printt('>>Assignment of data to tower/GPU %d' % i)
+            printt('>>>Data Shapes')
+            this_gpu_data = {}
             for key in data.keys():
-                this_data[key] = data[key][i]
+                this_gpu_data[key] = data[key][i]
 
-            tower_output = self._single_tower(i, input_data_shape, input_labels_shape,  validation_input_data_shape, validation_input_labels_shape, extra_data_shapes, validation_extra_data_shapes, this_data, validation_graph=validation_graph)
+            tower_output = self.single_tower(i, this_gpu_data, validation_graph=validation_graph)
 
             print(">>>Grad shapes")
-            results.append(tower_output.result)
             tower_grads.append(tower_output.grads)
             losses.append(tower_output.loss)
             diagnostics.append(tower_output.diagnostics)
-            ground_truths.append(tower_output.ground_truth)
-            input_data.append(tower_output.input_data)
-        print('>> Sumarise results from all towers')
-        summarized_results = self._summarize_towers(tower_grads, losses, diagnostics, tower_output.output_weights)
-        print('>> Return results from all towers')
-        return summarized_results, results, ground_truths, input_data
 
-    def _single_tower(self, tower_ind, input_data_shape, input_labels_shape, validation_input_data_shape, validation_input_labels_shape, extra_data_shapes,validation_extra_data_shapes, data, validation_graph=False, num_targets=1):
-        if(self.ArchitectureObject is None):
-            raise Exception('problem with architecture: not loaded')
-
-        if(self.cpu_only==True):
-            device_name_prefix = 'cpu'
-        else:
-            device_name_prefix = 'gpu'
-
-        with tf.device('/' + device_name_prefix + ':%d' % tower_ind):
-          print(".")
-          extra_data = {}
-          for key in self.extra_data_keys:
-              extra_data[key] = tf.compat.v1.placeholder(tf.complex128, shape=[1575, 30, 8192], name="ExtraData_"+key+"GPU"+str(tower_ind))
-              #self.tf_dataset = tf.data.Dataset.from_tensor_slices((extra_data[key]))
-              #self.tf_dataset_batched = self.tf_dataset.batch(1)
-
-          print(".")
-
-          validation_extra_data = {}
-          for key in self.extra_data_keys:
-              validation_extra_data[key] = tf.compat.v1.placeholder(tf.complex128, shape=[1575, 30, 8192], name="ValidationExtraData_"+key+"GPU"+str(tower_ind)) # 675
-              #self.tf_dataset_validation = tf.data.Dataset.from_tensor_slices((validation_extra_data[key]))
-              #self.tf_dataset_batched = self.tf_dataset.batch(1)
-
-          print(".")
-          #self.tf_dataset = tf.data.Dataset.from_tensor_slices((extra_data["image_data_complex"], validation_extra_data["image_data_complex"]))
-          '''self.tf_dataset = tf.data.Dataset.from_tensor_slices((self._tmp_DataObject.extra_data.image_data_complex.train, self._tmp_DataObject.extra_data.image_data_complex.train))
-
-          self.iterator = self.tf_dataset.make_initializable_iterator()
-          sessio
-          a,b = iterator.
-          extra_data["image_data_complex"]
-
-          self.tf_dataset = self.tf_dataset.batch(1)
-          self.handle = tf.placeholder(tf.string, shape=[])
-          self.tf_dataset_iterator = tf.data.Iterator.from_string_handle(self.handle, self.tf_dataset.output_types, self.tf_dataset.output_shapes)'''
-          print(".")
+        print('>> Sumarise Beta from all towers')
+        summarized_results = self.summarize_towers(tower_grads, losses, diagnostics, tower_output.output_weights)
+        print('>> Return Beta from all towers')
+        return summarized_results
 
 
-          print(".")
-          with tf.compat.v1.name_scope('tower_%d' % (tower_ind)) as scope:
 
 
-            tf.compat.v1.get_variable_scope().reuse_variables()
-            if(self.eager==False):
-              with tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope(), reuse=tf.compat.v1.AUTO_REUSE):
-                #input_data = tf.convert_to_tensor(input_data, dtype=tf.complex64)
-                #print(input_data.get_shape().as_list())
-                print(".")
-                #input_labels = tf.convert_to_tensor(input_labels, dtype=tf.float32)
-                output, loss, diagnostics, output_weights = self.ArchitectureObject.loss_func(data["input"], data["labels"], data["extra_data"], validation_graph=validation_graph)
-                grads_and_vars  = self._optimizer.compute_gradients(loss) # [] [unfinished] why
-            else:
-                #grads_and_vars  = self._optimizer.compute_gradients(losses_func)
-                #print(">>> Use contrib.eager gradient finder")
-                grad_function = tf.contrib.eager.implicit_value_and_gradients(self.ArchitectureObject.loss_func)
-                loss, grads_and_vars = grad_function(self.ArchitectureObject, input_data, input_labels)
-            print("-----grads and vars shape----")
-            print(np.shape(grads_and_vars))
-        input_data = None
-        input_labels = None
-        return TowerResult(output, grads_and_vars, loss, diagnostics, input_labels, input_data, output_weights)
-
-    def _summarize_towers(self, tower_grads, losses, diagnostics, output_weights):
-        print("....")
-        grads = self._average_gradients(tower_grads)
-        print("....")
-        diag, full_diag = self._average_diagnostics(diagnostics)
-        print("....")
-        #train_op = self._optimizer.apply_gradients(grads, global_step=self._global_step, name="ApplyGradientsTF")
+    def summarize_towers(self, tower_grads, losses, diagnostics, output_weights):
+        printt("Start Averaging Gradients...")
+        grads = self.average_gradients(tower_grads)
+        printt("Start Averaging Diagnostics...")
+        diag, full_diag = self.average_diagnostics(diagnostics)
+        printt("Apply Averaged Gradients using Optimizer")
         train_op = self._optimizer.apply_gradients(grads,name="ApplyGradients")
-        print("....")
-        summaries = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.SUMMARIES)
-        print("....")
-        summary = tf.compat.v1.summary.merge(summaries)
-        print("....")
+        printt("Calculate total, summed loss")
         summed_losses = tf.reduce_sum(input_tensor=losses)
         return JoinedResult(summary, train_op, summed_losses, diag, full_diag, output_weights)
