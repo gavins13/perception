@@ -2,6 +2,14 @@
 
 * Purely for learning purposes ;)
 
+# Dependencies
+
+```
+conda install python=3.7 tensorflow-gpu matplotlib imageio=2.6.1=py37_0 ipython
+conda install pillow
+conda instal jupyter nibabel
+```
+
 ## Current Issues:
 1. Single GPU input pipeline is sorted but Multi-GPUs still has some performance issues with feeding in the data
 
