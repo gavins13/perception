@@ -7,10 +7,202 @@ import time
 import pickle
 
 
+
+
+operation_seed = 1114
+graph_seed = 1114
+tf.random.set_seed(graph_seed)
+
+class BioBank(Dataset):
+    def py_gen(self, gen_name):
+        # This function will basically return the Train data and Validation record if
+        gen_name = gen_name.decode('utf8') + '_' + str(self.gen_num)
+        for num in range(5):
+            #sleep(0.3)
+            yield '{} yields {}'.format(gen_name, num)
+    def py_gen_train(self, gen_name):
+        pass
+    def py_gen_test(self, gen_name):
+        pass
+    def py_gen_validation(self, gen_name):
+        pass
+
+
+
+class Dataset():
+    counter=0 # counter for threads
+    def __init__(self):
+        #self.counter = 0
+        self.gen_num = Dataset.counter
+        Dataset.counter += 1
+        class Config: pass
+        self.system_type = Config()
+        self.system_type.use_generator = False # Use TF Generator
+        self.system_type.use_direct = False # Load all into memory
+
+        self.dev = Config()
+        self.dev.on = True
+        self.dev.dataset = 'cifar10'
+
+        self.generator = Config()
+        self.generator.data_types = None
+
+        self.config = Config()
+        self.config.type = 'train' # 'train', 'test', 'validate'
+        self.config.batch_size = None
+        self.config.prefetch_factor = 4
+
+        '''
+        Only valid when the using direct method
+        '''
+        self.config.dataset_split = [60,30,10] # Train, Test, Validate
+        self.config.cv_folds = None  
+        self.config.cv_fold_number = None
+        self.config.validation_size = 1
+    def use_generator(self, data_types):
+        self.system_type.use_generator = True
+        self.system_type.use_direct = False
+        self.generator = data_types
+        self.dev.on = False
+    def use_direct(self, dataset):
+        self.system_type.use_direct = True
+        self.system_type.use_generator = False
+        self.dev.on = False
+        raise NotImplementedError()
+    def use_developer_mode(self):
+        self.dev.on = True
+
+    def py_gen(self, gen_name):
+        # This function will basically return the Train data and Validation record if
+        gen_name = gen_name.decode('utf8') + '_' + str(self.gen_num)
+        for num in range(5):
+            #sleep(0.3)
+            yield '{} yields {}'.format(gen_name, num)
+    def py_gen_train(self, gen_name):
+        pass
+    def py_gen_test(self, gen_name):
+        pass
+    def py_gen_validation(self, gen_name):
+        pass
+
+    def create(self, threads=4, generator_name='py_gen'):
+        '''
+        threads = Number of computational threads to perform the retrieval of data
+        '''
+        if self.dev.on is True:
+            if self.dev.dataset == 'cifar10':
+                self.cifar10()
+            else:
+                raise NotImplementedError()
+        elif self.dev.on is False:
+            if self.type.use_generator is True:
+                dummy_ds = tf.data.Dataset.from_tensor_slices(['DataGenerator']*threads)
+                dummy_ds = dummy_ds.interleave(
+                    lambda x: tf.data.Dataset.from_generator(
+                        #lambda x: self.__class__().py_gen(x),
+                        lambda x: getattr(self.__class__(), generator_name)(x),
+                        output_types=(tf.string), args=(x,)
+                    ),
+                    cycle_length=threads,
+                    block_length=1,
+                    num_parallel_calls=threads)
+                self.Dataset = dummy_ds
+            else self.type.use_direct is True:
+                raise NotImplementedError()
+        self.process_dataset()
+
+    def process_dataset(self):
+        '''
+        For direct: Creates validation folds
+        For generator: access the three generators neccesssary
+        '''
+        if self.config.batch_size is None:
+            printt("Batch size is not set so Default is set to 1", warning=True)
+            self.config.batch_size = 1
+        if self.system_type.use_direct is True:
+            buffer_size = None if not(hasattr(self, 'buffer_size')) else getattr(self, 'buffer_size')
+            self.Dataset = self.Dataset.shuffle(buffer_size=buffer_size, seed=operation_seed)
+            if self.config.cv_folds is not None:
+                self.Datasets = []
+                if self.config.cv_fold_number is None:
+                    raise ValueError('Invalid fold number specified: ', self.config.cv_fold_number)
+                train_ds = []
+                for i in range(self.config.cv_folds):
+                    tmp = self.Dataset.shard(self.config.cv_folds, i)
+                    if self.config.cv_fold_number == i:
+                        test_ds = tmp
+                    else:
+                        train_ds.append(tmp)
+                first = train_ds[0]
+                del(train_ds[0])
+                for x in train_ds:
+                    first = first.concatenate(x)
+                train_ds = first
+                validation_ds = test_ds.take(self.config.validation_size)
+                self.Datasets = [train_ds, test_ds, validation_ds]
+                self.Datasets = [x(batch_size=self.config.batch_size) for x in self.Datasets]
+                self.Datasets = [x(buffer_size=self.config.batch_size*self.config.prefetch_factor) for x in self.Datasets]
+            elif self.config.dataset_split is not None:
+                raise NotImplementedError('Dataset splitting not implemented yet')
+        else:
+            self.Dataset = self.Dataset.batch(batch_size=self.config.batch_size)
+            self.Dataset = self.Dataset.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor)
+
+    def cifar10(self):
+        # Load training and eval data from tf.keras
+        (train_data, train_labels), _ = \
+            tf.keras.datasets.cifar10.load_data()
+
+        train_data = train_data.reshape(-1, 32, 32, 3).astype('float32')
+        train_data = train_data / 255.
+        train_labels = np.asarray(train_labels, dtype=np.int32)
+
+        train_data = train_data[0:49920]
+        train_labels = train_labels[0:49920]
+
+
+        tf.random.set_seed(69)
+        operation_seed = None
+
+        # for train
+        self.Dataset = tf.data.Dataset.from_tensor_slices(train_data, train_labels)
+
+
+
+class Dataset:
+    - also, setting up validation set and testing set
+
+
+
+
+Dataset = tf.data.Dataset
+ds = Dataset.from_tensor_slices(['Gen_0', 'Gen_1', 'Gen_2'])
+ds = ds.interleave(lambda x: Dataset.from_generator(py_gen, output_types=(tf.string), args=(x,)),
+                   cycle_length=3,
+                   block_length=1,
+                   num_parallel_calls=3)
+data_tf = ds.make_one_shot_iterator().get_next()
+
+
 # Execution is a context manager!
 class execution(object):
 
 
+    # data generator
+    def py_gen():
+        for num in range(5):
+            sleep(0.3)
+            yield '{} yields {}'.format('no name', num)
+    # set up tf generator
+    Dataset = tf.data.Dataset
+    ds = Dataset.from_tensor_slices(['xxx', 'xxx', 'xxx'])
+    ds = ds.interleave(lambda x: Dataset.from_generator(py_gen, output_types=(tf.string)),
+                    cycle_length=3,
+                    block_length=1,
+                    num_parallel_calls=3)
+    data_tf = ds.make_one_shot_iterator().get_next()
+
+    
 
 
     def training(self):
