@@ -13,22 +13,6 @@ operation_seed = 1114
 graph_seed = 1114
 tf.random.set_seed(graph_seed)
 
-class BioBank(Dataset):
-    def py_gen(self, gen_name):
-        # This function will basically return the Train data and Validation record if
-        gen_name = gen_name.decode('utf8') + '_' + str(self.gen_num)
-        for num in range(5):
-            #sleep(0.3)
-            yield '{} yields {}'.format(gen_name, num)
-    def py_gen_train(self, gen_name):
-        pass
-    def py_gen_test(self, gen_name):
-        pass
-    def py_gen_validation(self, gen_name):
-        pass
-
-
-
 class Dataset():
     counter=0 # counter for threads
     def __init__(self):
@@ -51,6 +35,7 @@ class Dataset():
         self.config.type = 'train' # 'train', 'test', 'validate'
         self.config.batch_size = None
         self.config.prefetch_factor = 4
+        self.config.epochs = None
 
         '''
         Only valid when the using direct method
@@ -85,7 +70,11 @@ class Dataset():
     def py_gen_validation(self, gen_name):
         pass
 
+    def config(self):
+        pass
+
     def create(self, threads=4, generator_name='py_gen'):
+        self.config()
         '''
         threads = Number of computational threads to perform the retrieval of data
         '''
