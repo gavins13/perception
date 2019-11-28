@@ -41,53 +41,30 @@ class BioBank(Dataset):
             yield '{} yields {}'.format(gen_name, num)
     def py_gen_train(self, gen_name):
         gen_name = gen_name.decode('utf8') + '_' + str(self.gen_num)
-        epochs = -1 if self.config.epochs is None else self.config.epochs
-        current_epoch = 0
-        step = 0
-        files = 0
-        while current_epoch != epochs+1:
-            idx = files % len(self.train_file_list)
-            filename = self.train_file_list[files]
-            data = nibabel.load(filename)
-            d = data.get_fdata() # numpy data # [H, W, SLICE, TIME] # (210, 208, 11, 50) 
-            batch_max = d.shape[2]
-            d = np.transpose(d, [0,1,3,2]) # [H, W, TIME, SLICE]
-            batch_size = self.config.batch_size if self.config.batch_size < batch_max else batch_max
-            no_slices = 0
-            while no_slices < batch_max:
-                this_batch_size = batch_size if (batch_max-no_slices) > batch_size else (batch_max-no_slices)
-                this_data = d[:,:,:,no_slices:no_slices+this_batch_size]
-                no_slices += this_batch_size
-                step += 1
-                yield this_data
-            files += 1
-            if idx == 0:
-                current_epoch += 1
+        epochs = -999 if self.config.epochs is None else self.config.epochs
 
-
-
-
-        current_epoch = 0
-        step = 0
-        files = -1
+        self.current.epoch = -1
+        self.current.step = 0
+        self.current.file = -1
 
         current_batch_max = None
         current_batch_size = None
         current_num_slices = 0
-        while current_epoch != epochs+1:
+        while self.current.epoch != epochs+1:
             if current_num_slices >= current_batch_max:
                 # LOAD NEXT FILE
-                files += 1
-                idx = files % len(self.train_file_list)
-                filename = self.train_file_list[files]
+                self.current.file += 1
+                idx = self.current.file % len(self.train_file_list)
+                filename = self.train_file_list[self.current.file]
                 data = nibabel.load(filename)
                 d = data.get_fdata() # numpy data # [H, W, SLICE, TIME] # (210, 208, 11, 50) 
                 current_batch_max = d.shape[2]
                 d = np.transpose(d, [0,1,3,2]) # [H, W, TIME, SLICE]
-                current_batch_size = self.config.batch_size if self.config.batch_size < batch_max else batch_max
-            else:
-                # CURRENT FILE
-
+                current_batch_size = self.config.batch_size if \
+                  self.config.batch_size < batch_max else batch_max
+            #else:
+            #    # CURRENT FILE
+            #    pass
 
             this_batch_size = current_batch_size if \
               (current_batch_max-current_num_slices) > \ 
@@ -95,13 +72,83 @@ class BioBank(Dataset):
               (current_batch_max-current_num_slices)
             this_data = d[:,:,:,no_slices:no_slices+this_batch_size]
             no_slices += this_batch_size
-            step += 1
-            yield this_data
-            
+            self.current.step += 1
             if idx == 0:
-                current_epoch += 1
+                self.current.epoch += 1
+            yield this_data
+
 
     def py_gen_test(self, gen_name):
-        pass
+        gen_name = gen_name.decode('utf8') + '_' + str(self.gen_num)
+        epochs = -999 if self.config.epochs is None else self.config.epochs
+
+        current_epoch = -1
+        current_step = 0
+        current_file = -1
+
+        current_batch_max = None
+        current_batch_size = None
+        current_num_slices = 0
+        while current_epoch != epochs+1:
+            if current_num_slices >= current_batch_max:
+                # LOAD NEXT FILE
+                current_file += 1
+                idx = current_file % len(self.test_file_list)
+                filename = self.train_file_list[current_file]
+                data = nibabel.load(filename)
+                d = data.get_fdata() # numpy data # [H, W, SLICE, TIME] # (210, 208, 11, 50) 
+                current_batch_max = d.shape[2]
+                d = np.transpose(d, [0,1,3,2]) # [H, W, TIME, SLICE]
+                current_batch_size = self.config.batch_size if \
+                  self.config.batch_size < batch_max else batch_max
+            #else:
+            #    # CURRENT FILE
+            #    pass
+
+            this_batch_size = current_batch_size if \
+              (current_batch_max-current_num_slices) > \ 
+              current_batch_size else \
+              (current_batch_max-current_num_slices)
+            this_data = d[:,:,:,no_slices:no_slices+this_batch_size]
+            no_slices += this_batch_size
+            current_step += 1
+            if idx == 0:
+                current_epoch += 1
+            yield this_data
     def py_gen_validation(self, gen_name):
-        pass
+        gen_name = gen_name.decode('utf8') + '_' + str(self.gen_num)
+        epochs = -999 if self.config.epochs is None else self.config.epochs
+
+        current_epoch = -1
+        current_step = 0
+        current_file = -1
+
+        current_batch_max = None
+        current_batch_size = None
+        current_num_slices = 0
+        while current_epoch != epochs+1:
+            if current_num_slices >= current_batch_max:
+                # LOAD NEXT FILE
+                current_file += 1
+                idx = current_file % len(self.validation_file_list)
+                filename = self.train_file_list[current_file]
+                data = nibabel.load(filename)
+                d = data.get_fdata() # numpy data # [H, W, SLICE, TIME] # (210, 208, 11, 50) 
+                current_batch_max = d.shape[2]
+                d = np.transpose(d, [0,1,3,2]) # [H, W, TIME, SLICE]
+                current_batch_size = self.config.batch_size if \
+                  self.config.batch_size < batch_max else batch_max
+            #else:
+            #    # CURRENT FILE
+            #    pass
+
+            this_batch_size = current_batch_size if \
+              (current_batch_max-current_num_slices) > \ 
+              current_batch_size else \
+              (current_batch_max-current_num_slices)
+            this_data = d[:,:,:,no_slices:no_slices+this_batch_size]
+            no_slices += this_batch_size
+            current_step += 1
+            if idx == 0:
+                current_epoch += 1
+            yield this_data

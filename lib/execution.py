@@ -44,6 +44,11 @@ class Dataset():
         self.config.cv_folds = None  
         self.config.cv_fold_number = None
         self.config.validation_size = 1
+
+        self.current = Config()
+        self.current.epoch = -1
+        self.current.step = 0
+        self.current.file = 0
     def use_generator(self, data_types):
         self.system_type.use_generator = True
         self.system_type.use_direct = False
@@ -73,7 +78,7 @@ class Dataset():
     def config(self):
         pass
 
-    def create(self, threads=4, generator_name='py_gen'):
+    def create(self, threads=4):
         self.config()
         '''
         threads = Number of computational threads to perform the retrieval of data
@@ -85,21 +90,27 @@ class Dataset():
                 raise NotImplementedError()
         elif self.dev.on is False:
             if self.type.use_generator is True:
-                dummy_ds = tf.data.Dataset.from_tensor_slices(['DataGenerator']*threads)
-                dummy_ds = dummy_ds.interleave(
-                    lambda x: tf.data.Dataset.from_generator(
-                        #lambda x: self.__class__().py_gen(x),
-                        lambda x: getattr(self.__class__(), generator_name)(x),
-                        output_types=(tf.string), args=(x,)
-                    ),
-                    cycle_length=threads,
-                    block_length=1,
-                    num_parallel_calls=threads)
-                self.Dataset = dummy_ds
+                self.Datasets = [
+                    self.create_generator('py_gen_train', threads=threads),
+                    self.create_generator('py_gen_test', threads=threads),
+                    self.create_generator('py_gen_validation', threads=threads)
+                ]
+                self.Dataset = self.Datasets[0]
             else self.type.use_direct is True:
                 raise NotImplementedError()
         self.process_dataset()
-
+    def create_generator(self, generator_name='py_gen_train', threads=4):
+        dummy_ds = tf.data.Dataset.from_tensor_slices(['DataGenerator']*threads)
+        dummy_ds = dummy_ds.interleave(
+            lambda x: tf.data.Dataset.from_generator(
+                #lambda x: self.__class__().py_gen(x),
+                lambda x: getattr(self.__class__(), generator_name)(x),
+                output_types=(tf.string), args=(x,)
+            ),
+            cycle_length=threads,
+            block_length=1,
+            num_parallel_calls=threads)
+        return dummy_ds
     def process_dataset(self):
         '''
         For direct: Creates validation folds
