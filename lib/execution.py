@@ -119,7 +119,7 @@ class Dataset():
         if self.config.batch_size is None:
             printt("Batch size is not set so Default is set to 1", warning=True)
             self.config.batch_size = 1
-        if self.system_type.use_direct is True:
+        if self.system_type.use_direct is True or self.dev.on is True:
             buffer_size = None if not(hasattr(self, 'buffer_size')) else getattr(self, 'buffer_size')
             self.Dataset = self.Dataset.shuffle(buffer_size=buffer_size, seed=operation_seed)
             if self.config.cv_folds is not None:
@@ -145,8 +145,12 @@ class Dataset():
             elif self.config.dataset_split is not None:
                 raise NotImplementedError('Dataset splitting not implemented yet')
         else:
-            self.Dataset = self.Dataset.batch(batch_size=self.config.batch_size)
-            self.Dataset = self.Dataset.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor)
+            self.Datasets = [x.batch(batch_size=self.config.batch_size \
+                for x in self.Datasets)]
+            self.Datasets = [x.prefetch(buffer_size=self.config.batch_size \
+                for x in self.Datasets)]
+            #self.Dataset = self.Dataset.batch(batch_size=self.config.batch_size)
+            #self.Dataset = self.Dataset.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor)
 
     def cifar10(self):
         # Load training and eval data from tf.keras
@@ -167,21 +171,6 @@ class Dataset():
         # for train
         self.Dataset = tf.data.Dataset.from_tensor_slices(train_data, train_labels)
 
-
-
-class Dataset:
-    - also, setting up validation set and testing set
-
-
-
-
-Dataset = tf.data.Dataset
-ds = Dataset.from_tensor_slices(['Gen_0', 'Gen_1', 'Gen_2'])
-ds = ds.interleave(lambda x: Dataset.from_generator(py_gen, output_types=(tf.string), args=(x,)),
-                   cycle_length=3,
-                   block_length=1,
-                   num_parallel_calls=3)
-data_tf = ds.make_one_shot_iterator().get_next()
 
 
 # Execution is a context manager!
