@@ -9,6 +9,11 @@ import sys
 import time
 import glob
 import h5py
+print('running')
+if not os.path.exists('saved'):
+    os.makedirs('saved')
+if not os.path.exists('images'):
+    os.makedirs('images')
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -25,12 +30,14 @@ from tensorflow.keras import layers
 tf.get_logger().setLevel('ERROR')
 #tf.logging.set_verbosity(tf.logging.INFO)
 
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 from layers import Generator, Discriminator
 from loss import discriminator_loss, generator_loss
 
-sys.path.insert(0, '/vol/biomedic/users/kgs13/PhD/projects/perception_tf2/data/biobank/')
+#sys.path.insert(0, '/vol/biomedic/users/kgs13/PhD/projects/perception_tf2/data/biobank/')
+#from BiobankDataLoader import BioBank
+sys.path.insert(0, '/data/root_only/perception/data/biobank/')
 from BiobankDataLoader import BioBank
 
 # Training Flags (hyperparameter configuration)
@@ -49,10 +56,12 @@ full_save_num_images = 49920
 second_unpaired = True
 
 
+print('Loading')
 # Load training and eval data from tf.keras
 (train_data, train_labels), _ = \
     tf.keras.datasets.cifar10.load_data()
 
+print('Loaded')
 
 train_data = train_data.reshape(-1, 32, 32, 3).astype('float32')
 train_data = train_data / 255.
@@ -70,9 +79,17 @@ train_dataset = tf.data.Dataset.from_tensor_slices(train_data)
 train_dataset = train_dataset.shuffle(buffer_size = 60000)
 train_dataset = train_dataset.batch(batch_size = batch_size)
 
+
+print('Dataset')
 biobank = BioBank()
 biobank.use_generator((tf.float32))
+print('Dev Mode')
+biobank.use_developer_mode('cifar10')
+
+print('Create')
 biobank.create()
+
+print('Get')
 train_dataset = biobank.Datasets[0]
 
 generator = Generator()
@@ -151,7 +168,7 @@ def print_or_save_sample_images(sample_data, max_print=num_examples_to_generate,
   plt.imshow(print_images, cmap='gray')
 
   if is_save is True:
-    plt.savefig(prefix+'image_at_epoch_{:04d}.png'.format(epoch))
+    plt.savefig('images/'+prefix+'image_at_epoch_{:04d}.png'.format(epoch))
   plt.show()
   plt.close('all')
 
@@ -247,7 +264,7 @@ for epoch in range(max_epochs):
       random_vector_for_full_save = tf.random.normal([batch_size, 1, 1, noise_dim])
       sample_data = generator(random_vector_for_full_save, training=False)
       sample_blob = sample_data.numpy()
-      h5f = h5py.File('imageblob_epoch{}_{}.h5'.format(epoch+1, batch+1), 'w')
+      h5f = h5py.File('saved/imageblob_epoch{}_{}.h5'.format(epoch+1, batch+1), 'w')
       h5f.create_dataset('imageblob', data=sample_blob)
       h5f.close()
 

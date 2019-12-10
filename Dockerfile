@@ -12,10 +12,10 @@ RUN apk add --no-cache subversion screen python
 RUN apk add --virtual build-dependencies build-base gcc
 RUN npm install -g node-gyp supervisor && cd / && npm init -y && npm install socket.io ws express http-proxy bagpipe chokidar request nodemailer await-signal log4js moment
 RUN chown -R theia:theia /node_modules && chown -R theia:theia /usr/local/lib/node_modules && chown -R theia:theia /home/theia/.npm && chown -R theia:theia /usr/local/bin/
-USER theia
+USER theia # Changed to USER 
 
-ENV username=land007
-ENV password=fcea920f7412b5da7be0cf42b8c93759
+ENV username=gavin
+ENV password=d8578edf8458ce06fbc5bb76a58c5ca4
 
 EXPOSE 5050
 #ENTRYPOINT [ "node", "/home/theia/agent/proxy.js" ]
