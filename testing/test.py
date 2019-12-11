@@ -245,7 +245,7 @@ for epoch in range(max_epochs):
     if step % 20 == 0:
         images = tf.tile(images, [16,1,1,1])
         images_rot = tf.tile(images, [16,1,1,1])
-        print("%d  saving" % (step), end="\r")
+        print("%d  saving" % (step), end="\r")  
         display.clear_output(wait=True)
         print("This images are saved at {} epoch".format(epoch+1))
         sample_data = generator(random_vector_for_generation, training=False)

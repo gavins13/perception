@@ -1,5 +1,7 @@
 from functools import reduce
 import operator
+import os
+import traceback
 '''
 from experiment import debug_level
 debug_level:
@@ -11,7 +13,7 @@ debug_level:
 '''
 
 error_level = 4
-def printt(val, warning=False, error=False, execution=False, info=True):
+def printt(val, warning=False, error=False, execution=False, info=True, stop=False):
     '''
     WARNING, ERROR, EXECUTION, INFO
     '''
@@ -33,4 +35,7 @@ def printt(val, warning=False, error=False, execution=False, info=True):
     elif error_level > 3:
         print(val)
 
-
+    if stop is True:
+        print("Stopped execution.")
+        traceback.print_tb()
+        raise SystemExit

@@ -29,6 +29,10 @@ class BioBank(Dataset):
         self.test_file_list = self.file_list[fold_sizes[0]:fold_sizes[0]+fold_sizes[1]]
         self.validation_file_list = [self.test_file_list[0]]
 
+        self.train_dataset_length = len(self.train_file_list)
+        self.testing_dataset_length = len(self.test_file_list)
+        self.validation_dataset_length = len(self.validation_file_list)
+
     def __config__(self):
         '''
         This is executed when create() is called. It is the first method

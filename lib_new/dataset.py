@@ -32,6 +32,9 @@ class Dataset():
     number of folds, and then also select a fold that the class' Python
     generators can use.
 
+    Remember to define self.train_dataset_length, self.testing_dataset_length
+    and self.validation_dataset_length in the class
+
     Developer mode:
     If using developer mode, remember to set self.dev.dataset before calling
     use()
@@ -72,13 +75,17 @@ class Dataset():
         self.current.epoch = -1
         self.current.step = 0
         self.current.file = 0
+
+        self.train_dataset_length = None
+        self.testing_dataset_length = None
+        self.validation_dataset_length = None
     def use(self, *args):
         if args is not None:
             if args[0] == 'generator':
                 self.use_generator(args[1])
             elif args[0] == 'direct':
                 self.use_direct(args[1])
-            elif args[0] == 'developer_mode':
+            elif args[0] == 'developer_mode' or args[0] == 'dev':
                 self.use_developer_mode(*args)
     def use_generator(self, data_types):
         self.system_type.use_generator = True
@@ -111,9 +118,14 @@ class Dataset():
     def __config__(self):
         pass
 
+    def __check__(self):
+        if self.train_dataset_length is None:
+            printt("Dataset length not set", error=True, stop=True)
+
     def create(self, threads=4):
         self.set_operation_seed()
         self.__config__()
+        self.__check__()
         '''
         threads = Number of computational threads to perform the retrieval of data
         '''
@@ -183,6 +195,9 @@ class Dataset():
             self.Datasets = [x.prefetch(buffer_size=self.config.batch_size) for x in self.Datasets]
             #self.Dataset = self.Dataset.batch(batch_size=self.config.batch_size)
             #self.Dataset = self.Dataset.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor)
+        self.train_dataset = self.Datasets[0]
+        self.testing_dataset = self.Datasets[1]
+        self.validation_dataset = self.Datasets[2]
 
     def cifar10(self):
         # Load training and eval data from tf.keras
@@ -194,6 +209,8 @@ class Dataset():
 
         train_data = train_data[0:49920]
         train_labels = train_labels[0:49920]
+
+        self.train_dataset_length = 49920
 
 
         # for train
