@@ -136,7 +136,7 @@ class Model(object):
             all_trainable_variables.append(model.trainable_variables)
             losses.append(loss)
 
-        testing = True if (training is False and validation is False)
+        testing = True if (training is False and validation is False) else False
         if training is True:
             return all_trainable_variables, losses
         else:

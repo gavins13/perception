@@ -9,9 +9,9 @@ class Execution:
 from lib_new.dataset import Dataset
 from lib_new.model import Model
 import json
-with open("../Config.perception", "r") as config_file:
+with open("Config.perception", "r") as config_file:
     Config = json.load(config_file)
-from misc import printt
+from lib_new.misc import printt
 
 from contextlib import ExitStack
 import os

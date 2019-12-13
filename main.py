@@ -6,10 +6,11 @@ import importlib
 from lib_new.execution import Execution
 from lib_new.dataset import Dataset
 from experiments import experiments
+from lib_new.misc import detect_cmd_arg
 
 
 ''' Config here '''
-experiment_id = 'MERUPv4_magnitude_v2'
+experiment_id = 'tf2_test'
 experiment_type='train'
 ''' End Config  '''
 
