@@ -5,14 +5,28 @@ from os import path
 from random import shuffle, seed as __seed__
 import tensorflow as tf
 from misc import pprint
-from lib_new.dataset import Dataset
+from lib_new.dataset import Dataset as DatasetBase
 
 biobank_list_path = 'biobank.json'
 basepath = path.dirname(__file__)
 biobank_list_path = path.abspath(path.join(basepath, biobank_list_path))
 
 
-class BioBank(Dataset):
+class Dataset(DatasetBase):
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        '''
+        Select folds and fold number
+        '''
+        if 'cv_folds' in kwargs.keys():
+            self.config.cv_folds = kwargs['cv_folds']
+            if 'cv_fold_number' in kwargs.keys():
+                self.config.cv_fold_num = kwargs['cv_fold_number']
+            else:
+                self.config.cv_fold_num = 1
+        else:
+            self.config.cv_fold_num = 1
+            self.config.cv_folds = 3
     '''
     Read the Dataset information
     '''
@@ -43,7 +57,8 @@ class BioBank(Dataset):
             # ' supports batch size 1 due to images being different sizes')
             printt("Note: batching along the slice axis", warning=True)
         self.import_list()
-        self.shuffle_and_split()
+        self.shuffle_and_split(cv_folds=self.config.cv_folds,
+            cv_fold_num=self.config.cv_fold_num)
     def py_gen(self, gen_name):
         raise NotImplemented("You're probably using the wrong function")
         # This function will basically return the Train data and Validation record if

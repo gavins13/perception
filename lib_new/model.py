@@ -24,7 +24,8 @@ Note: the loss function receives the output of the last model call.
 
 Step 2:
 Define Models (e.g. CustomModel) just as with Keras and define loss functions
-(e.g. loss_function).
+(e.g. loss_function). When adding summaries with the loss_function, be sure to 
+use add_summary() function
 
 Step 3:
 Define self.__config__ variables (mainly regarding the number of saving steps
@@ -38,7 +39,7 @@ class Model(object):
 	'''
 	__init__: sets up the optimizers, learning rate, hyperparameters
 	'''
-	def __init__(self):
+	def __init__(self, training=None):
 		self.__tapes__ = None
 		self.__losses__ = None # This is an active variable; (delete?) Issue #1.1
 		self.__variables__ = None # This is an active variable; (delete?) Issue #1.1
@@ -96,7 +97,7 @@ class Model(object):
         '''
         with open(save_dir + 'individual_pkle/' + str(idx) + '.p', 'wb') as handle:
             pickle.dump(diagnostics, handle)
-            
+
         pass
 		'''
         Create sub directories for each type of analysis

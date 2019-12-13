@@ -1,11 +1,11 @@
-
+'''
 class Execution:
     - load Config.perception file
     - load Experiments.perception file
     - Checkpointing, restoration, writing the saves to files
     - Keeps track of experiments by writing to a experiments txt file
     - Loads tensorboard during execution using port number specified in the exp config using no GPUs and 
-
+'''
 from dataset import Dataset
 from learning import Model
 import json
@@ -24,7 +24,8 @@ class Execution(object):
         Arguments:
         dataset: Dataset object (optional)
         experiment_name: string (optional)
-        load: string (optional)
+        load_path: string (optional)
+        model: Model object
         '''
 
         '''
@@ -50,7 +51,10 @@ class Execution(object):
         '''
         Handle directories for saving
         '''
-        project_path = Config['save_directory']
+        project_path = Config['save_directory'] if not((
+            'project_path' in kwargs['project_path'])
+             and kwargs['project_path'] is not None
+             ) else kwargs['project_path']
 
         self.experiment_name = kwargs['experiment_name'] \
             if 'experiment_name' in kwargs.keys() and \
@@ -60,14 +64,14 @@ class Execution(object):
         datetimestr = str(datetime.now())
         datetimestr = datetimestr.replace(" ", "-")
 
-        load = None if not(('load' in kwargs.keys()) and\
-            (isinstance(kwargs['load'], str))) else kwargs['load']
-        if(load==None):
+        load_path = None if not(('load_path' in kwargs.keys()) and\
+            (isinstance(kwargs['load_path'], str))) else kwargs['load_path']
+        if(load_path==None):
             self.save_directory_name = experiment_name + '_' + datetimestr
             self.save_directory = os.path.join(project_path,
                 self.save_directory_name)
         else:
-            self.save_directory = os.path.join(project_path, load)
+            self.save_directory = os.path.join(project_path, load_path)
             printt("Load Dir being used.", info=True)
 
         if 'save_directory' in Config.keys():
@@ -123,7 +127,18 @@ class Execution(object):
         if not(os.path.exists(os.path.join(self.save_directory, 'analysis'))):
             os.makedirs(os.path.join(self.save_directory, 'analysis'))        
         self.analysis_directory = os.path.join(self.save_directory, 'analysis')
-        
+
+        '''
+        Start training?
+        '''
+        if 'experiment_type' in kwargs.keys():
+            exp_type = kwargs['experiment_type']
+            if exp_type == 'train':
+                self.__call__ = self.training
+            elif exp_type == 'testing' or exp_type == 'evaluate':
+                self.__call__ = self.testing
+            if 'execute' is in kwargs.keys() and kwargs['execute'] is True:
+                self()
 
     def testing(self):
         epochs = 0

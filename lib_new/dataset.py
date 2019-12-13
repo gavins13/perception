@@ -17,6 +17,9 @@ class Dataset():
     Afer this, self.Datasets is a list of 3 items: the training, testing and
     validation datasets that you can loop through during training/testing/etc.
 
+    Additionally, after inheritance of Dataset, you can invoke use() in the
+    __init__ method (which will need to call super().__init__())
+
     Notes:
     Before, create(), might be worth also setting config.cv_folds and
     config.cv_folds_number for the number of folds and which fold to operate 
@@ -87,6 +90,10 @@ class Dataset():
                 self.use_direct(args[1])
             elif args[0] == 'developer_mode' or args[0] == 'dev':
                 self.use_developer_mode(*args)
+            else:
+                printt("Using developer mode by default", info=True)
+                self.use_developer_mode(*args)
+
     def use_generator(self, data_types):
         self.system_type.use_generator = True
         self.system_type.use_direct = False
@@ -121,6 +128,10 @@ class Dataset():
     def __check__(self):
         if self.train_dataset_length is None:
             printt("Dataset length not set", error=True, stop=True)
+
+    def __call__(self, *args, **kwargs):
+        self.create(*args, **kwargs)
+        return self
 
     def create(self, threads=4):
         self.set_operation_seed()
