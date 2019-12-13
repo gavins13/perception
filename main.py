@@ -37,37 +37,37 @@ if 'dataset_path' in experiments[experiment_id].keys():
 
 
 if 'experiment_name' in experiments[experiment_id].keys():
-	experiment_name = experiments[experiment_id]["experiment_name"]
+    experiment_name = experiments[experiment_id]["experiment_name"]
 else:
-	experiment_name = 'TODELETE'
+    experiment_name = 'TODELETE'
 
 
 
 if 'dataset_args' in experiments[experiment_id].keys():
-	Dataset_Frame = Dataset(**experiments[experiment_id]['dataset_args'])
+    Dataset_Frame = Dataset(**experiments[experiment_id]['dataset_args'])
 else:
-	Dataset_Frame = Dataset()
+    Dataset_Frame = Dataset()
 
 Dataset = Dataset_Frame()
 # Dataset_Frame.create(); Dataset = Dataset_Frame
 
 if 'load_path' in experiments[experiment_id].keys():
-	load_path = experiments[experiment_id]["load_path"]
+    load_path = experiments[experiment_id]["load_path"]
 else:
-	load_path = None
+    load_path = None
 
 if 'save_directory' in experiments[experiment_id].keys():
-	save_directory = experiments[experiment_id]["save_directory"]
+    save_directory = experiments[experiment_id]["save_directory"]
 else:
-	save_directory = None
+    save_directory = None
 
 
 if __name__ == "main":
-	Experiment = Execution(dataset=Dataset, experiment_name=experiment_name,
-		load_path=load_path, model=Model, project_path=save_directory,
-		experiment_type=experiment_type, execute=True)
+    Experiment = Execution(dataset=Dataset, experiment_name=experiment_name,
+        load_path=load_path, model=Model, project_path=save_directory,
+        experiment_type=experiment_type, execute=True)
 else:
-	Experiment = Execution(dataset=Dataset, experiment_name=experiment_name,
-		load_path=load_path, model=Model, project_path=save_directory,
-		experiment_type=experiment_type)
-	# e.g. from main import Experiment
+    Experiment = Execution(dataset=Dataset, experiment_name=experiment_name,
+        load_path=load_path, model=Model, project_path=save_directory,
+        experiment_type=experiment_type)
+    # e.g. from main import Experiment
