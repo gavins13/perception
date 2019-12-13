@@ -28,9 +28,9 @@ Model = ArchFile.Model
 
 
 if 'dataset_path' in experiments[experiment_id].keys():
-	if 'dataset_path' in experiments[experiment_id].keys():
-		sys.path.insert(0, experiments[experiment_id]['dataset_path'])
-	print("Using user-specified dataset")
+    if 'dataset_path' in experiments[experiment_id].keys():
+        sys.path.insert(0, experiments[experiment_id]['dataset_path'])
+        print("Using user-specified dataset")
     _tmp_mod_name = experiments[experiment_id]["dataset"]
     dataset_module = importlib.import_module(_tmp_mod_name)
     Dataset = dataset_module.Dataset

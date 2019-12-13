@@ -6,8 +6,8 @@ class Execution:
     - Keeps track of experiments by writing to a experiments txt file
     - Loads tensorboard during execution using port number specified in the exp config using no GPUs and 
 '''
-from dataset import Dataset
-from learning import Model
+from lib_new.dataset import Dataset
+from lib_new.model import Model
 import json
 with open("../Config.perception", "r") as config_file:
     Config = json.load(config_file)
@@ -137,7 +137,7 @@ class Execution(object):
                 self.__call__ = self.training
             elif exp_type == 'testing' or exp_type == 'evaluate':
                 self.__call__ = self.testing
-            if 'execute' is in kwargs.keys() and kwargs['execute'] is True:
+            if 'execute' in kwargs.keys() and kwargs['execute'] is True:
                 self()
 
     def testing(self):
@@ -206,7 +206,7 @@ class Execution(object):
                                     validation=True, summaries=True)
                             step += 1
                     epochs += 1
-                    if epochs % self.Model.__config__.saved_model_epochs = 0:
+                    if epochs % self.Model.__config__.saved_model_epochs == 0:
                         tf.saved_model.save(self.saved_model_directory)
                     if epochs >= self.Model.__config__.epochs:
                         train = False

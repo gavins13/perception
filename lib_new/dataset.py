@@ -1,7 +1,7 @@
 import numpy as np
 from random import shuffle, seed as __seed__
 import tensorflow as tf
-from misc import pprint
+from lib_new.misc import printt
 
 
 class Dataset():

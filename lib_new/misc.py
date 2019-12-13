@@ -23,7 +23,7 @@ def printt(val, warning=False, error=False, execution=False, info=True, stop=Fal
     elif (error is True) and (error_level > 1):
         print("ERROR: {0}".format(val))
     elif (info is True) and (error_level > 2):
-        print("INFO: {0}".format(val)))
+        print("INFO: {0}".format(val))
     elif execution is True:
         print("EXECUTION: {0}".format(val))
     elif error_level > 3:

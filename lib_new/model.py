@@ -91,7 +91,7 @@ class Model(object):
 		'''
 		pass
 
-	def analyse(self, diagnostics, idx, save_dir):
+    def analyse(self, diagnostics, idx, save_dir):
         '''
         Save all diagnostics to a pickle
         '''
