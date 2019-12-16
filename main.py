@@ -9,6 +9,13 @@ from experiments import experiments
 from lib_new.misc import detect_cmd_arg
 
 
+def Experiment(experiment_id, experiment_type):
+    if not(experiment_type in ['train', 'test', 'evaluate']):
+        raise ValueError()
+    
+
+
+
 ''' Config here '''
 experiment_id = 'tf2_test'
 experiment_type='train'

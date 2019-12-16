@@ -147,8 +147,12 @@ class Execution(object):
             dataset_keys = self.DataFrame.get_keys() # Keys list
             for record_number, data_record in self.Dataset.train_dataset.enumerate():
                 data = {key:value for i, key in enumerate(dataset_keys) for value in data_record[i]}
-                diagnostics = self.Model.loss_func(training=False)
-                self.Model.analyse(diagnostics, step, self.analysis_directory)
+                #diagnostics = self.Model.loss_func(data, training=False)
+                #analysis_output = self.Model.analyse(diagnostics, step, self.analysis_directory)
+
+                diagnostics, analysis_output = self.run(data,
+                    return_analysis=True,
+                    return_diagnostics=True)
                 '''
                 Print to console and save checkpoint
                 '''
@@ -159,6 +163,29 @@ class Execution(object):
                 step += 1
             epochs += 1
 
+    def run(self, input_data, return_diagnostics=True, execute_analysis=False,
+        return_analysis=False, step=None, analysis_directory=None):
+        '''
+        Use this to run forward passes on data
+        '''
+
+        analysis_directory = self.analysis_directory if analysis_directory is None else analysis_directory
+
+        execute_analysis = True if return_analysis is True else execute_analysis
+
+        diagnostics = self.Model.loss_func(data, training=False)
+        if execute_analysis is True:
+            analysis_output = self.Model.analyse(diagnostics, step, analysis_directory)
+
+        if return_diagnostics is True:
+            if return_analysis is True:
+                return diagnostics, analysis_output
+            else:
+                return diagnostics
+        else:
+            if return_analysis is True:
+                return analysis_output
+        
 
     def training(self):
         '''
