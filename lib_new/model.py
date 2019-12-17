@@ -1,4 +1,6 @@
 import tensorflow as tf
+from lib_new.misc import printt
+from contextlib import ExitStack
 
 '''
 Model
@@ -90,6 +92,9 @@ class Model(object):
         Literally just return loss
         '''
         pass
+        # For example
+        self = args[0]
+        results = args[1]
 
     def analyse(self, diagnostics, idx, save_dir):
         '''
@@ -122,18 +127,21 @@ class Model(object):
         all_trainable_variables = []
         losses = []
 
-        for i, models in enumerate(self.__optimiser_models__):
+        for i, models in enumerate(self.__optimisers_models__):
             '''
             Pass number below isn't a solid concept. But for example,
             pass_number = 0 could represent training a generator-discriminator
             whereas pass_number = 1 could represent training just the
             discriminator
             '''
+            this_optimiser_trainable_variables = []
             results = data
-            for model in models.models:
+            for model in models["models"]:
                 results = model(results, training=training, pass_number=i)
+                this_optimiser_trainable_variables += model.trainable_variables
+
+            all_trainable_variables.append(this_optimiser_trainable_variables)
             loss = models['loss_function'](results, pass_number=i)
-            all_trainable_variables.append(model.trainable_variables)
             losses.append(loss)
 
         testing = True if (training is False and validation is False) else False
@@ -153,24 +161,25 @@ class Model(object):
         if self.__active_vars__.summaries == False:
             return
         else:
-            raise NotImplemented()
+            printt("Summaries not implemented yet", warning=True)
     
 
-    def __update_weights__(self, data):
+    def __update_weights__(self, data, summaries=False):
+        self.__active_vars__.summaries = summaries
         n = len(self.__optimisers__)
-        self.__tapes__ =[tf.Gradient]*n
+        self.__tapes__ = [tf.GradientTape() for _ in range(n)]
         with ExitStack() as stack:
-            for i, mgr in enumerate(self.tapes):
-                self.tapes[i] = stack.enter_context(mgr)
+            for i, mgr in enumerate(self.__tapes__):
+                self.__tapes__[i] = stack.enter_context(mgr)
             all_trainable_variables, losses = self.loss_func(data, training=True)
             self.__variables__ = all_trainable_variables # Issue #1.1
             self.__losses__ = losses # Issue #1.1
 
-            for i, [tape, loss, all_trainable_variables, optimiser] in enumerate(
+            for i, [tape, loss, optimiser_trainable_variables, optimiser] in enumerate(
                 zip(self.__tapes__,
                     self.__losses__,
                     self.__variables__,
                     self.__optimisers__)):
-                grads = tape.gradient(loss, variables)
-                optimiser.apply_gradients(zip(grads, variables))
+                grads = tape.gradient(loss, optimiser_trainable_variables)
+                optimiser.apply_gradients(zip(grads, optimiser_trainable_variables))
 

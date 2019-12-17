@@ -4,7 +4,7 @@ import nibabel
 from os import path
 from random import shuffle, seed as __seed__
 import tensorflow as tf
-from misc import pprint
+from lib_new.misc import printt
 from lib_new.dataset import Dataset as DatasetBase
 
 biobank_list_path = 'biobank.json'

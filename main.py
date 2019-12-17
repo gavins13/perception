@@ -1,21 +1,31 @@
-if __name__ == "main":
+#!python3
+if __name__ == "__main__":
     print("running now...")
     ''' Config here '''
     experiment_id = 'tf2_test'
     experiment_type='train'
     ''' End Config  '''
+    import matplotlib
+    matplotlib.use("agg") #qt5agg
 
+import os
 import sys
-import matplotlib
-matplotlib.use("agg") #qt5agg
 import importlib
 from lib_new.execution import Execution
 from lib_new.dataset import Dataset
 from experiments import experiments
-from lib_new.misc import detect_cmd_arg
+from lib_new.misc import detect_cmd_arg, printt
 
 
-def Experiment(experiment_id, experiment_type, execute=False):
+def Experiment(experiment_id, experiment_type, execute=False, gpu=None):
+    if gpu is not None:
+        if not(isinstance(gpu, int)):
+            raise ValueError('GPU number invalid')
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
+        printt("GPU {} being used".format(gpu), warning=True)
+    else:
+        printt("GPU not being used", warning=True)
+
     if not(experiment_type in ['train', 'test', 'evaluate']):
         raise ValueError('Execution mode invalid')
 
@@ -66,13 +76,14 @@ def Experiment(experiment_id, experiment_type, execute=False):
 
     return Execution(dataset=Dataset, experiment_name=experiment_name,
         load_path=load_path, model=Model, project_path=save_directory,
-        experiment_type=experiment_type)
+        experiment_type=experiment_type, execute=execute)
 
 
 
 
 
-if __name__ == "main":
+if __name__ == "__main__":
     experiment_id = detect_cmd_arg("experiment_id", false_val=experiment_id)
     experiment_type = detect_cmd_arg("type", false_val=experiment_type)
-    ThisExperiment = Experiment(experiment_id, experiment_type, execute=True)
+    gpu = detect_cmd_arg("gpu", false_val=None, val_dtype=int)
+    ThisExperiment = Experiment(experiment_id, experiment_type, execute=True, gpu=gpu)

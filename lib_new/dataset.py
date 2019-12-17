@@ -177,8 +177,9 @@ class Dataset():
             printt("Batch size is not set so Default is set to 1", warning=True)
             self.config.batch_size = 1
         if self.system_type.use_direct is True or self.dev.on is True:
-            buffer_size = None if not(hasattr(self, 'buffer_size')) else getattr(self, 'buffer_size')
-            self.Dataset = self.Dataset.shuffle(buffer_size=buffer_size, seed=operation_seed)
+            if self.dev.on is False:
+                buffer_size = None if not(hasattr(self, 'buffer_size')) else getattr(self, 'buffer_size')
+                self.Dataset = self.Dataset.shuffle(buffer_size=buffer_size, seed=operation_seed)
             if self.config.cv_folds is not None:
                 self.Datasets = []
                 if self.config.cv_fold_number is None:
@@ -197,8 +198,8 @@ class Dataset():
                 train_ds = first
                 validation_ds = test_ds.take(self.config.validation_size)
                 self.Datasets = [train_ds, test_ds, validation_ds]
-                self.Datasets = [x(batch_size=self.config.batch_size) for x in self.Datasets]
-                self.Datasets = [x(buffer_size=self.config.batch_size*self.config.prefetch_factor) for x in self.Datasets]
+                self.Datasets = [x.batch(batch_size=self.config.batch_size) for x in self.Datasets]
+                self.Datasets = [x.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor) for x in self.Datasets]
             elif self.config.dataset_split is not None:
                 raise NotImplementedError('Dataset splitting not implemented yet')
         else:
@@ -211,21 +212,43 @@ class Dataset():
         self.validation_dataset = self.Datasets[2]
 
     def cifar10(self):
+        self.config.cv_folds = None
+        self.config.dataset_split = None
+        self.config.batch_size = 4
         # Load training and eval data from tf.keras
-        (train_data, train_labels), _ = tf.keras.datasets.cifar10.load_data()
+        (train_data, train_labels), (test_data, test_labels) = tf.keras.datasets.cifar10.load_data()
+        printt('CIFAR10 shapes train_data, test_data, test_data, test_labels', debug=True)
+        printt(train_data.shape, debug=True)
+        printt(test_data.shape, debug=True)
+        printt(train_labels.shape, debug=True)
+        printt(test_labels.shape, debug=True)
 
-        train_data = train_data.reshape(-1, 32, 32, 3).astype('float32')
+        #train_data = train_data.reshape(-1, 32, 32, 3).astype('float32')
         train_data = train_data / 255.
+        test_data = test_data / 255.
+
         train_labels = np.asarray(train_labels, dtype=np.int32)
+        test_labels = np.asarray(test_labels, dtype=np.int32)
 
-        train_data = train_data[0:49920]
-        train_labels = train_labels[0:49920]
+        #train_data = train_data[0:49920]
+        #train_labels = train_labels[0:49920]
 
-        self.train_dataset_length = 49920
-
-
+        self.train_dataset_length = 50000
+        self.test_dataset_length = 10000
+        self.validation_dataset_length = 1
         # for train
-        self.Dataset = tf.data.Dataset.from_tensor_slices(train_data, train_labels)
+        train_dataset = tf.data.Dataset.from_tensor_slices((train_data, train_labels))
+        #train_dataset_data = tf.data.Dataset.from_tensor_slices(train_data)
+        #train_dataset_labels = tf.data.Dataset.from_tensor_slices(train_labels)
+        #train_dataset = tf.data.Dataset.zip((train_dataset_data, train_dataset_labels))
+        
+        test_dataset = tf.data.Dataset.from_tensor_slices((test_data, test_labels))
+        validation_dataset = test_dataset.take(self.validation_dataset_length)
+
+        self.Datasets = [train_dataset, test_dataset, validation_dataset]
+        printt(self.Datasets, debug=True)
+        self.Datasets = [x.batch(batch_size=self.config.batch_size) for x in self.Datasets]
+        self.Datasets = [x.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor) for x in self.Datasets]
 
 
 

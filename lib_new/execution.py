@@ -15,8 +15,10 @@ from lib_new.misc import printt
 
 from contextlib import ExitStack
 import os
-
+from datetime import datetime
 from lib_new.model import Model
+import tensorflow as tf
+import time
 
 class Execution(object):
     def __init__(self, *args, **kwargs):
@@ -24,9 +26,24 @@ class Execution(object):
         Arguments:
         dataset: Dataset object (optional)
         experiment_name: string (optional)
-        load_path: string (optional)
+        save_folder: string (optional)
         model: Model object
         '''
+        printt(kwargs, debug=True)
+
+        '''
+        Training or Testing
+        '''
+        if 'experiment_type' in kwargs.keys():
+            exp_type = kwargs['experiment_type']
+            if exp_type == 'train':
+                self.__call__func = self.training
+            elif exp_type == 'testing' or exp_type == 'evaluate':
+                self.__call__func = self.testing
+            else:
+                printt("Invalid Experiment Execution type set", error=True, stop=True)
+        else:
+            printt("Experiment Execution type not set", error=True, stop=True)
 
         '''
         Handle Dataset
@@ -42,45 +59,50 @@ class Execution(object):
         '''
         Handle Model
         '''
+        if 'model' in kwargs.keys() and issubclass(kwargs['model'], Model):
+            kwargs['model'] = kwargs['model'](training=exp_type)
         if 'model' in kwargs.keys() and isinstance(kwargs['model'], Model):
             # Use this dataset
             self.Model = kwargs['model']
             self.Model.create_models()
+        else:
+            printt(kwargs.keys(), debug=True)
+            printt(kwargs['model'], debug=True)
+            printt("No Model for execution", error=True, stop=True)
 
 
         '''
         Handle directories for saving
         '''
-        project_path = Config['save_directory'] if not((
-            'project_path' in kwargs['project_path'])
-             and kwargs['project_path'] is not None
-             ) else kwargs['project_path']
-
+        # Create Perception Experiments Save Directory
+        perception_save_path = Config['save_directory'] if not((
+            'perception_save_path' in kwargs.keys() )
+             and kwargs['perception_save_path'] is not None
+             ) else kwargs['perception_save_path']
+        if not(os.path.exists(perception_save_path)):
+            os.makedirs(perception_save_path)
+        # Create an experiment name that is unique
         self.experiment_name = kwargs['experiment_name'] \
             if 'experiment_name' in kwargs.keys() and \
             isinstance(kwargs['experiment_name'], str) else 'tmp'
         printt("Experiment Name: {0}".format(self.experiment_name), info=True) 
-        
         datetimestr = str(datetime.now())
         datetimestr = datetimestr.replace(" ", "-")
 
-        load_path = None if not(('load_path' in kwargs.keys()) and\
-            (isinstance(kwargs['load_path'], str))) else kwargs['load_path']
-        if(load_path==None):
-            self.save_directory_name = experiment_name + '_' + datetimestr
-            self.save_directory = os.path.join(project_path,
+        # Create the save folder name from the experiment name above
+        save_folder = None if not(('save_folder' in kwargs.keys()) and\
+            (isinstance(kwargs['save_folder'], str))) else kwargs['save_folder']
+        if(save_folder==None):
+            self.save_directory_name = self.experiment_name + '_' + datetimestr
+            self.save_directory = os.path.join(perception_save_path,
                 self.save_directory_name)
         else:
-            self.save_directory = os.path.join(project_path, load_path)
+            self.save_directory = os.path.join(perception_save_path, save_folder)
             printt("Load Dir being used.", info=True)
+        # Create the save folder
+        if not(os.path.exists(self.save_directory)):
+            os.makedirs(self.save_directory)
 
-        if 'save_directory' in Config.keys():
-            if not(os.path.exists(project_path)):
-                os.makedirs(project_path)
-        else:
-            printt("'save_directory' attribute doesn't exist!", error=True,
-                stop=True)
-        self.save_directory = kwargs['save_directory']
 
 
         '''
@@ -111,7 +133,7 @@ class Execution(object):
             printt("Restored from {}".format(self.ckpt_manager.latest_checkpoint),
                 info=True)
         else:
-            printt("Initializing from scratch.", info=True)
+            printt("Initializing from scratch.", debug=True)
 
 
         '''
@@ -131,26 +153,22 @@ class Execution(object):
         '''
         Start training?
         '''
-        if 'experiment_type' in kwargs.keys():
-            exp_type = kwargs['experiment_type']
-            if exp_type == 'train':
-                self.__call__ = self.training
-            elif exp_type == 'testing' or exp_type == 'evaluate':
-                self.__call__ = self.testing
-            if 'execute' in kwargs.keys() and kwargs['execute'] is True:
-                self()
+        if 'execute' in kwargs.keys() and kwargs['execute'] is True:
+            printt("Start training/testing", info=True)
+            self()
+    def __call__(self, *args, **kwargs):
+        return self.__call__func(*args, **kwargs)
 
     def testing(self):
+        printt("Entering testing loop", debug=True)
         epochs = 0
         step = 0
         while test is True:
-            dataset_keys = self.DataFrame.get_keys() # Keys list
             for record_number, data_record in self.Dataset.train_dataset.enumerate():
-                data = {key:value for i, key in enumerate(dataset_keys) for value in data_record[i]}
                 #diagnostics = self.Model.loss_func(data, training=False)
                 #analysis_output = self.Model.analyse(diagnostics, step, self.analysis_directory)
 
-                diagnostics, analysis_output = self.run(data,
+                diagnostics, analysis_output = self.run(data_record,
                     return_analysis=True,
                     return_diagnostics=True)
                 '''
@@ -191,37 +209,34 @@ class Execution(object):
         '''
         Training Loop
         '''
+        printt("Entering training loop", debug=True)
         epochs = 0
         step=0
         train = True
         with self.summary_writer.as_default():
-            with tf.summary_recordif(True):
+            with tf.summary.record_if(True):
                 while train is True: # Trains across epochs, NOT steps
-                    dataset_keys = self.DataFrame.get_keys() # Keys list
                     for record_number, data_record in\
                         self.Dataset.train_dataset.enumerate():
                             add_summary = (step+1) % self.Model.__config__.summary_steps
                             add_summary = True if add_summary == 0 else False
                             # Start Timing
                             start_time = time.time()
-                            # Organise Data
-                            data = {key:value for i, key in enumerate(
-                                dataset_keys) for value in data_record[i]}
                             # Execute Model
-                            self.Model.__update_weights__(data, summaries=add_summary)
+                            self.Model.__update_weights__(data_record, summaries=add_summary)
                             # Print training information and duration
-                            print("training epoch: %d" % epochs+1, end=";")
+                            print("training epoch: {}".format(epochs+1), end=";")
                             print("data split: %d of %d" % (
                                 record_number+1,
                                 self.Dataset.train_dataset_length), end=";")
-                            print("step: %d" % steps, end=";")
+                            print("step: %d" % step, end=";")
                             duration = time.time() - start_time
                             print("time: %.3f" % duration, end=";")
                             # Checkpointing
                             self.ckpt.step.assign_add(1)
                             if int(self.ckpt.step) %\
                              self.Model.__config__.checkpoint_steps == 0:
-                                save_path = manager.save()
+                                save_path = self.ckpt_manager.save()
                                 print("Saved checkpoint for step {}: {}".format(
                                     int(self.ckpt.step), save_path), end=";")
                             print("",
@@ -229,7 +244,7 @@ class Execution(object):
 
                             # Validation
                             if (step+1) % self.Model.__config__.validation_steps == 0:
-                                self.Model.loss_func(training=False,
+                                self.Model.loss_func(data_record, training=False,
                                     validation=True, summaries=True)
                             step += 1
                     epochs += 1
