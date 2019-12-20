@@ -1,3 +1,9 @@
+ - execution.py: reload step
+ - pass step to update_weights, (mainly for summaries)
+
+
+
+
 Have a dev mode option that operates on the toy dataset, summarises every step, validates every step, tests every 5 steps, launches tensorboard automatically
 have dev mode option that allows you to operate on the real dataset (not toy)
 

@@ -55,14 +55,21 @@ class Model(object):
         self.__config__.epochs = 300
         self.__config__.saved_model_epochs = 1
 
-        self.__keras_models__ = None
+        self.__keras_models__ = None # Typically this should describe the forward pass also
+        self.__forward_pass_model__ = None # Ideally, should be concatentation
+                                           # of __keras_models__
 
         self.__active_vars__ = Config()
         self.__active_vars__.summaries = False
         self.__active_vars__.training = False
         self.__active_vars__.validation = False
         self.__active_vars__.return_weights = False
+        self.__active_vars__.step = None
     class CustomModel(tf.keras.Model):
+        '''
+        Add decorator below if you want to use SavedModel and TF Serving
+        '''
+        @tf.function(input_signature=[tf.TensorSpec([], tf.float32)])
         def call(self, inputs, training=False, pass_number=None):
             pass
 
@@ -74,6 +81,7 @@ class Model(object):
         '''
         self.__keras_models__ = []
         self.__keras_models__.append(self.CustomModel())
+        self.__forward_pass_model__ = self.__keras_models__[0]
         self.__optimisers__ = []
         self.__optimisers__.append(tf.keras.optimizers.Adam(5.e-5))
 
@@ -154,14 +162,27 @@ class Model(object):
     No modification required
     '''
 
-    def add_summary(self, name, data, type='scalar'):
+    def add_summary(self, name, data, **kwargs):
         '''
         type: string from 'scalar', 'video', 'image'
         '''
+        if 'type' not in kwargs.keys():
+            printt("type not valid", error=True, stop=True)
+        else:
+            typ = kwargs['type']
+        del(kwargs['type'])
+        kwargs['step'] = self.__active_vars__.step
         if self.__active_vars__.summaries == False:
             return
         else:
-            printt("Summaries not implemented yet", warning=True)
+            if typ == "scalar":
+                tf.summary.scalar(name, data, **kwargs)
+            elif typ == "image":
+                tf.summary.image(name, data, **kwargs)
+            elif typ == "video" or typ == "gif":
+                printt("Video Summaries not implemented yet", warning=True)
+            else:
+                printt("Invalid summary type", error=True)
     
 
     def __update_weights__(self, data, summaries=False):

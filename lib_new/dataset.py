@@ -82,6 +82,13 @@ class Dataset():
         self.train_dataset_length = None
         self.testing_dataset_length = None
         self.validation_dataset_length = None
+
+        self.train_dataset_steps = None # Should be the same as
+                                        # train_data_length for batch_size
+                                        # = 1, otherwise, = 
+                                        # train_dataset_length / batch_size
+        self.testing_dataset_steps = None
+        self.validation_dataset_steps = None
     def use(self, *args):
         if args is not None:
             if args[0] == 'generator':
@@ -207,14 +214,16 @@ class Dataset():
             self.Datasets = [x.prefetch(buffer_size=self.config.batch_size) for x in self.Datasets]
             #self.Dataset = self.Dataset.batch(batch_size=self.config.batch_size)
             #self.Dataset = self.Dataset.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor)
+        self.set_dataset_steps()
         self.train_dataset = self.Datasets[0]
         self.testing_dataset = self.Datasets[1]
         self.validation_dataset = self.Datasets[2]
 
+
     def cifar10(self):
         self.config.cv_folds = None
         self.config.dataset_split = None
-        self.config.batch_size = 4
+        self.config.batch_size = 256
         # Load training and eval data from tf.keras
         (train_data, train_labels), (test_data, test_labels) = tf.keras.datasets.cifar10.load_data()
         printt('CIFAR10 shapes train_data, test_data, test_data, test_labels', debug=True)
@@ -223,9 +232,10 @@ class Dataset():
         printt(train_labels.shape, debug=True)
         printt(test_labels.shape, debug=True)
 
+
         #train_data = train_data.reshape(-1, 32, 32, 3).astype('float32')
-        train_data = train_data / 255.
-        test_data = test_data / 255.
+        train_data = np.float32(train_data) / 255.
+        test_data = np.float32(test_data) / 255.
 
         train_labels = np.asarray(train_labels, dtype=np.int32)
         test_labels = np.asarray(test_labels, dtype=np.int32)
@@ -233,8 +243,8 @@ class Dataset():
         #train_data = train_data[0:49920]
         #train_labels = train_labels[0:49920]
 
-        self.train_dataset_length = 50000
-        self.test_dataset_length = 10000
+        self.train_dataset_length = train_labels.shape[0] # 50,000
+        self.test_dataset_length = test_labels.shape[0] # 10,000
         self.validation_dataset_length = 1
         # for train
         train_dataset = tf.data.Dataset.from_tensor_slices((train_data, train_labels))
@@ -251,7 +261,17 @@ class Dataset():
         self.Datasets = [x.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor) for x in self.Datasets]
 
 
-
+    def set_dataset_steps(self):
+        if self.config.batch_size is None:
+            printt("Batch size not set!", error=True, stop=True)
+        if self.train_dataset_length is None:
+            printt("Training dataset size not set!", error=True, stop=True)
+        if self.test_dataset_length is None:
+            printt("Test dataset size not set!", error=True, stop=True)
+        self.train_dataset_steps = np.floor(np.divide(self.train_dataset_length,
+            self.config.batch_size))
+        self.test_dataset_steps = np.floor(np.divide(self.test_dataset_length,
+            self.config.batch_size))
 
     def set_operation_seed(self, seed=1114):
         tf.random.set_seed(seed)

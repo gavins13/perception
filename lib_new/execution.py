@@ -15,6 +15,7 @@ from lib_new.misc import printt
 
 from contextlib import ExitStack
 import os
+import sys
 from datetime import datetime
 from lib_new.model import Model
 import tensorflow as tf
@@ -69,7 +70,9 @@ class Execution(object):
             printt(kwargs.keys(), debug=True)
             printt(kwargs['model'], debug=True)
             printt("No Model for execution", error=True, stop=True)
-
+        step_counter = tf.Variable(initial_value=1, trainable=False,
+                                   name="global_step", dtype=tf.int64)
+        self.Model.__active_vars__.step = step_counter
 
         '''
         Handle directories for saving
@@ -125,7 +128,7 @@ class Execution(object):
         models = {'model_'+str(i): model for i, model in enumerate(
             self.Model.__keras_models__)}
 
-        self.ckpt = tf.train.Checkpoint(**optimisers, **models, step=tf.Variable(1))
+        self.ckpt = tf.train.Checkpoint(**optimisers, **models, step=step_counter)
         self.ckpt_manager = tf.train.CheckpointManager(
             self.ckpt, checkpoint_dir, max_to_keep=3)
         self.ckpt.restore(self.ckpt_manager.latest_checkpoint)
@@ -177,7 +180,7 @@ class Execution(object):
                 print("testing epoch: %d" % epochs, end=";")
                 print("data split: %d of %d" % (record_number+1, self.data_strap.dataset_length), end=";")
                 print("step: %d" % steps, end=";")
-                print("", end='                                        \r')
+                sys.stdout.write("\033[K")
                 step += 1
             epochs += 1
 
@@ -228,7 +231,7 @@ class Execution(object):
                             print("training epoch: {}".format(epochs+1), end=";")
                             print("data split: %d of %d" % (
                                 record_number+1,
-                                self.Dataset.train_dataset_length), end=";")
+                                self.Dataset.train_dataset_steps), end=";")
                             print("step: %d" % step, end=";")
                             duration = time.time() - start_time
                             print("time: %.3f" % duration, end=";")
@@ -239,8 +242,8 @@ class Execution(object):
                                 save_path = self.ckpt_manager.save()
                                 print("Saved checkpoint for step {}: {}".format(
                                     int(self.ckpt.step), save_path), end=";")
-                            print("",
-                                end='                                        \r')
+                                sys.stdout.write("\033[K")
+                            print("", end="\r")
 
                             # Validation
                             if (step+1) % self.Model.__config__.validation_steps == 0:
@@ -248,7 +251,10 @@ class Execution(object):
                                     validation=True, summaries=True)
                             step += 1
                     epochs += 1
-                    if epochs % self.Model.__config__.saved_model_epochs == 0:
-                        tf.saved_model.save(self.saved_model_directory)
+                    if epochs % self.Model.__config__.saved_model_epochs == 0:                        
+                        if not(os.path.exists(os.path.join(self.saved_model_directory, 'epoch_'+str(epochs)))):
+                            os.makedirs(os.path.join(self.saved_model_directory, 'epoch_'+str(epochs)))
+                        this_epoch_saved_model_dir = os.path.join(self.saved_model_directory, 'epoch_'+str(epochs))
+                        tf.saved_model.save(self.Model.__forward_pass_model__, this_epoch_saved_model_dir)
                     if epochs >= self.Model.__config__.epochs:
                         train = False

@@ -27,6 +27,8 @@ class Dataset(DatasetBase):
         else:
             self.config.cv_fold_num = 1
             self.config.cv_folds = 3
+
+        self.config.batch_size = 1
     '''
     Read the Dataset information
     '''
