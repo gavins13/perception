@@ -146,6 +146,8 @@ class Model(object):
             results = data
             for model in models["models"]:
                 results = model(results, training=training, pass_number=i)
+                #print(model.inputs)
+                #print(self.__forward_pass_model__.inputs)
                 this_optimiser_trainable_variables += model.trainable_variables
 
             all_trainable_variables.append(this_optimiser_trainable_variables)

@@ -17,7 +17,7 @@ from experiments import experiments
 from lib_new.misc import detect_cmd_arg, printt
 
 
-def Experiment(experiment_id, experiment_type, execute=False, gpu=None):
+def Experiment(experiment_id, experiment_type, execute=False, gpu=None, tensorboard_only=False):
     if gpu is not None:
         if not(isinstance(gpu, int)):
             raise ValueError('GPU number invalid')
@@ -25,6 +25,10 @@ def Experiment(experiment_id, experiment_type, execute=False, gpu=None):
         printt("GPU {} being used".format(gpu), warning=True)
     else:
         printt("GPU not being used", warning=True)
+    
+    if tensorboard_only is True:
+        os.environ["CUDA_VISIBLE_DEVICES"] = ''
+        printt("Only Tensorboard starting", info=True)
 
     if not(experiment_type in ['train', 'test', 'evaluate']):
         raise ValueError('Execution mode invalid')
@@ -76,7 +80,8 @@ def Experiment(experiment_id, experiment_type, execute=False, gpu=None):
 
     return Execution(dataset=Dataset, experiment_name=experiment_name,
         load_path=load_path, model=Model, project_path=save_directory,
-        experiment_type=experiment_type, execute=execute)
+        experiment_type=experiment_type, execute=execute,
+        tensorboard_only=tensorboard_only)
 
 
 
@@ -86,4 +91,5 @@ if __name__ == "__main__":
     experiment_id = detect_cmd_arg("experiment_id", false_val=experiment_id)
     experiment_type = detect_cmd_arg("type", false_val=experiment_type)
     gpu = detect_cmd_arg("gpu", false_val=None, val_dtype=int)
-    ThisExperiment = Experiment(experiment_id, experiment_type, execute=True, gpu=gpu)
+    tensorboard_only = detect_cmd_arg("tensorboard", retrieve_val=False)
+    ThisExperiment = Experiment(experiment_id, experiment_type, execute=True, gpu=gpu, tensorboard_only=tensorboard_only)

@@ -17,6 +17,16 @@ pip --version
 which pip
 pip install tensorflow-addons
 ```
+# JSON "experiments.json" format
+
+Each experiment entry has:
+ - experiment_id (dictionary key)
+ - experiment_name
+ - dataset (optional)
+ - dataset_path (optional)
+ - dataset_args (optional)
+ - save_folder (optional)
+ - save_directory (optional)
 
 
 # Issues

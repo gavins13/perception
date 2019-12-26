@@ -20,6 +20,8 @@ from datetime import datetime
 from lib_new.model import Model
 import tensorflow as tf
 import time
+from tensorboard import program as tb_program
+
 
 class Execution(object):
     def __init__(self, *args, **kwargs):
@@ -29,6 +31,7 @@ class Execution(object):
         experiment_name: string (optional)
         save_folder: string (optional)
         model: Model object
+        tensorboard_only: bool (optional)
         '''
         printt(kwargs, debug=True)
 
@@ -45,6 +48,9 @@ class Execution(object):
                 printt("Invalid Experiment Execution type set", error=True, stop=True)
         else:
             printt("Experiment Execution type not set", error=True, stop=True)
+        if 'tensorboard_only' in kwargs.keys() and kwargs['tensorboard_only'] is True:
+            self.__call__func = self.tensorboard
+            kwargs['execute'] = True
 
         '''
         Handle Dataset
@@ -115,6 +121,7 @@ class Execution(object):
             os.makedirs(os.path.join(self.save_directory, 'summaries'))
         self.summary_writer = tf.summary.create_file_writer(
             os.path.join(self.save_directory, 'summaries'))
+        self.summaries_directory = os.path.join(self.save_directory, 'summaries')
 
 
         '''
@@ -188,6 +195,9 @@ class Execution(object):
         return_analysis=False, step=None, analysis_directory=None):
         '''
         Use this to run forward passes on data
+        Arguments:
+         - input_data : list of input data to be executed
+         - 
         '''
 
         analysis_directory = self.analysis_directory if analysis_directory is None else analysis_directory
@@ -207,6 +217,17 @@ class Execution(object):
             if return_analysis is True:
                 return analysis_output
         
+    def tensorboard(self, port=None):
+        '''
+        Start tensorboard
+        '''
+        tb = tb_program.TensorBoard()
+        args = [None, '--logdir', self.experiment_name+':'+self.summaries_directory, '--host', '0.0.0.0']
+        if port is not None:
+            args.append('--port')
+            args.append(port)
+        tb.configure(argv=args)
+        tb_url = tb.launch()
 
     def training(self):
         '''
@@ -216,6 +237,11 @@ class Execution(object):
         epochs = 0
         step=0
         train = True
+        '''
+        Start Tensorboard
+        '''
+        self.tensorboard()
+
         with self.summary_writer.as_default():
             with tf.summary.record_if(True):
                 while train is True: # Trains across epochs, NOT steps
@@ -240,8 +266,8 @@ class Execution(object):
                             if int(self.ckpt.step) %\
                              self.Model.__config__.checkpoint_steps == 0:
                                 save_path = self.ckpt_manager.save()
-                                print("Saved checkpoint for step {}: {}".format(
-                                    int(self.ckpt.step), save_path), end=";")
+                                print("Saved checkpoint for step {}".format(
+                                    int(self.ckpt.step)), end=";")
                                 sys.stdout.write("\033[K")
                             print("", end="\r")
 
@@ -255,6 +281,13 @@ class Execution(object):
                         if not(os.path.exists(os.path.join(self.saved_model_directory, 'epoch_'+str(epochs)))):
                             os.makedirs(os.path.join(self.saved_model_directory, 'epoch_'+str(epochs)))
                         this_epoch_saved_model_dir = os.path.join(self.saved_model_directory, 'epoch_'+str(epochs))
-                        tf.saved_model.save(self.Model.__forward_pass_model__, this_epoch_saved_model_dir)
+                        #tf.saved_model.save(self.Model.__forward_pass_model__, this_epoch_saved_model_dir)
+                        #_ = self.Model.__forward_pass_model__(data_record)
+                        #print(type(data_record))
+                        #print(self.Model.__forward_pass_model__.inputs)
+                        #print("")
+                        if epochs == 1:
+                            _ = self.Model.__forward_pass_model__.predict(data_record)
+                        self.Model.__forward_pass_model__.save(this_epoch_saved_model_dir)
                     if epochs >= self.Model.__config__.epochs:
                         train = False

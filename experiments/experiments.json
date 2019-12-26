@@ -1,0 +1,26 @@
+{
+    "MERUPv4_magnitude_v2":
+        {
+            "module": 'models.MERUP.main_v3_.merup_cnn',
+            "experiment_name": 'MERUPv4_magnitude_v2',
+            "data_loader": "cine_patches_v4",
+            "data_loader_folder": "patches_x32_MICCAI_cv1of3__WITH_STATIC_MASKS__ABS__NOROTATION__",
+            "load_path": 'MERUPv4_magnitude_v2_2019-12-06-15:10:47.416695',
+            "dataset_args":
+                {
+                    "cv_folds": 3, "cv_fold_number": 1
+                }
+        },
+    "tf2_test":
+        {
+            "module": 'models.test_model.main',
+            "experiment_name": 'tf2_test',
+            "dataset": "BiobankDataLoader",
+            "dataset_path": "data/biobank",
+            "dataset_args":
+                {
+                    "cv_folds": 3, "cv_fold_number": 1
+                },
+            "save_folder": None,
+        },       
+}
