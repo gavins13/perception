@@ -18,3 +18,4 @@ tb
 experiments_archive.txt
 archive/
 *.orig
+.theia/
