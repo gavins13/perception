@@ -19,4 +19,4 @@ logs/
 /archive/
 *.orig
 .theia/
-Config.perception
+/Config.perception
