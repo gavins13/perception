@@ -21,6 +21,7 @@ from lib_new.model import Model
 import tensorflow as tf
 import time
 from tensorboard import program as tb_program
+import numpy as np
 
 from lib_new.experiments import Experiments
 
@@ -100,19 +101,20 @@ class Execution(object):
         datetimestr = str(datetime.now())
         datetimestr = datetimestr.replace(" ", "-")
 
+        # Saving section
+        save_folder = None if not(('save_folder' in kwargs.keys()) and\
+            (isinstance(kwargs['save_folder'], str))) else kwargs['save_folder']
         # Check for reset flag
         if 'reset' in kwargs.keys() and kwargs['reset'] is True:
             save_folder = None
             ExperimentsManager = Experiments()
-
         # Create the save folder name from the experiment name above
-        save_folder = None if not(('save_folder' in kwargs.keys()) and\
-            (isinstance(kwargs['save_folder'], str))) else kwargs['save_folder']
         if(save_folder==None):
             self.save_directory_name = self.experiment_name + '_' + datetimestr
             self.save_directory = os.path.join(perception_save_path,
                 self.save_directory_name)
         else:
+            self.save_directory_name = save_folder
             self.save_directory = os.path.join(perception_save_path, save_folder)
             printt("Load Dir being used.", info=True)
 
@@ -124,7 +126,7 @@ class Execution(object):
         # If reset, or new folder created for experiment, update the exp.
         # If custom perception_save_path used, update this as well
         if 'experiment_id' in kwargs.keys() and 'ExperimentsManager' in locals():
-            Experiments[kwargs['experiment_id']] = save_folder
+            ExperimentsManager[kwargs['experiment_id']] = self.save_directory_name
             if ((
              'perception_save_path' in kwargs.keys() )\
              and (kwargs['perception_save_path'] is not None)
@@ -246,7 +248,7 @@ class Execution(object):
         Start tensorboard
         '''
         tb = tb_program.TensorBoard()
-        args = [None, '--logdir', self.experiment_name+':'+self.summaries_directory, '--host', '0.0.0.0']
+        args = [None, '--logdir', self.summaries_directory, '--host', '0.0.0.0']
         if port is not None:
             args.append('--port')
             args.append(port)
@@ -260,7 +262,10 @@ class Execution(object):
         printt("Entering training loop", debug=True)
         epochs = 0
         step=0
+        epochs = int(tf.floor(tf.divide(self.ckpt.step, self.Dataset.train_dataset_steps)))
+        step=int(self.ckpt.step)
         train = True
+        predict_for_input_signature_bug_run = False
         '''
         Start Tensorboard
         '''
@@ -286,9 +291,9 @@ class Execution(object):
                             duration = time.time() - start_time
                             print("time: %.3f" % duration, end=";")
                             # Checkpointing
-                            self.ckpt.step.assign_add(1)
-                            if int(self.ckpt.step) %\
+                            if step %\
                              self.Model.__config__.checkpoint_steps == 0:
+                                self.ckpt.step.assign_add(self.Model.__config__.checkpoint_steps)
                                 save_path = self.ckpt_manager.save()
                                 print("Saved checkpoint for step {}".format(
                                     int(self.ckpt.step)), end=";")
@@ -310,8 +315,9 @@ class Execution(object):
                         #print(type(data_record))
                         #print(self.Model.__forward_pass_model__.inputs)
                         #print("")
-                        if epochs == 1:
+                        if predict_for_input_signature_bug_run is False:
                             _ = self.Model.__forward_pass_model__.predict(data_record)
+                            predict_for_input_signature_bug_run = True
                         self.Model.__forward_pass_model__.save(this_epoch_saved_model_dir)
                     if epochs >= self.Model.__config__.epochs:
                         train = False

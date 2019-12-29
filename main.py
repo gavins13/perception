@@ -6,7 +6,7 @@ if __name__ == "__main__":
     import matplotlib
     matplotlib.use("agg") #qt5agg
     import json
-    if os.path.isfile("Config.perception") is True
+    if os.path.isfile("Config.perception") is True:
         with open("Config.perception", "r") as config_file:
             Config = json.load(config_file)
     else:
@@ -23,7 +23,7 @@ from lib_new.misc import detect_cmd_arg
 
 
 def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None, tensorboard_only=False, reset=False):
-
+    experiments = ExperimentsManager()
     if tensorboard_only is True:
         gpu = None
         printt("Only Tensorboard starting", info=True)
@@ -41,7 +41,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None, t
         printt('Execution mode invalid', error=True, stop=True)
 
     if not(experiment_id in experiments.keys()):
-        printt("Experiment doesn\'t exist", error=True, stop=True)
+        printt("Experiment doesn't exist", error=True, stop=True)
 
     if 'module' in experiments[experiment_id].keys():
         if 'module_path' in experiments[experiment_id].keys():
@@ -80,22 +80,22 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None, t
     Dataset = Dataset_Frame()
     # Dataset_Frame.create(); Dataset = Dataset_Frame
 
-    if 'load_path' in experiments[experiment_id].keys():
-        load_path = experiments[experiment_id]["load_path"]
+    if 'save_folder_name' in experiments[experiment_id].keys():
+        save_folder_name = experiments[experiment_id]["save_folder_name"]
     else:
-        load_path = None
+        save_folder_name = None
 
-    if 'save_directory' in experiments[experiment_id].keys():
-        save_directory = experiments[experiment_id]["save_directory"]
+    if 'save_path' in experiments[experiment_id].keys():
+        save_path = experiments[experiment_id]["save_path"]
     else:
-        save_directory = None
+        save_path = None
 
 
     return Execution(dataset=Dataset, experiment_name=experiment_name,
-        load_path=load_path, model=Model, project_path=save_directory,
+        save_folder=save_folder_name, model=Model,
         experiment_type=experiment_type, execute=execute,
         tensorboard_only=tensorboard_only, experiment_id=experiment_id,
-        reset=reset)
+        reset=reset, perception_save_path=save_path)
 
 
 
