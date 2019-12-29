@@ -4,7 +4,7 @@ class Execution:
     - load Experiments.perception file
     - Checkpointing, restoration, writing the saves to files
     - Keeps track of experiments by writing to a experiments txt file
-    - Loads tensorboard during execution using port number specified in the exp config using no GPUs and 
+    - Loads tensorboard during execution using port number specified in the exp config using no GPUs and
 '''
 from lib_new.dataset import Dataset
 from lib_new.model import Model
@@ -21,6 +21,8 @@ from lib_new.model import Model
 import tensorflow as tf
 import time
 from tensorboard import program as tb_program
+
+from lib_new.experiments import Experiments
 
 
 class Execution(object):
@@ -94,9 +96,14 @@ class Execution(object):
         self.experiment_name = kwargs['experiment_name'] \
             if 'experiment_name' in kwargs.keys() and \
             isinstance(kwargs['experiment_name'], str) else 'tmp'
-        printt("Experiment Name: {0}".format(self.experiment_name), info=True) 
+        printt("Experiment Name: {0}".format(self.experiment_name), info=True)
         datetimestr = str(datetime.now())
         datetimestr = datetimestr.replace(" ", "-")
+
+        # Check for reset flag
+        if 'reset' in kwargs.keys() and kwargs['reset'] is True:
+            save_folder = None
+            ExperimentsManager = Experiments()
 
         # Create the save folder name from the experiment name above
         save_folder = None if not(('save_folder' in kwargs.keys()) and\
@@ -108,9 +115,26 @@ class Execution(object):
         else:
             self.save_directory = os.path.join(perception_save_path, save_folder)
             printt("Load Dir being used.", info=True)
+
         # Create the save folder
         if not(os.path.exists(self.save_directory)):
             os.makedirs(self.save_directory)
+            ExperimentsManager = Experiments()
+
+        # If reset, or new folder created for experiment, update the exp.
+        # If custom perception_save_path used, update this as well
+        if 'experiment_id' in kwargs.keys() and 'ExperimentsManager' in locals():
+            Experiments[kwargs['experiment_id']] = save_folder
+            if ((
+             'perception_save_path' in kwargs.keys() )\
+             and (kwargs['perception_save_path'] is not None)
+             ):
+                ExperimentsManager.update_experiment(
+                 kwargs['experiment_id'], 'perception_save_path',
+                 kwargs['perception_save_path'])
+
+
+
 
 
 
@@ -128,7 +152,7 @@ class Execution(object):
         Create checkpointer and restore
         '''
         if not(os.path.exists(os.path.join(self.save_directory, 'checkpoints'))):
-            os.makedirs(os.path.join(self.save_directory, 'checkpoints'))        
+            os.makedirs(os.path.join(self.save_directory, 'checkpoints'))
         checkpoint_dir = os.path.join(self.save_directory, 'checkpoints')
         optimisers = {'opt_'+str(i): opt for i, opt in enumerate(
             self.Model.__optimisers__)}
@@ -150,14 +174,14 @@ class Execution(object):
         Create Saved Model and directory
         '''
         if not(os.path.exists(os.path.join(self.save_directory, 'saved_model'))):
-            os.makedirs(os.path.join(self.save_directory, 'saved_model'))        
+            os.makedirs(os.path.join(self.save_directory, 'saved_model'))
         self.saved_model_directory = os.path.join(self.save_directory, 'saved_model')
-        
+
         '''
         Create analysis directory
         '''
         if not(os.path.exists(os.path.join(self.save_directory, 'analysis'))):
-            os.makedirs(os.path.join(self.save_directory, 'analysis'))        
+            os.makedirs(os.path.join(self.save_directory, 'analysis'))
         self.analysis_directory = os.path.join(self.save_directory, 'analysis')
 
         '''
@@ -197,7 +221,7 @@ class Execution(object):
         Use this to run forward passes on data
         Arguments:
          - input_data : list of input data to be executed
-         - 
+         -
         '''
 
         analysis_directory = self.analysis_directory if analysis_directory is None else analysis_directory
@@ -216,7 +240,7 @@ class Execution(object):
         else:
             if return_analysis is True:
                 return analysis_output
-        
+
     def tensorboard(self, port=None):
         '''
         Start tensorboard
@@ -277,7 +301,7 @@ class Execution(object):
                                     validation=True, summaries=True)
                             step += 1
                     epochs += 1
-                    if epochs % self.Model.__config__.saved_model_epochs == 0:                        
+                    if epochs % self.Model.__config__.saved_model_epochs == 0:
                         if not(os.path.exists(os.path.join(self.saved_model_directory, 'epoch_'+str(epochs)))):
                             os.makedirs(os.path.join(self.saved_model_directory, 'epoch_'+str(epochs)))
                         this_epoch_saved_model_dir = os.path.join(self.saved_model_directory, 'epoch_'+str(epochs))
