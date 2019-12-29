@@ -21,4 +21,4 @@ logs/
 .theia/
 /Config.perception
 /experiments/*
-!/experiment/example.json
+!/experiments/example.json
