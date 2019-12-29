@@ -49,6 +49,7 @@ def detect_cmd_arg(arg, retrieve_val=True, val_dtype=str, false_val=None):
         assert isinstance(arg, str)
     except:
         raise ValueError("argument should be a string")
+    arg = "--" + arg if arg.find("--") != 0 else arg
     arg = arg + "=" if retrieve_val is True else arg
     for i in range(len(sys.argv)):
         this_arg = sys.argv[i]
