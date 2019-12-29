@@ -2,7 +2,9 @@
 
 * Purely for learning purposes ;)
 
-# Dependencies
+# Installation
+
+## Dependencies
 
 ```
 conda install python=3.7 tensorflow-gpu matplotlib imageio=2.6.1=py37_0 ipython
@@ -17,7 +19,7 @@ pip --version
 which pip
 pip install tensorflow-addons
 ```
-# JSON "experiments.json" format
+## JSON "experiments.json" format
 
 Each experiment entry has:
  - experiment_id (dictionary key)
@@ -27,6 +29,19 @@ Each experiment entry has:
  - dataset_args (optional)
  - save_folder (optional)
  - save_directory (optional)
+
+## Config.perception format (JSON format)
+Specify the default experiment ID, save directory and other variables here.
+Typical format shown below:
+```
+{
+  "defaults": {
+    experiment_id: 'tf2_test',
+    experiment_type: 'train'
+  },
+	"save_directory": "/vol/biomedic/users/kgs13/PhD/projects/misc_experiments/tf2_experimental_results/"
+}
+```
 
 
 # Issues
