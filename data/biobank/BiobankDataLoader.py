@@ -4,8 +4,8 @@ import nibabel
 from os import path
 from random import shuffle, seed as __seed__
 import tensorflow as tf
-from lib_new.misc import printt
-from lib_new.dataset import Dataset as DatasetBase
+from lib.misc import printt
+from lib.dataset import Dataset as DatasetBase
 
 biobank_list_path = 'biobank.json'
 basepath = path.dirname(__file__)
@@ -15,6 +15,18 @@ biobank_list_path = path.abspath(path.join(basepath, biobank_list_path))
 class Dataset(DatasetBase):
     def __init__(self, *args, **kwargs):
         super().__init__()
+        '''
+        Override default options
+        '''
+        self.dev.on = False
+        self.use_generator(tf.float32)
+
+        '''
+        Set some default properties
+        '''
+        #self.train_dataset_length = 26904*50
+        self.config.batch_size = 1
+
         '''
         Select folds and fold number
         '''
@@ -28,7 +40,7 @@ class Dataset(DatasetBase):
             self.config.cv_fold_num = 1
             self.config.cv_folds = 3
 
-        self.config.batch_size = 1
+
     '''
     Read the Dataset information
     '''
@@ -46,8 +58,12 @@ class Dataset(DatasetBase):
         self.validation_file_list = [self.test_file_list[0]]
 
         self.train_dataset_length = len(self.train_file_list)
-        self.testing_dataset_length = len(self.test_file_list)
+        self.test_dataset_length = len(self.test_file_list)
         self.validation_dataset_length = len(self.validation_file_list)
+
+        self.train_dataset_steps = int(self.train_dataset_length / self.config.batch_size)
+        self.test_dataset_steps = int(self.test_dataset_length / self.config.batch_size)
+        self.validation_dataset_steps = int(self.validation_dataset_length / self.config.batch_size)
 
     def __config__(self):
         '''
@@ -86,7 +102,7 @@ class Dataset(DatasetBase):
                 current_num_slices = 0
                 self.current.file += 1
                 idx = self.current.file % len(self.train_file_list)
-                filename = self.train_file_list[self.current.file]
+                filename = self.train_file_list[idx]
                 data = nibabel.load(filename)
                 d = data.get_fdata() # numpy data # [H, W, SLICE, TIME] # (210, 208, 11, 50) 
                 current_batch_max = d.shape[2]
@@ -110,7 +126,9 @@ class Dataset(DatasetBase):
             self.current.step += 1
             if idx == 0:
                 self.current.epoch += 1
-            yield tf.convert_to_tensor(this_data)
+            this_data = tf.convert_to_tensor(this_data)
+            this_data = tf.transpose(this_data, [3,0,1,2]) # [SLICE, H, W, TIME]
+            yield this_data
 
 
     def py_gen_test(self, gen_name):
@@ -129,7 +147,7 @@ class Dataset(DatasetBase):
                 # LOAD NEXT FILE
                 current_file += 1
                 idx = current_file % len(self.test_file_list)
-                filename = self.train_file_list[current_file]
+                filename = self.train_file_list[idx]
                 data = nibabel.load(filename)
                 d = data.get_fdata() # numpy data # [H, W, SLICE, TIME] # (210, 208, 11, 50) 
                 current_batch_max = d.shape[2]
@@ -145,6 +163,8 @@ class Dataset(DatasetBase):
             current_step += 1
             if idx == 0:
                 current_epoch += 1
+            this_data = tf.convert_to_tensor(this_data)
+            this_data = tf.transpose(this_data, [3,0,1,2]) # [SLICE, H, W, TIME]
             yield this_data
     def py_gen_validation(self, gen_name):
         gen_name = gen_name.decode('utf8') + '_' + str(self.gen_num)
@@ -162,7 +182,7 @@ class Dataset(DatasetBase):
                 # LOAD NEXT FILE
                 current_file += 1
                 idx = current_file % len(self.validation_file_list)
-                filename = self.train_file_list[current_file]
+                filename = self.train_file_list[idx]
                 data = nibabel.load(filename)
                 d = data.get_fdata() # numpy data # [H, W, SLICE, TIME] # (210, 208, 11, 50) 
                 current_batch_max = d.shape[2]
@@ -178,4 +198,6 @@ class Dataset(DatasetBase):
             current_step += 1
             if idx == 0:
                 current_epoch += 1
+            this_data = tf.convert_to_tensor(this_data)
+            this_data = tf.transpose(this_data, [3,0,1,2]) # [SLICE, H, W, TIME]
             yield this_data
