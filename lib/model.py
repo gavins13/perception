@@ -1,6 +1,7 @@
 import tensorflow as tf
-from lib_new.misc import printt
+from .misc import printt
 from contextlib import ExitStack
+from .summaries import video_summary
 
 '''
 Model
@@ -182,7 +183,7 @@ class Model(object):
             elif typ == "image":
                 tf.summary.image(name, data, **kwargs)
             elif typ == "video" or typ == "gif":
-                printt("Video Summaries not implemented yet", warning=True)
+                video_summary(name, data, **kwargs)
             else:
                 printt("Invalid summary type", error=True)
     
