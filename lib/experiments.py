@@ -1,11 +1,19 @@
 import json
 from os import listdir
 from os.path import isfile, join
-from lib_new.misc import printt
+from .misc import printt
+import os
+
+path = os.path.join(
+        os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            "../"
+        ),
+        "experiments/")
 
 exp_ext = '.json'
-json_files = [join('experiments/', f) for f in listdir('experiments/')\
-    if isfile(join('experiments/', f)) and f.find(exp_ext)==len(f)-5]
+json_files = [join(path, f) for f in listdir(path)\
+    if isfile(join(path, f)) and f.find(exp_ext)==len(f)-5]
 printt("List of experiment files: " + '\n'.join('{}: {}'.format(*k) for k in enumerate(json_files)), debug=True)
 
 

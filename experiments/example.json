@@ -1,5 +1,16 @@
 {
     "tf2_test": {
+        "module": "models.test_model_time.main",
+        "experiment_name": "tf2_test",
+        "dataset": "BiobankDataLoader",
+        "dataset_path": "data/biobank",
+        "dataset_args": {
+            "cv_folds": 3,
+            "cv_fold_number": 1
+        },
+        "save_folder_name": "tf2_test_2020-01-03-17:41:38.813299"
+    },
+    "tf2_test_2D": {
         "module": "models.test_model.main",
         "experiment_name": "tf2_test",
         "dataset": "BiobankDataLoader",
