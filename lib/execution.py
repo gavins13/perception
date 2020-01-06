@@ -6,24 +6,30 @@ class Execution:
     - Keeps track of experiments by writing to a experiments txt file
     - Loads tensorboard during execution using port number specified in the exp config using no GPUs and
 '''
-from lib_new.dataset import Dataset
-from lib_new.model import Model
+from .dataset import Dataset
+from .model import Model
 import json
-with open("Config.perception", "r") as config_file:
+import os
+
+with open(os.path.join(
+    os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        "../"),
+    "Config.perception"
+  ), "r") as config_file:
     Config = json.load(config_file)
-from lib_new.misc import printt
+from .misc import printt
 
 from contextlib import ExitStack
-import os
 import sys
 from datetime import datetime
-from lib_new.model import Model
+from .model import Model
 import tensorflow as tf
 import time
 from tensorboard import program as tb_program
 import numpy as np
 
-from lib_new.experiments import Experiments
+from .experiments import Experiments
 
 
 class Execution(object):
@@ -52,7 +58,7 @@ class Execution(object):
         else:
             printt("Experiment Execution type not set", error=True, stop=True)
         if 'tensorboard_only' in kwargs.keys() and kwargs['tensorboard_only'] is True:
-            self.__call__func = self.tensorboard
+            self.__call__func = self.tensorboard_only
             kwargs['execute'] = True
 
         '''
@@ -81,7 +87,10 @@ class Execution(object):
             printt("No Model for execution", error=True, stop=True)
         step_counter = tf.Variable(initial_value=1, trainable=False,
                                    name="global_step", dtype=tf.int64)
-        self.Model.__active_vars__.step = step_counter
+        current_dataset_file_counter = tf.Variable(initial_value=0, trainable=False,
+                                   name="current_file_counter", dtype=tf.int64)
+        epoch_counter = tf.Variable(initial_value=0, trainable=False,
+                                   name="epoch_counter", dtype=tf.int64)
 
         '''
         Handle directories for saving
@@ -161,15 +170,16 @@ class Execution(object):
         models = {'model_'+str(i): model for i, model in enumerate(
             self.Model.__keras_models__)}
 
-        self.ckpt = tf.train.Checkpoint(**optimisers, **models, step=step_counter)
+        self.ckpt = tf.train.Checkpoint(**optimisers, **models, step=step_counter, current_file=current_dataset_file_counter, epoch=epoch_counter)
         self.ckpt_manager = tf.train.CheckpointManager(
             self.ckpt, checkpoint_dir, max_to_keep=3)
         self.ckpt.restore(self.ckpt_manager.latest_checkpoint)
-        if self.ckpt_manager.latest_checkpoint:
+        if self.ckpt_manager.latest_checkpoint is not None:
             printt("Restored from {}".format(self.ckpt_manager.latest_checkpoint),
                 info=True)
         else:
             printt("Initializing from scratch.", debug=True)
+        self.Model.__active_vars__.step = step_counter
 
 
         '''
@@ -254,6 +264,11 @@ class Execution(object):
             args.append(port)
         tb.configure(argv=args)
         tb_url = tb.launch()
+        print("TensorBoard started at {}".format(tb_url))
+        self.tb_url = tb_url
+    def tensorboard_only(self):
+        self.tensorboard()
+        input("Press enter to exit and stop TensorBoard...")
 
     def training(self):
         '''
@@ -262,10 +277,13 @@ class Execution(object):
         printt("Entering training loop", debug=True)
         epochs = 0
         step=0
-        epochs = int(tf.floor(tf.divide(self.ckpt.step, self.Dataset.train_dataset_steps)))
+        #epochs = int(tf.floor(tf.divide(self.ckpt.step, self.Dataset.train_dataset_steps)))
+        epochs = int(self.ckpt.epoch)
         step=int(self.ckpt.step)
         train = True
         predict_for_input_signature_bug_run = False
+        #self.Dataset.train_dataset=self.Dataset.train_dataset.skip(step)
+        self.Dataset.skip(step, current_file=int(self.ckpt.current_file), epoch=int(self.ckpt.epoch))
         '''
         Start Tensorboard
         '''
@@ -284,9 +302,11 @@ class Execution(object):
                             self.Model.__update_weights__(data_record, summaries=add_summary)
                             # Print training information and duration
                             print("training epoch: {}".format(epochs+1), end=";")
+                            data_split_num = record_number if self.Dataset.system_type.use_generator is False else self.Dataset.current.file
+                            data_split_num_total = self.Dataset.train_dataset_steps if self.Dataset.system_type.use_generator is False else self.Dataset.num_files
                             print("data split: %d of %d" % (
-                                record_number+1,
-                                self.Dataset.train_dataset_steps), end=";")
+                                data_split_num+1,
+                                data_split_num_total), end=";")
                             print("step: %d" % step, end=";")
                             duration = time.time() - start_time
                             print("time: %.3f" % duration, end=";")
@@ -294,6 +314,8 @@ class Execution(object):
                             if step %\
                              self.Model.__config__.checkpoint_steps == 0:
                                 self.ckpt.step.assign_add(self.Model.__config__.checkpoint_steps)
+                                self.ckpt.current_file.assign(self.Dataset.current.file)
+                                self.ckpt.epoch.assign(self.Dataset.current.epoch)
                                 save_path = self.ckpt_manager.save()
                                 print("Saved checkpoint for step {}".format(
                                     int(self.ckpt.step)), end=";")
@@ -305,6 +327,7 @@ class Execution(object):
                                 self.Model.loss_func(data_record, training=False,
                                     validation=True, summaries=True)
                             step += 1
+                            self.Model.__active_vars__.step = step
                     epochs += 1
                     if epochs % self.Model.__config__.saved_model_epochs == 0:
                         if not(os.path.exists(os.path.join(self.saved_model_directory, 'epoch_'+str(epochs)))):
@@ -317,7 +340,10 @@ class Execution(object):
                         #print("")
                         if predict_for_input_signature_bug_run is False:
                             _ = self.Model.__forward_pass_model__.predict(data_record)
+                            self.Model.__forward_pass_model__.save(this_epoch_saved_model_dir)
                             predict_for_input_signature_bug_run = True
-                        self.Model.__forward_pass_model__.save(this_epoch_saved_model_dir)
+                            print("TensorBoard started at {}".format(self.tb_url))
+                        else:
+                            self.Model.__forward_pass_model__.save(this_epoch_saved_model_dir)
                     if epochs >= self.Model.__config__.epochs:
                         train = False
