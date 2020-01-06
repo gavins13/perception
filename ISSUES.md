@@ -20,3 +20,5 @@ for features, labels in dataset:
     print("loss: ", lv)
 
  '''
+
+ Issue #3.1: When using a generator for the dataset, the TF Dataset API function .skip() does not work. Hence, this method needs to be specified in the Perception Dataset API
