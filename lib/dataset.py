@@ -1,7 +1,7 @@
 import numpy as np
 from random import shuffle, seed as __seed__
 import tensorflow as tf
-from lib_new.misc import printt
+from .misc import printt
 
 
 class Dataset():
@@ -35,7 +35,7 @@ class Dataset():
     number of folds, and then also select a fold that the class' Python
     generators can use.
 
-    Remember to define self.train_dataset_length, self.testing_dataset_length
+    Remember to define self.train_dataset_length, self.test_dataset_length
     and self.validation_dataset_length in the class
 
     Developer mode:
@@ -59,6 +59,7 @@ class Dataset():
 
         self.generator = Config()
         self.generator.data_types = None
+        self.num_files = None
 
         self.config = Config()
         self.config.type = 'train' # 'train', 'test', 'validate'
@@ -75,19 +76,19 @@ class Dataset():
         self.config.validation_size = 1
 
         self.current = Config()
-        self.current.epoch = -1
-        self.current.step = 0
-        self.current.file = 0
+        self.current.epoch = None # -1
+        self.current.step = None
+        self.current.file = -1 # -1
 
         self.train_dataset_length = None
-        self.testing_dataset_length = None
+        self.test_dataset_length = None
         self.validation_dataset_length = None
 
         self.train_dataset_steps = None # Should be the same as
                                         # train_data_length for batch_size
                                         # = 1, otherwise, = 
                                         # train_dataset_length / batch_size
-        self.testing_dataset_steps = None
+        self.test_dataset_steps = None
         self.validation_dataset_steps = None
     def use(self, *args):
         if args is not None:
@@ -115,6 +116,19 @@ class Dataset():
         self.dev.on = True
         if dataset is not None:
             self.dev.dataset = dataset
+    
+    def skip(self, steps, current_file=None, epoch=None):
+        if self.system_type.use_direct is True:
+            self.Dataset.train_dataset=self.Dataset.train_dataset.skip(step)
+        elif self.system_type.use_generator is True:
+            self.generator_skip(steps, current_file=current_file, epoch=epoch)
+    def generator_skip(self, steps, current_file, epoch):
+        '''
+        This function must be mainly implemented in the child class.
+        It will use the function arguments to set some active variables.
+        Take a look at BiobankDataLoader for an example.
+        '''
+        printt("Generator Skip not implemented", error=True, stop=True)
 
     def py_gen(self, gen_name):
         # This function will basically return the Train data and Validation record if
@@ -216,7 +230,7 @@ class Dataset():
             #self.Dataset = self.Dataset.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor)
         self.set_dataset_steps()
         self.train_dataset = self.Datasets[0]
-        self.testing_dataset = self.Datasets[1]
+        self.test_dataset = self.Datasets[1]
         self.validation_dataset = self.Datasets[2]
 
 

@@ -20,12 +20,14 @@ class Dataset(DatasetBase):
         '''
         self.dev.on = False
         self.use_generator(tf.float32)
+        self.num_files = None # needs setting
 
         '''
         Set some default properties
         '''
         #self.train_dataset_length = 26904*50
         self.config.batch_size = 1
+
 
         '''
         Select folds and fold number
@@ -46,15 +48,28 @@ class Dataset(DatasetBase):
     '''
     def import_list(self):
         self.file_list = json.load(open(biobank_list_path, 'rb'))
+        self.num_files = len(self.file_list)
     def shuffle_and_split(self, cv_folds=3, cv_fold_num=1):
         n = len(self.file_list)
         #self.file_list = np.random.shuffle(self.file_list)
-        shuffle(self.file_list)
+        #shuffle(self.file_list)
         n_ = np.int(np.float(n)/np.float(cv_folds))
         fold_remainder = n-((cv_folds-1)*n_)
         fold_sizes = [n_]*(cv_folds-1) + [fold_remainder]
-        self.train_file_list = self.file_list[0:fold_sizes[0]]
-        self.test_file_list = self.file_list[fold_sizes[0]:fold_sizes[0]+fold_sizes[1]]
+
+        fold_start_positions = [0] + [np.sum(fold_sizes[0:i+1]) for i in range(cv_folds-1)]
+        fold_end_positions = [fold_start_positions[i]+fold_sizes[i] for i in range(cv_folds)]
+
+        file_list = self.file_list[:]
+        folds = [file_list[fold_start_positions[i]:fold_end_positions[i]] for i in range(cv_folds)]
+
+        self.test_file_list = folds[cv_fold_num-1]
+        train_folds = folds[:]
+        del(train_folds[cv_fold_num-1])
+        self.train_file_list = [tfile for fold_files in train_folds for tfile in fold_files ]
+
+        #self.train_file_list = self.file_list[0:fold_sizes[0]]
+        #self.test_file_list = self.file_list[fold_sizes[0]:fold_sizes[0]+fold_sizes[1]]
         self.validation_file_list = [self.test_file_list[0]]
 
         self.train_dataset_length = len(self.train_file_list)
@@ -84,13 +99,20 @@ class Dataset(DatasetBase):
         for num in range(5):
             #sleep(0.3)
             yield '{} yields {}'.format(gen_name, num)
+    
+    def generator_skip(self, steps, current_file, epoch):
+        self.current.step = steps
+        self.current.file = current_file
+        self.current.epoch = epoch
+        
     def py_gen_train(self, gen_name):
         gen_name = gen_name.decode('utf8') + '_' + str(self.gen_num)
         epochs = -999 if self.config.epochs is None else self.config.epochs
 
-        self.current.epoch = -1
-        self.current.step = 0
-        self.current.file = -1
+        if self.current.step is None:
+            self.current.epoch = -1
+            self.current.step = 0
+            self.current.file = -1
 
         current_batch_max = None
         current_batch_size = None
