@@ -1,7 +1,7 @@
-#!python3
+#!python
 import os
-from lib_new.misc import printt
 if __name__ == "__main__":
+    from lib.misc import printt
     print("running now...")
     import matplotlib
     matplotlib.use("agg") #qt5agg
@@ -13,16 +13,31 @@ if __name__ == "__main__":
         printt("Config.perception doesn't exist", error=True, stop=True)
     experiment_id = Config['defaults']['experiment_id']
     experiment_type = Config['defaults']['experiment_type']
+    from lib.execution import Execution
+    from lib.dataset import Dataset
+    from lib.experiments import Experiments as ExperimentsManager
+    from lib.misc import detect_cmd_arg
+else:
+    from .lib.misc import printt
+    from .lib.execution import Execution
+    from .lib.dataset import Dataset
+    from .lib.experiments import Experiments as ExperimentsManager
+    from .lib.misc import detect_cmd_arg
 
 import sys
 import importlib
-from lib_new.execution import Execution
-from lib_new.dataset import Dataset
-from lib_new.experiments import Experiments as ExperimentsManager
-from lib_new.misc import detect_cmd_arg
 
 
-def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None, tensorboard_only=False, reset=False):
+def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
+  tensorboard_only=False, reset=False):
+    '''
+    experiment_id: (str) experiment_id from the JSON files
+    experiment_type: (str) 'train' or 'test'
+    (optional) execute: (bool) Execute before returning?
+    (optional) gpu: (int) Which GPU number to use
+    (optional) tensorboard_only: (bool) Only start TensorBoard (TB)? Default is to start TB with training
+    (optional) reset: (bool) train from scratch?
+    '''
     experiments = ExperimentsManager()
     if tensorboard_only is True:
         gpu = None
@@ -106,5 +121,7 @@ if __name__ == "__main__":
     experiment_type = detect_cmd_arg("type", false_val=experiment_type)
     gpu = detect_cmd_arg("gpu", false_val=None, val_dtype=int)
     tensorboard_only = detect_cmd_arg("tensorboard", retrieve_val=False)
+    tensorboard_only_2 = detect_cmd_arg("tensorboard_only", retrieve_val=False)
+    tensorboard_only = (tensorboard_only or tensorboard_only_2)
     reset = detect_cmd_arg("reset", retrieve_val=False)
     ThisExperiment = Experiment(experiment_id, experiment_type, execute=True, gpu=gpu, tensorboard_only=tensorboard_only, reset=reset)
