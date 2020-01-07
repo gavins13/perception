@@ -6,6 +6,7 @@ from random import shuffle, seed as __seed__
 import tensorflow as tf
 from lib.misc import printt
 from lib.dataset import Dataset as DatasetBase
+from scipy import stats
 
 biobank_list_path = 'biobank.json'
 basepath = path.dirname(__file__)
@@ -27,6 +28,19 @@ class Dataset(DatasetBase):
         '''
         #self.train_dataset_length = 26904*50
         self.config.batch_size = 1
+
+
+        # Start Customising class
+        class Config: pass
+        self.config.patches = Config()
+        self.config.patches.enabled = False
+        self.config.patches.size = 32
+        self.config.patches.positions_stategy = 'vd' # VD = Variable Density
+        self.config.patches.positions_total = 10 # Number of patches to use per example
+        if 'patches' in kwargs.keys() and isinstance(kwargs['patches'], bool):
+            self.config.patches.enabled = kwargs['patches']
+        if 'patch_size' in kwargs.keys() and isinstance(kwargs['patch_size'], int):
+            self.config.patches.size = kwargs['patch_size']
 
 
         '''
@@ -77,6 +91,8 @@ class Dataset(DatasetBase):
         self.validation_dataset_length = len(self.validation_file_list)
 
         self.train_dataset_steps = int(self.train_dataset_length / self.config.batch_size)
+        if self.config.patches.enabled is True:
+            self.train_dataset_steps = int(self.train_dataset_length * self.config.patches.positions_total / self.config.batch_size)
         self.test_dataset_steps = int(self.test_dataset_length / self.config.batch_size)
         self.validation_dataset_steps = int(self.validation_dataset_length / self.config.batch_size)
 
@@ -127,8 +143,23 @@ class Dataset(DatasetBase):
                 filename = self.train_file_list[idx]
                 data = nibabel.load(filename)
                 d = data.get_fdata() # numpy data # [H, W, SLICE, TIME] # (210, 208, 11, 50) 
-                current_batch_max = d.shape[2]
-                d = np.transpose(d, [0,1,3,2]) # [H, W, TIME, SLICE]
+                if self.config.patches.enabled is True:
+                    #patch_positions = [...] # to compute []
+                    dis = stats.norm(loc=float(d.shape[0])/2., scale=float(d.shape[0])/5.)
+                    patch_positions = dis.rvs(self.config.patches.positions_total).astype(np.int) # [] must fix code this
+                    patch_positions[patch_positions>d.shape[1]-self.config.patches.size] = d.shape[1]-self.config.patches.size # [] Error
+                    patch_positions[patch_positions<0] = 0
+
+                    d = [d[:, start:start+self.config.patches.size, :, :] for start in patch_positions]
+                    d = [np.expand_dims(x, axis=4) for x in d]
+                    d = np.concatenate(d, axis=4) # (210, PATCH_SIZE, 11, 50, PATCH_POSITIONS)
+                    d = np.transpose(d, [0,1,3,2, 4]) # (210, PATCH_SIZE, 50, 11SLICES, PATCH_POSITIONS)
+                    d_shape = d.shape
+                    d = np.reshape(d, list(d_shape[0:3])+[-1], order='C') # (210, PATCH_SIZE, 50, 11*PATCH_POSITIONS)
+                    current_batch_max = d.shape[3]
+                else:
+                    current_batch_max = d.shape[2]
+                    d = np.transpose(d, [0,1,3,2]) # [H, W, TIME, SLICE]
                 current_batch_size = self.config.batch_size if self.config.batch_size < current_batch_max else current_batch_max
             #else:
             #    # CURRENT FILE
@@ -165,8 +196,9 @@ class Dataset(DatasetBase):
         current_batch_size = None
         current_num_slices = 0
         while current_epoch != epochs+1:
-            if current_num_slices >= current_batch_max:
+            if (current_batch_max is None) or (current_num_slices >= current_batch_max):
                 # LOAD NEXT FILE
+                current_num_slices = 0
                 current_file += 1
                 idx = current_file % len(self.test_file_list)
                 filename = self.train_file_list[idx]
@@ -200,8 +232,9 @@ class Dataset(DatasetBase):
         current_batch_size = None
         current_num_slices = 0
         while current_epoch != epochs+1:
-            if current_num_slices >= current_batch_max:
+            if (current_batch_max is None) or (current_num_slices >= current_batch_max):
                 # LOAD NEXT FILE
+                current_num_slices = 0
                 current_file += 1
                 idx = current_file % len(self.validation_file_list)
                 filename = self.train_file_list[idx]
@@ -209,14 +242,14 @@ class Dataset(DatasetBase):
                 d = data.get_fdata() # numpy data # [H, W, SLICE, TIME] # (210, 208, 11, 50) 
                 current_batch_max = d.shape[2]
                 d = np.transpose(d, [0,1,3,2]) # [H, W, TIME, SLICE]
-                current_batch_size = self.config.batch_size if self.config.batch_size < batch_max else batch_max
+                current_batch_size = self.config.batch_size if self.config.batch_size < current_batch_max else current_batch_max
             #else:
             #    # CURRENT FILE
             #    pass
 
             this_batch_size = current_batch_size if (current_batch_max-current_num_slices) >current_batch_size else (current_batch_max-current_num_slices)
-            this_data = d[:,:,:,no_slices:no_slices+this_batch_size]
-            no_slices += this_batch_size
+            this_data = d[:,:,:,current_num_slices:current_num_slices+this_batch_size]
+            current_num_slices += this_batch_size
             current_step += 1
             if idx == 0:
                 current_epoch += 1
