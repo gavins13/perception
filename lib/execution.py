@@ -324,8 +324,9 @@ class Execution(object):
 
                             # Validation
                             if (step+1) % self.Model.__config__.validation_steps == 0:
-                                self.Model.loss_func(data_record, training=False,
-                                    validation=True, summaries=True)
+                                for validation_data_record in self.Dataset.validation_dataset.take(-1):
+                                    self.Model.loss_func(validation_data_record, training=False,
+                                        validation=True, summaries=True)
                             step += 1
                             self.Model.__active_vars__.step = step
                     epochs += 1
