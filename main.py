@@ -118,6 +118,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
 
 if __name__ == "__main__":
     experiment_id = detect_cmd_arg("experiment_id", false_val=experiment_id)
+    experiment_id = detect_cmd_arg("experiment", false_val=experiment_id)
     experiment_type = detect_cmd_arg("type", false_val=experiment_type)
     gpu = detect_cmd_arg("gpu", false_val=None, val_dtype=int)
     tensorboard_only = detect_cmd_arg("tensorboard", retrieve_val=False)
