@@ -178,6 +178,10 @@ class Model(object):
         if self.__active_vars__.summaries == False:
             return
         else:
+            if self.__active_vars__.validation is True:
+                name = "Validation/" + name
+            else:
+                name = "Training/" + name
             if typ == "scalar":
                 tf.summary.scalar(name, data, **kwargs)
             elif typ == "image":
@@ -195,7 +199,7 @@ class Model(object):
         with ExitStack() as stack:
             for i, mgr in enumerate(self.__tapes__):
                 self.__tapes__[i] = stack.enter_context(mgr)
-            all_trainable_variables, losses = self.loss_func(data, training=True)
+            all_trainable_variables, losses = self.loss_func(data, training=True, summaries=summaries)
             self.__variables__ = all_trainable_variables # Issue #1.1
             self.__losses__ = losses # Issue #1.1
 
