@@ -324,11 +324,15 @@ class Execution(object):
 
                             # Validation
                             if (step+1) % self.Model.__config__.validation_steps == 0:
-                                for validation_data_record in self.Dataset.validation_dataset.take(-1):
+                                for validation_data_record in self.Dataset.validation_dataset.take(self.Dataset.validation_dataset_length):
                                     self.Model.loss_func(validation_data_record, training=False,
                                         validation=True, summaries=True)
                             step += 1
                             self.Model.__active_vars__.step = step
+
+                            # Save summary of the model
+                            if step == 0:
+                                self.Model.__forward_pass_model__.summary(printt)
                     epochs += 1
                     if epochs % self.Model.__config__.saved_model_epochs == 0:
                         if not(os.path.exists(os.path.join(self.saved_model_directory, 'epoch_'+str(epochs)))):
