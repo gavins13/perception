@@ -44,7 +44,7 @@ class Dataset():
 
     '''
     counter=0 # counter for threads
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         #self.counter = 0
         self.gen_num = Dataset.counter
         Dataset.counter += 1
@@ -90,6 +90,7 @@ class Dataset():
                                         # train_dataset_length / batch_size
         self.test_dataset_steps = None
         self.validation_dataset_steps = None
+        self.operation_seed = None
     def use(self, *args):
         if args is not None:
             if args[0] == 'generator':
@@ -111,7 +112,14 @@ class Dataset():
         self.system_type.use_direct = True
         self.system_type.use_generator = False
         self.dev.on = False
-        raise NotImplementedError()
+        # NB/ Something like this should work:
+        '''
+        inputs = dict(images=images)
+        outputs = dict(labels=labels)
+        dataset = tf.data.Dataset.from_tensor_slices((inputs, outputs))
+        '''
+        self.Dataset = tf.data.Dataset.from_tensor_slices((dataset))
+        #raise NotImplementedError()
     def use_developer_mode(self, dataset=None):
         self.dev.on = True
         if dataset is not None:
@@ -175,7 +183,8 @@ class Dataset():
                 ]
                 self.Dataset = self.Datasets[0]
             elif self.system_type.use_direct is True:
-                raise NotImplementedError()
+                # Nothing?
+                printt("-")
         self.__process_dataset__()
     def create_generator(self, generator_name='py_gen_train', threads=4):
         dummy_ds = tf.data.Dataset.from_tensor_slices(['DataGenerator']*threads)
@@ -200,7 +209,7 @@ class Dataset():
         if self.system_type.use_direct is True or self.dev.on is True:
             if self.dev.on is False:
                 buffer_size = None if not(hasattr(self, 'buffer_size')) else getattr(self, 'buffer_size')
-                self.Dataset = self.Dataset.shuffle(buffer_size=buffer_size, seed=operation_seed)
+                self.Dataset = self.Dataset.shuffle(buffer_size=buffer_size, seed=self.operation_seed)
             if self.config.cv_folds is not None:
                 self.Datasets = []
                 if self.config.cv_fold_number is None:
@@ -291,4 +300,5 @@ class Dataset():
         tf.random.set_seed(seed)
         np.random.seed(seed)
         __seed__(seed)
+        self.operation_seed = seed
 
