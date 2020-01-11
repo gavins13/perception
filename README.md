@@ -4,21 +4,23 @@
 
 # Installation
 
-## Dependencies
-
+## Dependencies (with Anaconda)
+Install the following dependencies with Anaconda:
 ```
-conda install python=3.7 tensorflow-gpu matplotlib imageio=2.4.1=py37_0 ipython requests
-conda install pillow
-conda install jupyter
+conda install python=3.7 tensorflow-gpu matplotlib imageio=2.4.1=py37_0 ipython requests scipy pillow jupyter
 conda install -c conda-forge nibabel scikit-image moviepy
-
 ```
-then check your pip location is correct (the conda location)
+
+then check your pip location and version is correct (it should correspond to the Anaconda location)
 ```
 pip --version
 which pip
 pip install tensorflow-addons
 ```
+
+## As a package (optional)
+To install perception as a package, move the directory containing this file to your local python "site-packages" or alternatively
+
 ## JSON "experiments.json" format
 
 Each experiment entry has:
@@ -42,6 +44,17 @@ Typical format shown below:
 	"save_directory": "/vol/biomedic/users/kgs13/PhD/projects/misc_experiments/tf2_experimental_results/"
 }
 ```
+# Perception main.py arguments.py
+'''
+from experiment import debug_level
+debug_level:
+0 = No printing except execution
+1 = Warnings
+2 = Errors
+3 = Information
+4 = Debugging Information
+5 = All (Full debugging)
+'''
 
 
 # Issues
