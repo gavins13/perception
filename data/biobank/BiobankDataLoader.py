@@ -102,8 +102,8 @@ class Dataset(DatasetBase):
         executed in create()
         '''
         if self.config.batch_size != 1:
-            #raise ValueError('This BioBank dataset only' + \
-            # ' supports batch size 1 due to images being different sizes')
+            raise ValueError('This BioBank dataset only' +\
+                ' supports batch size 1 due to images being different sizes')
             printt("Note: batching along the slice axis", warning=True)
         self.import_list()
         self.shuffle_and_split(cv_folds=self.config.cv_folds,
