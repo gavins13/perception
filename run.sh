@@ -64,21 +64,6 @@ case $i in
 esac
 done
 
-if [ "$OLD" = '' ]; then
-  #export PYTHONPATH=
-  export CUDA_PATH=/vol/biomedic/users/kgs13/Software/cuda_envs/9.2.148-cudnn7.2.1/cuda
-  export CUDA_INC_PATH=/vol/biomedic/users/kgs13/Software/cuda_envs/9.2.148-cudnn7.2.1/cuda/include
-  export LD_LIBRARY_PATH=/vol/biomedic/users/kgs13/Software/cuda_envs/9.2.148-cudnn7.2.1/cuda/lib64:/vol/biomedic/users/kgs13/Software/cuda_envs/9.2.148-cudnn7.2.1/cuda/:$LD_LIBRARY_PATH
-else
-  folder=9.0.176
-  folder2=8.0.61-cudnn.7.0.2
-  export PATH=$PATH:/vol/cuda/$folder:/vol/cuda/$folder/lib64:/vol/cuda/$folder2:/vol/cuda/$folder2/lib64
-  export LIBRARY_PATH=$LIBRARY_PATH:/vol/cuda/$folder:/vol/cuda/$folder/lib64:/vol/cuda/$folder2:/vol/cuda/$folder2/lib64
-  export LD_LIBRARY_PATH=:/vol/cuda/$folder:/vol/cuda/$folder/lib64:/vol/cuda/$folder2:/vol/cuda/$folder2/lib64
-  export CPATH=$CPATH:/vol/cuda/$folder:/vol/cuda/$folder/lib64:/vol/cuda/$folder2:/vol/cuda/$folder2/lib64
-  echo $LD_LIBRARY_PATH
-fi
-
 #python3 -m memory_profiler experiment.py
 
 if [ "$MERUP_UNDERSAMPLING_RATE" = '' ]; then
