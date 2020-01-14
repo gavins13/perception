@@ -278,8 +278,11 @@ class execution(object):
             for i in range(_N_):
                 print("data split: %d of %d" %
                       (i+1, self.data_strap.n_splits_per_gpu_test[0]))
+                #print(self.model.ArchitectureObject.global_step)
                 '''summary_i, result, ground_truth, input_data, this_split_diagnostics,this_split_full_diagnostics = self.session.run([self.summarised_result.summary, self.results, self.ground_truths, self.input_data, self.summarised_result.diagnostics, self.summarised_result.full_diagnostics])'''
-                this_split_full_diagnostics = self.session.run([self.summarised_result.full_diagnostics])
+                this_split_full_diagnostics = self.session.run(
+                  [self.summarised_result.full_diagnostics],
+                  feed_dict={self.model.ArchitectureObject.global_step: [np.float(i)]})
                 print("finished data split: %d of %d" % (i+1, _N_))
                 self.model.ArchitectureObject.analyse_single(i, this_split_full_diagnostics, self.summary_folder, final_idx=_N_-1)
 
