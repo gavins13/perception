@@ -16,20 +16,20 @@ if __name__ == "__main__":
     from lib.execution import Execution
     from lib.dataset import Dataset
     from lib.experiments import Experiments as ExperimentsManager
-    from lib.misc import detect_cmd_arg
+    from lib.misc import detect_cmd_arg, path as prepare_path
 else:
     from .lib.misc import printt
     from .lib.execution import Execution
     from .lib.dataset import Dataset
     from .lib.experiments import Experiments as ExperimentsManager
-    from .lib.misc import detect_cmd_arg
+    from .lib.misc import detect_cmd_arg, path as prepare_path
 
 import sys
 import importlib
 
 
 def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
-  tensorboard_only=False, reset=False):
+  tensorboard_only=False, reset=False, experiments_file=None, debug_level=None):
     '''
     experiment_id: (str) experiment_id from the JSON files
     experiment_type: (str) 'train' or 'test'
@@ -38,10 +38,16 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
     (optional) tensorboard_only: (bool) Only start TensorBoard (TB)? Default is to start TB with training
     (optional) reset: (bool) train from scratch?
     '''
-    experiments = ExperimentsManager()
+    experiments = ExperimentsManager(experiments_file=experiments_file)
     if tensorboard_only is True:
         gpu = None
         printt("Only Tensorboard starting", info=True)
+
+    if debug_level is not None:
+        if not(isinstance(debug_level, int)):
+            raise ValueError('Invalid DEBUG_LEVEL')
+        os.environ["PYTHON_PERCEPTION_DEBUG_LEVEL"] = str(debug_level)
+        printt("DEBUG LEVEL {} being used".format(debug_level), info=True)
 
     if gpu is not None:
         if not(isinstance(gpu, int)):
@@ -60,7 +66,9 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
 
     if 'module' in experiments[experiment_id].keys():
         if 'module_path' in experiments[experiment_id].keys():
-            sys.path.insert(0, experiments[experiment_id]['dataset_path'])
+            sys.path.insert(0, prepare_path(
+                experiments[experiment_id]['module_path'])
+            )
             printt("Using user-specified module path", info=True)
         _tmp_mod_name = experiments[experiment_id]["module"]
         if experiment_type in ['evaluate', 'test']:
@@ -73,7 +81,11 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
 
     if 'dataset_path' in experiments[experiment_id].keys():
         if 'dataset_path' in experiments[experiment_id].keys():
-            sys.path.insert(0, experiments[experiment_id]['dataset_path'])
+            printt("DATASET PATH: "+prepare_path(
+                experiments[experiment_id]['dataset_path']), debug=True)
+            sys.path.insert(0, prepare_path(
+                experiments[experiment_id]['dataset_path'])
+            )
             print("Using user-specified dataset path")
         _tmp_mod_name = experiments[experiment_id]["dataset"]
         dataset_module = importlib.import_module(_tmp_mod_name)
@@ -110,7 +122,8 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         save_folder=save_folder_name, model=Model,
         experiment_type=experiment_type, execute=execute,
         tensorboard_only=tensorboard_only, experiment_id=experiment_id,
-        reset=reset, perception_save_path=save_path)
+        reset=reset, perception_save_path=save_path,
+        experiments_manager=experiments)
 
 
 
@@ -119,10 +132,19 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
 if __name__ == "__main__":
     experiment_id = detect_cmd_arg("experiment_id", false_val=experiment_id)
     experiment_id = detect_cmd_arg("experiment", false_val=experiment_id)
+    experiment_filename = detect_cmd_arg("experiments_file", false_val=None)
     experiment_type = detect_cmd_arg("type", false_val=experiment_type)
     gpu = detect_cmd_arg("gpu", false_val=None, val_dtype=int)
     tensorboard_only = detect_cmd_arg("tensorboard", retrieve_val=False)
     tensorboard_only_2 = detect_cmd_arg("tensorboard_only", retrieve_val=False)
     tensorboard_only = (tensorboard_only or tensorboard_only_2)
     reset = detect_cmd_arg("reset", retrieve_val=False)
-    ThisExperiment = Experiment(experiment_id, experiment_type, execute=True, gpu=gpu, tensorboard_only=tensorboard_only, reset=reset)
+    ThisExperiment = Experiment(
+                        experiment_id,
+                        experiment_type,
+                        experiments_file=experiments_file,
+                        execute=True,
+                        gpu=gpu,
+                        tensorboard_only=tensorboard_only,
+                        reset=reset
+                    )

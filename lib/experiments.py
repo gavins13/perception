@@ -18,17 +18,21 @@ printt("List of experiment files: " + '\n'.join('{}: {}'.format(*k) for k in enu
 
 
 class Experiments(object):
-    def __init__(self):
+    def __init__(self, experiments_file=None):
         json_dict = {}
         json_dicts = {}
         json_locations = {}
-        for json_file in json_files:
+        all_json_files= json_files[:]
+        if experiments_file is not None:
+            all_json_files.append(experiments_file)
+        for json_file in all_json_files:
             with open(json_file, 'r') as f:
                 this_dict = json.load(f)
                 json_dict = {**this_dict, **json_dict}
                 json_dicts[json_file] = this_dict
                 this_json_locations = {k: json_file for k in this_dict.keys()}
                 json_locations = {**json_locations, **this_json_locations}
+        printt(all_json_files, debug=True)
         self.experiments = json_dict
         self.experiments_json_files = json_dicts
         self.json_locations = json_locations
