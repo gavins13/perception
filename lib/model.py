@@ -56,6 +56,7 @@ class Model(object):
         self.__config__.epochs = 300
         self.__config__.saved_model_epochs = 1
 
+
         self.__keras_models__ = None # Typically this should describe the forward pass also
         self.__forward_pass_model__ = None # Ideally, should be concatentation
                                            # of __keras_models__
@@ -66,6 +67,9 @@ class Model(object):
         self.__active_vars__.validation = False
         self.__active_vars__.return_weights = False
         self.__active_vars__.step = None
+        
+        self.__analysis_directory__ = None
+
     class CustomModel(tf.keras.Model):
         '''
         Add decorator below if you want to use SavedModel and TF Serving
