@@ -9,7 +9,7 @@ setup(name='Perception',
       license='MIT',
       packages=['perception'],
       install_requires=[
-          'tensorflow==1.8.0',
+          'tensorflow==1.15.2',
           'numpy==1.15.3',
       ],
       zip_safe=False)
