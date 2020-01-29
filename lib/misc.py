@@ -6,13 +6,12 @@ import sys
 
 import json
 
+perception_path =os.path.join(
+        os.path.dirname(os.path.realpath(__file__)), "../")
+
 with open(os.path.join(
-    os.path.join(
-        os.path.dirname(os.path.realpath(__file__)),
-        "../"),
-    "Config.perception"
-  ), "r") as config_file:
-    Config = json.load(config_file)
+    perception_path, "Config.perception"), "r") as config_file:
+        Config = json.load(config_file)
 
 def detect_cmd_arg(arg, retrieve_val=True, val_dtype=str, false_val=None):
     '''
@@ -44,28 +43,38 @@ def detect_cmd_arg(arg, retrieve_val=True, val_dtype=str, false_val=None):
 
 
 
-error_level = Config["debug_level"]
-error_level = detect_cmd_arg("debug_level",
-    retrieve_val=True, val_dtype=int, false_val=error_level)
-def printt(val, warning=False, error=False, execution=False, info=False, stop=False, debug=False):
-    '''
-    WARNING, ERROR, EXECUTION, INFO
-    '''
-    if (warning is True) and (error_level > 0):
-        print("WARNING: {0}".format(val))
-    elif (error is True) and (error_level > 1):
-        print("ERROR: {0}".format(val))
-    elif (info is True) and (error_level > 2):
-        print("INFO: {0}".format(val))
-    elif (debug is True) and (error_level > 3):
-        print("DEBUG: {0}".format(val))
-    elif execution is True:
-        print("EXECUTION: {0}".format(val))
-    elif error_level > 4:
-        print("STREAM: {0}".format(val))
+config_error_level = Config["debug_level"]
+config_error_level = detect_cmd_arg("debug_level",
+    retrieve_val=True, val_dtype=int, false_val=config_error_level)
+def printt(val, warning=False, error=False, execution=False, info=False,
+    stop=False, debug=False, filename=None):
+        '''
+        WARNING, ERROR, EXECUTION, INFO
+        '''
+        os_error_level = os.environ.get('PYTHON_PERCEPTION_DEBUG_LEVEL')
+        if os_error_level is not None:
+            error_level = int(os_error_level)
+        else:
+            error_level = config_error_level
 
-    if stop is True:
-        print("Stopped execution.")
-        traceback.print_exc()
-        raise SystemExit
+        if (warning is True) and (error_level > 0):
+            print("WARNING: {0}".format(val))
+        elif (error is True) and (error_level > 1):
+            print("ERROR: {0}".format(val))
+        elif (info is True) and (error_level > 2):
+            print("INFO: {0}".format(val))
+        elif (debug is True) and (error_level > 3):
+            print("DEBUG: {0}".format(val))
+        elif execution is True:
+            print("EXECUTION: {0}".format(val))
+        elif error_level > 4:
+            print("STREAM: {0}".format(val))
 
+        if stop is True:
+            print("Stopped execution.")
+            traceback.print_exc()
+            raise SystemExit
+
+def path(fullpath, needle="**__path__**"):
+    fullpath = fullpath.replace(needle, perception_path)
+    return fullpath
