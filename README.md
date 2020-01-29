@@ -8,7 +8,7 @@
 Install the following dependencies with Anaconda:
 ```
 conda install python=3.7 tensorflow-gpu matplotlib imageio=2.4.1=py37_0 ipython requests scipy pillow jupyter
-conda install -c conda-forge nibabel scikit-image moviepy
+conda install -c conda-forge nibabel scikit-image moviepy tensorflow-probability
 ```
 
 then check your pip location and version is correct (it should correspond to the Anaconda location)
@@ -70,7 +70,7 @@ Example of format for experiments.py:
         {
             "module": "models.test_model.main",
             "experiment_name": "tf2_test",
-            "dataset": "BiobankDataLoader",
+            "dataset": "BiobankDataLoader", # Module name. Absolute and Relative imports are both supported
             "dataset_path": "data/biobank", # if the data loader is in a different directory, an absolute path can be used
             "dataset_args":
                 {
@@ -80,3 +80,5 @@ Example of format for experiments.py:
             "save_path": "/absolute/path/to/location/containing/save_folder_name" # aka 'perception_save_path'
         },
 ```
+
+In the specification of the "dataset_path" or "module_path", you can use the string "**__path__**" which will be used to fetch the perception install directory. This is used in the case where you wish to place modules in the perception directory but have not updated package imports or initialised packages
