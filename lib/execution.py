@@ -116,7 +116,10 @@ class Execution(object):
         # Check for reset flag
         if 'reset' in kwargs.keys() and kwargs['reset'] is True:
             save_folder = None
-            ExperimentsManager = Experiments()
+            if 'experiments_manager' in kwargs.keys():
+                ExperimentsManager = kwargs['experiments_manager']
+            else:
+                ExperimentsManager = Experiments()
         # Create the save folder name from the experiment name above
         if(save_folder==None):
             self.save_directory_name = self.experiment_name + '_' + datetimestr
@@ -130,7 +133,10 @@ class Execution(object):
         # Create the save folder
         if not(os.path.exists(self.save_directory)):
             os.makedirs(self.save_directory)
-            ExperimentsManager = Experiments()
+            if 'experiments_manager' in kwargs.keys():
+                ExperimentsManager = kwargs['experiments_manager']
+            else:
+                ExperimentsManager = Experiments()
 
         # If reset, or new folder created for experiment, update the exp.
         # If custom perception_save_path used, update this as well
@@ -195,10 +201,12 @@ class Execution(object):
         if not(os.path.exists(os.path.join(self.save_directory, 'analysis'))):
             os.makedirs(os.path.join(self.save_directory, 'analysis'))
         self.analysis_directory = os.path.join(self.save_directory, 'analysis')
+        self.Model.__analysis_directory__ = self.analysis_directory
 
         '''
         Start training?
         '''
+        self.tb_url = None
         if 'execute' in kwargs.keys() and kwargs['execute'] is True:
             printt("Start training/testing", info=True)
             self()
@@ -267,7 +275,8 @@ class Execution(object):
         print("TensorBoard started at {}".format(tb_url))
         self.tb_url = tb_url
     def tensorboard_only(self):
-        self.tensorboard()
+        if self.tb_url is None:
+            self.tensorboard()
         input("Press enter to exit and stop TensorBoard...")
 
     def training(self):
@@ -343,12 +352,13 @@ class Execution(object):
                         #print(type(data_record))
                         #print(self.Model.__forward_pass_model__.inputs)
                         #print("")
-                        if predict_for_input_signature_bug_run is False:
+                        '''if predict_for_input_signature_bug_run is False:
                             _ = self.Model.__forward_pass_model__.predict(data_record)
                             self.Model.__forward_pass_model__.save(this_epoch_saved_model_dir)
                             predict_for_input_signature_bug_run = True
                             print("TensorBoard started at {}".format(self.tb_url))
                         else:
-                            self.Model.__forward_pass_model__.save(this_epoch_saved_model_dir)
+                            self.Model.__forward_pass_model__.save(this_epoch_saved_model_dir)'''
                     if epochs >= self.Model.__config__.epochs:
                         train = False
+        self.tensorboard_only()
