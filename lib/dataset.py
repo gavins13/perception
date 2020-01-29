@@ -1,5 +1,5 @@
 import numpy as np
-from random import shuffle, seed as __seed__
+#from random import shuffle, seed as __seed__
 import tensorflow as tf
 from .misc import printt
 
@@ -22,11 +22,11 @@ class Dataset():
 
     Notes:
     Before, create(), might be worth also setting config.cv_folds and
-    config.cv_folds_number for the number of folds and which fold to operate 
+    config.cv_folds_number for the number of folds and which fold to operate
     on for the current running of Perception. Note: cross-validation folds are
     generated after during the create() calling, either through __config__()
     for the generator mode, or in the __process_dataset__() method for direct/
-    developer mode. 
+    developer mode.
 
     Generator mode:
     When the generator mode is used, and the generator is specified, remember
@@ -71,7 +71,7 @@ class Dataset():
         Only valid when the using direct method
         '''
         self.config.dataset_split = [60,30,10] # Train, Test, Validate
-        self.config.cv_folds = None  
+        self.config.cv_folds = None
         self.config.cv_fold_number = None
         self.config.validation_size = 1
 
@@ -86,7 +86,7 @@ class Dataset():
 
         self.train_dataset_steps = None # Should be the same as
                                         # train_data_length for batch_size
-                                        # = 1, otherwise, = 
+                                        # = 1, otherwise, =
                                         # train_dataset_length / batch_size
         self.test_dataset_steps = None
         self.validation_dataset_steps = None
@@ -124,10 +124,10 @@ class Dataset():
         self.dev.on = True
         if dataset is not None:
             self.dev.dataset = dataset
-    
+
     def skip(self, steps, current_file=None, epoch=None):
         if self.system_type.use_direct is True:
-            self.Dataset.train_dataset=self.Dataset.train_dataset.skip(step)
+            self.train_dataset=self.train_dataset.skip(steps)
         elif self.system_type.use_generator is True:
             self.generator_skip(steps, current_file=current_file, epoch=epoch)
     def generator_skip(self, steps, current_file, epoch):
@@ -209,7 +209,9 @@ class Dataset():
         if self.system_type.use_direct is True or self.dev.on is True:
             if self.dev.on is False:
                 buffer_size = None if not(hasattr(self, 'buffer_size')) else getattr(self, 'buffer_size')
-                self.Dataset = self.Dataset.shuffle(buffer_size=buffer_size, seed=self.operation_seed)
+                self.Dataset = self.Dataset.shuffle(
+                    buffer_size=buffer_size, seed=self.operation_seed) if\
+                    buffer_size is not None else self.Dataset
             if self.config.cv_folds is not None:
                 self.Datasets = []
                 if self.config.cv_fold_number is None:
@@ -274,7 +276,7 @@ class Dataset():
         #train_dataset_data = tf.data.Dataset.from_tensor_slices(train_data)
         #train_dataset_labels = tf.data.Dataset.from_tensor_slices(train_labels)
         #train_dataset = tf.data.Dataset.zip((train_dataset_data, train_dataset_labels))
-        
+
         test_dataset = tf.data.Dataset.from_tensor_slices((test_data, test_labels))
         validation_dataset = test_dataset.take(self.validation_dataset_length)
 
@@ -297,8 +299,7 @@ class Dataset():
             self.config.batch_size))
 
     def set_operation_seed(self, seed=1114):
-        tf.random.set_seed(seed)
-        np.random.seed(seed)
-        __seed__(seed)
+        #tf.random.set_seed(seed)
+        #np.random.seed(seed)
+        #__seed__(seed)
         self.operation_seed = seed
-
