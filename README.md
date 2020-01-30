@@ -7,7 +7,7 @@
 ## Dependencies (with Anaconda)
 Install the following dependencies with Anaconda:
 ```
-conda install python=3.7 tensorflow-gpu matplotlib imageio=2.4.1=py37_0 ipython requests scipy pillow jupyter
+conda install python=3.7 tensorflow-gpu=2.0 matplotlib imageio=2.4.1=py37_0 ipython requests scipy pillow jupyter
 conda install -c conda-forge nibabel scikit-image moviepy tensorflow-probability
 ```
 
@@ -15,7 +15,7 @@ then check your pip location and version is correct (it should correspond to the
 ```
 pip --version
 which pip
-pip install tensorflow-addons
+pip install tensorflow-addons=0.6
 ```
 
 ## As a package (optional)
