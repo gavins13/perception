@@ -28,6 +28,7 @@ import tensorflow as tf
 import time
 from tensorboard import program as tb_program
 import numpy as np
+import inspect
 
 from .experiments import Experiments
 
@@ -64,8 +65,10 @@ class Execution(object):
         '''
         Handle Dataset
         '''
-        if 'dataset' in kwargs.keys() and isinstance(kwargs['dataset'], Dataset):
+        if 'dataset' in kwargs.keys():
             # Use this dataset
+            if isinstance(kwargs['dataset'], Dataset) is False:
+                printt("Instance check for chosen Dataset failed.", warning=True)
             self.Dataset = kwargs['dataset']
         else:
             self.Dataset = Dataset()
@@ -75,10 +78,13 @@ class Execution(object):
         '''
         Handle Model
         '''
-        if 'model' in kwargs.keys() and issubclass(kwargs['model'], Model):
+        if 'model' in kwargs.keys() and (issubclass(kwargs['model'], Model) or\
+          inspect.isclass(kwargs['model'])):
             kwargs['model'] = kwargs['model'](training=exp_type)
-        if 'model' in kwargs.keys() and isinstance(kwargs['model'], Model):
+        if 'model' in kwargs.keys():
             # Use this dataset
+            if isinstance(kwargs['model'], Model) is False:
+                printt("Instance check for chosen Model failed.", warning=True)
             self.Model = kwargs['model']
             self.Model.create_models()
         else:
@@ -279,6 +285,11 @@ class Execution(object):
             self.tensorboard()
         input("Press enter to exit and stop TensorBoard...")
 
+    def logging(self, val):
+        full_file_path = os.path.join(self.save_directory, "model_summary.txt")
+        #printt("Printing model summary to path: {}".format(full_file_path), debug=True)
+        printt(val, full_file_path=full_file_path)
+
     def training(self):
         '''
         Training Loop
@@ -288,7 +299,7 @@ class Execution(object):
         step=0
         #epochs = int(tf.floor(tf.divide(self.ckpt.step, self.Dataset.train_dataset_steps)))
         epochs = int(self.ckpt.epoch)
-        step=int(self.ckpt.step)
+        step=int(self.ckpt.step) # Starts on 1
         train = True
         predict_for_input_signature_bug_run = False
         #self.Dataset.train_dataset=self.Dataset.train_dataset.skip(step)
@@ -332,33 +343,33 @@ class Execution(object):
                             print("", end="\r")
 
                             # Validation
-                            if (step+1) % self.Model.__config__.validation_steps == 0:
+                            if step % self.Model.__config__.validation_steps == 0:
                                 for validation_data_record in self.Dataset.validation_dataset.take(self.Dataset.validation_dataset_length):
                                     self.Model.loss_func(validation_data_record, training=False,
                                         validation=True, summaries=True)
+
+                            # Save summary of the model
+                            if step == 1:
+                                self.Model.__forward_pass_model__.summary(print_fn=self.logging)
+
+                            # Increment to next step
                             step += 1
                             self.Model.__active_vars__.step = step
 
-                            # Save summary of the model
-                            if step == 0:
-                                self.Model.__forward_pass_model__.summary(printt)
                     epochs += 1
                     if epochs % self.Model.__config__.saved_model_epochs == 0:
                         if not(os.path.exists(os.path.join(self.saved_model_directory, 'epoch_'+str(epochs)))):
                             os.makedirs(os.path.join(self.saved_model_directory, 'epoch_'+str(epochs)))
                         this_epoch_saved_model_dir = os.path.join(self.saved_model_directory, 'epoch_'+str(epochs))
-                        #tf.saved_model.save(self.Model.__forward_pass_model__, this_epoch_saved_model_dir)
-                        #_ = self.Model.__forward_pass_model__(data_record)
-                        #print(type(data_record))
-                        #print(self.Model.__forward_pass_model__.inputs)
-                        #print("")
-                        '''if predict_for_input_signature_bug_run is False:
-                            _ = self.Model.__forward_pass_model__.predict(data_record)
-                            self.Model.__forward_pass_model__.save(this_epoch_saved_model_dir)
-                            predict_for_input_signature_bug_run = True
-                            print("TensorBoard started at {}".format(self.tb_url))
-                        else:
-                            self.Model.__forward_pass_model__.save(this_epoch_saved_model_dir)'''
+                        saving_enabled = False if tf.__version__ == '2.0.0' else True
+                        if saving_enabled is True:
+                            if predict_for_input_signature_bug_run is False:
+                                _ = self.Model.__forward_pass_model__.predict(data_record)
+                                self.Model.__forward_pass_model__.save(this_epoch_saved_model_dir)
+                                predict_for_input_signature_bug_run = True
+                                print("TensorBoard started at {}".format(self.tb_url))
+                            else:
+                                self.Model.__forward_pass_model__.save(this_epoch_saved_model_dir)
                     if epochs >= self.Model.__config__.epochs:
                         train = False
         self.tensorboard_only()
