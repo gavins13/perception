@@ -142,7 +142,7 @@ if __name__ == "__main__":
     ThisExperiment = Experiment(
                         experiment_id,
                         experiment_type,
-                        experiments_file=experiments_file,
+                        experiments_file=experiment_filename,
                         execute=True,
                         gpu=gpu,
                         tensorboard_only=tensorboard_only,
