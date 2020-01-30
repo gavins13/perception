@@ -47,7 +47,7 @@ config_error_level = Config["debug_level"]
 config_error_level = detect_cmd_arg("debug_level",
     retrieve_val=True, val_dtype=int, false_val=config_error_level)
 def printt(val, warning=False, error=False, execution=False, info=False,
-    stop=False, debug=False, filename=None):
+    stop=False, debug=False, full_file_path=None):
         '''
         WARNING, ERROR, EXECUTION, INFO
         '''
@@ -56,19 +56,27 @@ def printt(val, warning=False, error=False, execution=False, info=False,
             error_level = int(os_error_level)
         else:
             error_level = config_error_level
-
+        for_print = None
         if (warning is True) and (error_level > 0):
-            print("WARNING: {0}".format(val))
+            for_print = "WARNING: {0}".format(val)
         elif (error is True) and (error_level > 1):
-            print("ERROR: {0}".format(val))
+            for_print = "ERROR: {0}".format(val)
         elif (info is True) and (error_level > 2):
-            print("INFO: {0}".format(val))
+            for_print = "INFO: {0}".format(val)
         elif (debug is True) and (error_level > 3):
-            print("DEBUG: {0}".format(val))
+            for_print = "DEBUG: {0}".format(val)
         elif execution is True:
-            print("EXECUTION: {0}".format(val))
+            for_print = "EXECUTION: {0}".format(val)
         elif error_level > 4:
-            print("STREAM: {0}".format(val))
+            for_print = "STREAM: {0}".format(val)
+
+        if for_print is not None:
+            print(for_print)
+        if full_file_path is not None:
+            with open(full_file_path, 'a') as f:
+                for_print = "{0}".format(val) if\
+                    for_print is None else for_print
+                f.write(for_print + "\r\n")
 
         if stop is True:
             print("Stopped execution.")
