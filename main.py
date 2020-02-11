@@ -79,6 +79,12 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
     else:
         printt("Architecture/Model not specified", error=True, stop=True)
 
+    
+    if 'module_args' in experiments[experiment_id].keys():
+        module_args = experiments[experiment_id]['module_args']
+    else:
+        module_args = None
+
     if 'dataset_path' in experiments[experiment_id].keys():
         if 'dataset_path' in experiments[experiment_id].keys():
             printt("DATASET PATH: "+prepare_path(
@@ -120,6 +126,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
 
     return Execution(dataset=Dataset, experiment_name=experiment_name,
         save_folder=save_folder_name, model=Model,
+        model_args=module_args,
         experiment_type=experiment_type, execute=execute,
         tensorboard_only=tensorboard_only, experiment_id=experiment_id,
         reset=reset, perception_save_path=save_path,

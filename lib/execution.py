@@ -80,7 +80,10 @@ class Execution(object):
         '''
         if 'model' in kwargs.keys() and (issubclass(kwargs['model'], Model) or\
           inspect.isclass(kwargs['model'])):
-            kwargs['model'] = kwargs['model'](training=exp_type)
+            model_args = {}
+            if 'model_args' in kwargs.keys() and kwargs['model_args'] is not None:
+                model_args = kwargs['model_args']
+            kwargs['model'] = kwargs['model'](training=exp_type, **model_args)
         if 'model' in kwargs.keys():
             # Use this dataset
             if isinstance(kwargs['model'], Model) is False:
@@ -223,23 +226,22 @@ class Execution(object):
         printt("Entering testing loop", debug=True)
         epochs = 0
         step = 0
-        while test is True:
-            for record_number, data_record in self.Dataset.train_dataset.enumerate():
-                #diagnostics = self.Model.loss_func(data, training=False)
-                #analysis_output = self.Model.analyse(diagnostics, step, self.analysis_directory)
+        for record_number, data_record in self.Dataset.test_dataset.enumerate():
+            #diagnostics = self.Model.loss_func(data, training=False)
+            #analysis_output = self.Model.analyse(diagnostics, step, self.analysis_directory)
 
-                diagnostics, analysis_output = self.run(data_record,
-                    return_analysis=True,
-                    return_diagnostics=True)
-                '''
-                Print to console and save checkpoint
-                '''
-                print("testing epoch: %d" % epochs, end=";")
-                print("data split: %d of %d" % (record_number+1, self.data_strap.dataset_length), end=";")
-                print("step: %d" % steps, end=";")
-                sys.stdout.write("\033[K")
-                step += 1
-            epochs += 1
+            diagnostics, analysis_output = self.run(data_record,
+                return_analysis=True,
+                return_diagnostics=True, step=step)
+            '''
+            Print to console and save checkpoint
+            '''
+            print("testing epoch: %d" % epochs, end=";")
+            print("data split: %d of %d" % (record_number+1, self.data_strap.dataset_length), end=";")
+            print("step: %d" % steps, end=";")
+            sys.stdout.write("\033[K")
+            step += 1
+        epochs += 1
 
     def run(self, input_data, return_diagnostics=True, execute_analysis=False,
         return_analysis=False, step=None, analysis_directory=None):
@@ -254,7 +256,7 @@ class Execution(object):
 
         execute_analysis = True if return_analysis is True else execute_analysis
 
-        diagnostics = self.Model.loss_func(data, training=False)
+        diagnostics, losses = self.Model.loss_func(input_data, training=False)
         if execute_analysis is True:
             analysis_output = self.Model.analyse(diagnostics, step, analysis_directory)
 
@@ -327,7 +329,7 @@ class Execution(object):
                             print("data split: %d of %d" % (
                                 data_split_num+1,
                                 data_split_num_total), end=";")
-                            print("step: %d" % step, end=";")
+                            print("step: %d / %d" % (step,self.Dataset.train_dataset_steps), end=";")
                             duration = time.time() - start_time
                             print("time: %.3f" % duration, end=";")
                             # Checkpointing
@@ -348,9 +350,13 @@ class Execution(object):
                                     self.Model.loss_func(validation_data_record, training=False,
                                         validation=True, summaries=True)
 
+
                             # Save summary of the model
                             if step == 1:
                                 self.Model.__forward_pass_model__.summary(print_fn=self.logging)
+                                for optimisers_models in self.Model.__optimisers_models__:
+                                    for model in optimisers_models['models']:
+                                        model.summary(print_fn=self.logging)
 
                             # Increment to next step
                             step += 1
