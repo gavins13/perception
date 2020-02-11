@@ -237,11 +237,12 @@ class Execution(object):
             Print to console and save checkpoint
             '''
             print("testing epoch: %d" % epochs, end=";")
-            print("data split: %d of %d" % (record_number+1, self.data_strap.dataset_length), end=";")
-            print("step: %d" % steps, end=";")
+            print("data split: %d of %d" % (record_number+1, self.Dataset.test_dataset_length), end=";")
+            print("step: %d" % step, end=";")
             sys.stdout.write("\033[K")
             step += 1
         epochs += 1
+        self.Model.analysis_complete()
 
     def run(self, input_data, return_diagnostics=True, execute_analysis=False,
         return_analysis=False, step=None, analysis_directory=None):
