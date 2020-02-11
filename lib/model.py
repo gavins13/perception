@@ -65,10 +65,14 @@ class Model(object):
         self.__active_vars__.summaries = False
         self.__active_vars__.training = False
         self.__active_vars__.validation = False
+        self.__active_vars__.testing = False
         self.__active_vars__.return_weights = False
         self.__active_vars__.step = None
         
         self.__analysis_directory__ = None
+
+        self.__analysis__ = Config()
+        self.__analysis__.__active_vars__ = Config()
 
     class CustomModel(tf.keras.Model):
         '''
@@ -102,7 +106,11 @@ class Model(object):
 
     def loss_function(self, results, pass_number=None):
         '''
-        Literally just return loss
+        Literally just return loss. If parts used to calculate the loss
+        are useful for the analyse() function, then please store in the 
+        active variable self.__analysis__.__active_vars__ and remember,
+        that there is access to the variable self.__active_vars__.testing
+        to tell the model is the model is in testing mode or not
         '''
         pass
         # For example
@@ -111,7 +119,9 @@ class Model(object):
 
     def analyse(self, diagnostics, idx, save_dir):
         '''
-        Save all diagnostics to a pickle
+        Save all diagnostics to a pickle.
+        Note: diagnostics has the same nested structure as the variable
+        self.__optimiser_models__ containing the network outputs for each
         '''
         with open(save_dir + 'individual_pkle/' + str(idx) + '.p', 'wb') as handle:
             pickle.dump(diagnostics, handle)
@@ -123,23 +133,35 @@ class Model(object):
         ground_truth_path = os.path.join(save_dir, 'ground_truth')
         if not(os.path.exists(ground_truth_path)):
             os.makedirs(ground_truth_path)
+    
+    def analysis_complete(self):
+        '''
+        This runs at the end of testing. Usually it involves working with a
+        variable(s) produced during testing in order to produce some value
+        (e.g. mean, std, etc...) and probably will make use of the variable:
+        self.__analysis__.__active_vars__
+        '''
+        pass
 
     '''
     Mild modification perhaps neccessary
     '''
     def loss_func(self, data, training=False, return_weights=False, validation=False,
         summaries=False):
+        testing = True if (training is False and validation is False) else False
+
         '''
         Remember to run summary functions here
         '''
         self.__active_vars__.summaries = summaries
         self.__active_vars__.training = training
         self.__active_vars__.validation = validation
+        self.__active_vars__.testing = testing
         self.__active_vars__.return_weights = return_weights
 
         all_trainable_variables = []
         losses = []
-
+        optimisers_diagnostics = []
         for i, models in enumerate(self.__optimisers_models__):
             '''
             Pass number below isn't a solid concept. But for example,
@@ -147,24 +169,24 @@ class Model(object):
             whereas pass_number = 1 could represent training just the
             discriminator
             '''
+            this_optimisers_diagnostics = []
             this_optimiser_trainable_variables = []
             results = data
             for model in models["models"]:
                 results = model(results, training=training, pass_number=i)
-                #print(model.inputs)
-                #print(self.__forward_pass_model__.inputs)
                 this_optimiser_trainable_variables += model.trainable_variables
+                this_optimisers_diagnostics.append(results)
 
             all_trainable_variables.append(this_optimiser_trainable_variables)
             loss = models['loss_function'](results, pass_number=i)
             losses.append(loss)
+            optimisers_diagnostics.append(this_optimisers_diagnostics)
 
-        testing = True if (training is False and validation is False) else False
         if training is True:
             return all_trainable_variables, losses
         else:
             if testing is True:
-                return diagnostics
+                return optimisers_diagnostics, losses
     '''
     No modification required
     '''
@@ -182,6 +204,17 @@ class Model(object):
         if self.__active_vars__.summaries == False:
             return
         else:
+
+            if 'normalise' in kwargs.keys():
+                if kwargs['normalise'] is True:
+                    data = tf.math.real(data)
+                    max_val = tf.reduce_max(data)
+                    min_val = tf.reduce_min(data)
+                    val_range = max_val - min_val
+                    data = (data - min_val)/val_range
+                    #data = data/max_val
+                del(kwargs['normalise'])
+
             if self.__active_vars__.validation is True:
                 name = "Validation/" + name
             else:
