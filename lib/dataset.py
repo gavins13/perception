@@ -28,6 +28,14 @@ class Dataset():
     for the generator mode, or in the __process_dataset__() method for direct/
     developer mode.
 
+    In __config__ (or __init__), remember to set:
+     - self.train_dataset_length (along with validation and test)
+     - self.train_dataset_steps
+
+    NOTE: the variable self.current.steps is not used in the main Executor
+    model and is purely for the Dataset API (e.g. for restarting training,
+    See the skip() method for this class).
+
     Generator mode:
     When the generator mode is used, and the generator is specified, remember
     to specify in the inherited 'generator' class a '__config__' method which
@@ -35,8 +43,30 @@ class Dataset():
     number of folds, and then also select a fold that the class' Python
     generators can use.
 
+    It is advisable to set "self.num_files" to the number of training files, so
+    that training display is more informative.
+
     Remember to define self.train_dataset_length, self.test_dataset_length
     and self.validation_dataset_length in the class
+
+    Also, you must define a generator_skip() method. The purpose of this
+    is the ensure that when training is stopped and restarted, the generator
+    starts from the current location in the dataset. The code for this method
+    will probably look something like this:
+
+    ```
+    def generator_skip(self, steps, current_file, epoch):
+        self.current.step = steps
+        self.current.file = current_file
+        self.current.epoch = epoch
+    ```
+
+    Since the generator can be batch using the TF.Dataset batch() method, it is
+    uneccessary in most cases to batch within the generator function. However,
+    there will exist cases where you do want to batch within the generator (for
+    example, when each image generated has a different image dimension). In
+    this scenerio, you can disabled the TF.Dataset batch() call by using
+    self.config.disable_batching = True.
 
     Developer mode:
     If using developer mode, remember to set self.dev.dataset before calling
@@ -63,9 +93,11 @@ class Dataset():
 
         self.config = Config()
         self.config.type = 'train' # 'train', 'test', 'validate'
-        self.config.batch_size = None
+        self.config.batch_size = None # Can be int or list [train, val, test]
+                                      # or dict(train,validation,test)
         self.config.prefetch_factor = 4
         self.config.epochs = None
+        self.config.disable_batching = False
 
         '''
         Only valid when the using direct method
@@ -91,6 +123,12 @@ class Dataset():
         self.test_dataset_steps = None
         self.validation_dataset_steps = None
         self.operation_seed = None
+
+        if 'threads' in kwargs.keys():
+            self.config.threads = kwargs['threads']
+        else:
+            self.config.threads = 4
+
     def use(self, *args):
         if args is not None:
             if args[0] == 'generator':
@@ -139,11 +177,61 @@ class Dataset():
         printt("Generator Skip not implemented", error=True, stop=True)
 
     def py_gen(self, gen_name):
-        # This function will basically return the Train data and Validation record if
+        '''
+        How to use the generators in Perception 2.0.
+
+        Typically three functions will need to be defined in the inherited
+        class. They are:
+            - py_gen_train
+            - py_gen_validation
+            - py_gen_test
+
+        For each of these three types of execution of the model, there will
+        be a unique instantiation of the Perception Dataset class.
+
+        Each 'py_gen_*' function will typically involve 3 variables required by
+        the Perception Dataset object:
+             - self.current.epoch: (required) initialised with -1
+             - self.current.step: (required) initialised with 0 (see below)
+             - self.current.file: (required: when training is resumed, it is
+                                    important know which file to start with)
+                                   Inialised with -1
+        NOTE: these variables are all for training (not validation or testing).
+        Using these variables, the generator should move through a set of files
+        and 'yield' an output whilst incrementing the variables above whilst
+        being sure to reset self.current.file when the end of the file list has
+        been reached.
+
+        Please note, you may require counters for the validation and testing,
+        but they do not need to be an object property (since the Executor does
+        not need to access them).
+
+        If the generator is being used for the first time (e.g. training for
+        the first time), then self.current.step is None which is why the generator
+        code will typically contain the following lines:
+
+        ```
+        if self.current.step is None:
+            self.current.epoch = -1
+            self.current.step = 0
+            self.current.file = -1
+        ```
+        '''
         gen_name = gen_name.decode('utf8') + '_' + str(self.gen_num)
-        for num in range(5):
+        epochs = -999 if self.config.epochs is None else self.config.epochs
+        if self.current.step is None:
+            self.current.epoch = -1
+            self.current.step = 0
+            self.current.file = -1
+        while self.current.epoch != epochs+1:
             #sleep(0.3)
-            yield '{} yields {}'.format(gen_name, num)
+            self.current.file += 1
+            this_file = [
+                            load_file_data(filenames[self.current.file]) \
+                            for x in range(self.config.batch_size)
+                        ]
+            #yield '{} yields {}'.format(gen_name, num)
+            yield tf.concat(this_file, axis=0)
     def py_gen_train(self, gen_name):
         pass
     def py_gen_test(self, gen_name):
@@ -162,7 +250,8 @@ class Dataset():
         self.create(*args, **kwargs)
         return self
 
-    def create(self, threads=4):
+    def create(self, threads=None):
+        threads = threads if threads is not None else self.config.threads
         self.set_operation_seed()
         self.__config__()
         self.__check__()
@@ -206,6 +295,9 @@ class Dataset():
         if self.config.batch_size is None:
             printt("Batch size is not set so Default is set to 1", warning=True)
             self.config.batch_size = 1
+
+        batch_sizes = self.get_batch_sizes()
+
         if self.system_type.use_direct is True or self.dev.on is True:
             if self.dev.on is False:
                 buffer_size = None if not(hasattr(self, 'buffer_size')) else getattr(self, 'buffer_size')
@@ -230,13 +322,18 @@ class Dataset():
                 train_ds = first
                 validation_ds = test_ds.take(self.config.validation_size)
                 self.Datasets = [train_ds, test_ds, validation_ds]
-                self.Datasets = [x.batch(batch_size=self.config.batch_size) for x in self.Datasets]
-                self.Datasets = [x.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor) for x in self.Datasets]
+                if self.config.disable_batching is False:
+                    self.Datasets = [x.batch(batch_size=batch_sizes[ii]) for ii, x in enumerate(self.Datasets)]
+                #self.Datasets = [x.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor) for x in self.Datasets]
+                self.Datasets = [x.prefetch(tf.data.experimental.AUTOTUNE) for x in self.Datasets]
             elif self.config.dataset_split is not None:
                 raise NotImplementedError('Dataset splitting not implemented yet')
         else:
-            #self.Datasets = [x.batch(batch_size=self.config.batch_size) for x in self.Datasets]
-            self.Datasets = [x.prefetch(buffer_size=self.config.batch_size) for x in self.Datasets]
+            if self.config.disable_batching is False:
+                #self.Datasets = [x.batch(batch_size=self.config.batch_size) for x in self.Datasets]
+                self.Datasets = [x.batch(batch_size=batch_sizes[ii]) for ii, x in enumerate(self.Datasets)]
+            #self.Datasets = [x.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor) for x in self.Datasets]
+            self.Datasets = [x.prefetch(tf.data.experimental.AUTOTUNE) for x in self.Datasets]
             #self.Dataset = self.Dataset.batch(batch_size=self.config.batch_size)
             #self.Dataset = self.Dataset.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor)
         self.set_dataset_steps()
@@ -293,10 +390,30 @@ class Dataset():
             printt("Training dataset size not set!", error=True, stop=True)
         if self.test_dataset_length is None:
             printt("Test dataset size not set!", error=True, stop=True)
+
+        batch_sizes = self.get_batch_sizes()
         self.train_dataset_steps = np.floor(np.divide(self.train_dataset_length,
-            self.config.batch_size))
+            batch_sizes[0]))
         self.test_dataset_steps = np.floor(np.divide(self.test_dataset_length,
-            self.config.batch_size))
+            batch_sizes[2]))
+
+    def get_batch_sizes(self):
+        '''
+        Interprets the user specific self.config.batch_size variable
+        and then return a list with three elements:
+        [train_batch_size, validation_batch_size, test_batch_size]
+        '''
+        if isinstance(self.config.batch_size, list):
+            batch_sizes = self.config.batch_size
+        elif isinstance(self.config.batch_size, dict):
+            batch_sizes = [
+                self.config.batch_size["train"],
+                self.config.batch_size["validation"],
+                self.config.batch_size["test"]
+            ]
+        else:
+            batch_sizes = [self.config.batch_size]*3
+        return batch_sizes
 
     def set_operation_seed(self, seed=1114):
         #tf.random.set_seed(seed)
