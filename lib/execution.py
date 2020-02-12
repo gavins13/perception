@@ -236,9 +236,11 @@ class Execution(object):
             '''
             Print to console and save checkpoint
             '''
+            data_split_num = record_number if self.Dataset.system_type.use_generator is False else self.Dataset.current.test_file
+            data_split_num_total = self.Dataset.test_dataset_steps if self.Dataset.system_type.use_generator is False else self.Dataset.num_test_files
             print("testing epoch: %d" % epochs, end=";")
-            print("data split: %d of %d" % (record_number+1, self.Dataset.test_dataset_length), end=";")
-            print("step: %d" % step, end=";")
+            print("data split: %d of %d" % (data_split_num, data_split_num_total), end=";")
+            print("step: %d of %d" % (step+1, self.Dataset.test_dataset_steps), end=";")
             sys.stdout.write("\033[K")
             step += 1
         epochs += 1
