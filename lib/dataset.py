@@ -98,6 +98,7 @@ class Dataset():
         self.config.prefetch_factor = 4
         self.config.epochs = None
         self.config.disable_batching = False
+        self.generator.single_thread_test_dataset = True
 
         '''
         Only valid when the using direct method
@@ -125,8 +126,10 @@ class Dataset():
         self.operation_seed = None
 
         if 'threads' in kwargs.keys():
+            printt("Threads specified. USING %d THREADS" % kwargs['threads'], info=True)
             self.config.threads = kwargs['threads']
         else:
+            printt("Threads not specified. USING 4 THREADS", info=True)
             self.config.threads = 4
 
     def use(self, *args):
@@ -265,10 +268,11 @@ class Dataset():
                 raise NotImplementedError()
         elif self.dev.on is False:
             if self.system_type.use_generator is True:
+                test_threads = 1 if self.generator.single_thread_test_dataset is True else threads
                 self.Datasets = [
                     self.create_generator('py_gen_train', threads=threads),
-                    self.create_generator('py_gen_test', threads=threads),
-                    self.create_generator('py_gen_validation', threads=threads)
+                    self.create_generator('py_gen_validation', threads=threads),
+                    self.create_generator('py_gen_test', threads=test_threads)
                 ]
                 self.Dataset = self.Datasets[0]
             elif self.system_type.use_direct is True:
@@ -321,11 +325,11 @@ class Dataset():
                     first = first.concatenate(x)
                 train_ds = first
                 validation_ds = test_ds.take(self.config.validation_size)
-                self.Datasets = [train_ds, test_ds, validation_ds]
+                self.Datasets = [train_ds, validation_ds, test_ds]
                 if self.config.disable_batching is False:
                     self.Datasets = [x.batch(batch_size=batch_sizes[ii]) for ii, x in enumerate(self.Datasets)]
                 #self.Datasets = [x.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor) for x in self.Datasets]
-                self.Datasets = [x.prefetch(tf.data.experimental.AUTOTUNE) for x in self.Datasets]
+                self.Datasets = [x.prefetch(tf.data.experimental.AUTOTUNE) if i != 2 else x for i, x in enumerate(self.Datasets) ]
             elif self.config.dataset_split is not None:
                 raise NotImplementedError('Dataset splitting not implemented yet')
         else:
@@ -333,13 +337,13 @@ class Dataset():
                 #self.Datasets = [x.batch(batch_size=self.config.batch_size) for x in self.Datasets]
                 self.Datasets = [x.batch(batch_size=batch_sizes[ii]) for ii, x in enumerate(self.Datasets)]
             #self.Datasets = [x.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor) for x in self.Datasets]
-            self.Datasets = [x.prefetch(tf.data.experimental.AUTOTUNE) for x in self.Datasets]
+            self.Datasets = [x.prefetch(tf.data.experimental.AUTOTUNE) if i != 2 else x for i, x in enumerate(self.Datasets) ]
             #self.Dataset = self.Dataset.batch(batch_size=self.config.batch_size)
             #self.Dataset = self.Dataset.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor)
         self.set_dataset_steps()
         self.train_dataset = self.Datasets[0]
-        self.test_dataset = self.Datasets[1]
-        self.validation_dataset = self.Datasets[2]
+        self.validation_dataset = self.Datasets[1]
+        self.test_dataset = self.Datasets[2]
 
 
     def cifar10(self):
