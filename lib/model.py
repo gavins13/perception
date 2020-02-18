@@ -227,6 +227,8 @@ class Model(object):
                     data = (data - min_val)/val_range
                     #data = data/max_val
                 del(kwargs['normalise'])
+            if 'verbose' in kwargs.keys():
+                del(kwargs['verbose'])
 
             if self.__active_vars__.validation is True:
                 name = "Validation/" + name
