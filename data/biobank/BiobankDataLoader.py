@@ -4,8 +4,10 @@ import nibabel
 from os import path
 from random import shuffle, seed as __seed__
 import tensorflow as tf
-from lib.misc import printt
-from lib.dataset import Dataset as DatasetBase
+#from lib.misc import printt
+#from lib.dataset import Dataset as DatasetBase
+from __init__ import *
+
 from scipy import stats
 
 biobank_list_path = 'biobank.json'
@@ -29,6 +31,7 @@ class Dataset(DatasetBase):
         #self.train_dataset_length = 26904*50
         self.config.batch_size = 1
 
+        self.config.disable_batching = True
 
         # Start Customising class
         class Config: pass
