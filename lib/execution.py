@@ -339,7 +339,8 @@ class Execution(object):
                             if step %\
                              self.Model.__config__.checkpoint_steps == 0:
                                 self.ckpt.step.assign_add(self.Model.__config__.checkpoint_steps)
-                                self.ckpt.current_file.assign(self.Dataset.current.file)
+                                if self.Dataset.system_type.use_generator is True:
+                                    self.ckpt.current_file.assign(self.Dataset.current.file)
                                 self.ckpt.epoch.assign(self.Dataset.current.epoch)
                                 save_path = self.ckpt_manager.save()
                                 print("Saved checkpoint for step {}".format(
@@ -364,6 +365,10 @@ class Execution(object):
                             # Increment to next step
                             step += 1
                             self.Model.__active_vars__.step = step
+
+                            if self.Dataset.system_type.use_generator is False:
+                                self.Dataset.current.epoch = epochs
+                                self.Dataset.current.step = step
 
                     epochs += 1
                     if epochs % self.Model.__config__.saved_model_epochs == 0:
