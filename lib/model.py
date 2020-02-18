@@ -42,7 +42,7 @@ class Model(object):
     '''
     __init__: sets up the optimizers, learning rate, hyperparameters
     '''
-    def __init__(self, training=None):
+    def __init__(self, training=None, **kwargs):
         self.__tapes__ = None
         self.__losses__ = None # This is an active variable; (delete?) Issue #1.1
         self.__variables__ = None # This is an active variable; (delete?) Issue #1.1
@@ -73,6 +73,9 @@ class Model(object):
 
         self.__analysis__ = Config()
         self.__analysis__.__active_vars__ = Config()
+
+    def __get_step__(self):
+        return self.__active_vars__.step
 
     class CustomModel(tf.keras.Model):
         '''
