@@ -1,6 +1,8 @@
 '''
 Load Magnitudes cines with motion fields generated from a x16 acceleration
-factor
+factor and masks
+
+Note: returns dict: dict_keys(['u', 'v', 'gt', 'masks'])
 '''
 
 import numpy as np
