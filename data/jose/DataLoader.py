@@ -11,6 +11,8 @@ import pickle
 path = '/vol/biomedic/users/kgs13/PhD/projects/datasets/'
 jose_data = pickle.load(open(path+'MICCAI_cardiac_data.pkl', 'rb'), encoding='bytes')
 
+# This dataset is simple a (10, 30, 256, 256) complex128 matrix
+
 class Dataset(DatasetBase):
     def __init__(self, *args, **kwargs):
         super().__init__()
