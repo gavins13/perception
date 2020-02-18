@@ -53,6 +53,7 @@ class Model(object):
         self.__config__.checkpoint_steps = 100
         self.__config__.validation_steps = 20
         self.__config__.summary_steps = 20
+        self.__config__.verbose_summary_steps = 40
         self.__config__.epochs = 300
         self.__config__.saved_model_epochs = 1
 
@@ -63,6 +64,7 @@ class Model(object):
 
         self.__active_vars__ = Config()
         self.__active_vars__.summaries = False
+        self.__active_vars__.verbose_summaries = False
         self.__active_vars__.training = False
         self.__active_vars__.validation = False
         self.__active_vars__.testing = False
@@ -150,13 +152,14 @@ class Model(object):
     Mild modification perhaps neccessary
     '''
     def loss_func(self, data, training=False, return_weights=False, validation=False,
-        summaries=False):
+        summaries=False, verbose_summaries=False):
         testing = True if (training is False and validation is False) else False
 
         '''
         Remember to run summary functions here
         '''
         self.__active_vars__.summaries = summaries
+        self.__active_vars__.verbose_summaries = verbose_summaries
         self.__active_vars__.training = training
         self.__active_vars__.validation = validation
         self.__active_vars__.testing = testing
@@ -204,7 +207,14 @@ class Model(object):
             typ = kwargs['type']
         del(kwargs['type'])
         kwargs['step'] = self.__active_vars__.step
-        if self.__active_vars__.summaries == False:
+        if not(
+          (self.__active_vars__.summaries is True and \
+            not('verbose' in kwargs.keys() and kwargs['verbose'] is True)
+          ) or (
+            ('verbose' in kwargs.keys() and kwargs['verbose'] is True)\
+              and self.__active_vars__.verbose_summaries is True
+          )
+        ):
             return
         else:
 
@@ -222,6 +232,11 @@ class Model(object):
                 name = "Validation/" + name
             else:
                 name = "Training/" + name
+
+
+            if self.__active_vars__.verbose_summaries is True:
+                name = "Verbose/" + name
+
             if typ == "scalar":
                 tf.summary.scalar(name, data, **kwargs)
             elif typ == "image":
@@ -232,14 +247,15 @@ class Model(object):
                 printt("Invalid summary type", error=True)
     
 
-    def __update_weights__(self, data, summaries=False):
+    def __update_weights__(self, data, summaries=False, verbose_summaries=False):
         self.__active_vars__.summaries = summaries
         n = len(self.__optimisers__)
         self.__tapes__ = [tf.GradientTape() for _ in range(n)]
         with ExitStack() as stack:
             for i, mgr in enumerate(self.__tapes__):
                 self.__tapes__[i] = stack.enter_context(mgr)
-            all_trainable_variables, losses = self.loss_func(data, training=True, summaries=summaries)
+            all_trainable_variables, losses = self.loss_func(data,
+                training=True, summaries=summaries, verbose_summaries=verbose_summaries)
             self.__variables__ = all_trainable_variables # Issue #1.1
             self.__losses__ = losses # Issue #1.1
 

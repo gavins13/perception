@@ -321,10 +321,12 @@ class Execution(object):
                         self.Dataset.train_dataset.enumerate():
                             add_summary = (step+1) % self.Model.__config__.summary_steps
                             add_summary = True if add_summary == 0 else False
+                            verbose_add_summary = (step+1) % self.Model.__config__.verbose_summary_steps
+                            verbose_add_summary = True if verbose_add_summary == 0 else False
                             # Start Timing
                             start_time = time.time()
                             # Execute Model
-                            self.Model.__update_weights__(data_record, summaries=add_summary)
+                            self.Model.__update_weights__(data_record, summaries=add_summary, verbose_summaries=verbose_add_summary)
                             # Print training information and duration
                             print("training epoch: {}".format(epochs+1), end=";")
                             data_split_num = record_number if self.Dataset.system_type.use_generator is False else self.Dataset.current.file
@@ -352,7 +354,7 @@ class Execution(object):
                             if step % self.Model.__config__.validation_steps == 0:
                                 for validation_data_record in self.Dataset.validation_dataset.take(self.Dataset.validation_dataset_length):
                                     self.Model.loss_func(validation_data_record, training=False,
-                                        validation=True, summaries=True)
+                                        validation=True, summaries=True, verbose_summaries=True)
 
 
                             # Save summary of the model
