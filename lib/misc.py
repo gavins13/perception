@@ -13,8 +13,10 @@ with open(os.path.join(
     perception_path, "Config.perception"), "r") as config_file:
         Config = json.load(config_file)
 
-def detect_cmd_arg(arg, retrieve_val=True, val_dtype=str, false_val=None):
+def detect_cmd_arg(arg, retrieve_val=True, val_dtype=str, false_val=False):
     '''
+    NOTE: Prefer this over argparse package since custom 'Perception' functionality will be added later
+
     This will look for the argument 'arg' in the Python command line input and if the retrieve_val is set to True, it will make sure to include an '=' sign in the input and retrieve the corresponding value
 
     If val_dtype is set, it will also perform a conversion on the argument to the specified data type
@@ -36,10 +38,11 @@ def detect_cmd_arg(arg, retrieve_val=True, val_dtype=str, false_val=None):
                 return val
             else:
                 return True
-    if retrieve_val is True:
+    '''if retrieve_val is True:
         return false_val
     else:
-        return False
+        return False'''
+    return false_val
 
 
 
