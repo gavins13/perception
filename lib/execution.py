@@ -386,6 +386,6 @@ class Execution(object):
                                 print("TensorBoard started at {}".format(self.tb_url))
                             else:
                                 self.Model.__forward_pass_model__.save(this_epoch_saved_model_dir)
-                    if epochs >= self.Model.__config__.epochs:
+                    if (epochs >= self.Model.__config__.epochs) and (self.Model.__config__.epochs != -1):
                         train = False
         self.tensorboard_only()
