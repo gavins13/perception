@@ -38,6 +38,14 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
     (optional) tensorboard_only: (bool) Only start TensorBoard (TB)? Default is to start TB with training
     (optional) reset: (bool) train from scratch?
     '''
+
+
+    gpu = detect_cmd_arg("gpu", false_val=gpu, val_dtype=int)
+    tensorboard_only = detect_cmd_arg("tensorboard", retrieve_val=False, false_val=tensorboard_only)
+    tensorboard_only_2 = detect_cmd_arg("tensorboard_only", retrieve_val=False, false_val=tensorboard_only)
+    tensorboard_only = (tensorboard_only or tensorboard_only_2)
+    reset = detect_cmd_arg("reset", retrieve_val=False, false_val=reset)
+
     experiments = ExperimentsManager(experiments_file=experiments_file)
     if tensorboard_only is True:
         gpu = None
