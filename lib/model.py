@@ -230,14 +230,15 @@ class Model(object):
             if 'verbose' in kwargs.keys():
                 del(kwargs['verbose'])
 
+            if 'verbose' in kwargs.keys() and kwargs['verbose'] is True:
+                name = "Verbose/" + name
+                
             if self.__active_vars__.validation is True:
                 name = "Validation/" + name
             else:
                 name = "Training/" + name
 
 
-            if self.__active_vars__.verbose_summaries is True:
-                name = "Verbose/" + name
 
             if typ == "scalar":
                 tf.summary.scalar(name, data, **kwargs)
