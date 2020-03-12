@@ -121,23 +121,25 @@ class Execution(object):
 
         # Saving section
         save_folder = None if not(('save_folder' in kwargs.keys()) and\
-            (isinstance(kwargs['save_folder'], str))) else kwargs['save_folder']
+            (isinstance(kwargs['save_folder'], str) is True)) else kwargs['save_folder']
+        printt("Execution: Save folder: {}".format(save_folder), info=True)
         # Check for reset flag
-        if 'reset' in kwargs.keys() and kwargs['reset'] is True:
+        if ('reset' in kwargs.keys()) and (kwargs['reset'] is True):
             save_folder = None
             if 'experiments_manager' in kwargs.keys():
                 ExperimentsManager = kwargs['experiments_manager']
             else:
                 ExperimentsManager = Experiments()
         # Create the save folder name from the experiment name above
-        if(save_folder==None):
+        if(save_folder is None):
             self.save_directory_name = self.experiment_name + '_' + datetimestr
             self.save_directory = os.path.join(perception_save_path,
                 self.save_directory_name)
+            printt("New save folder created: {}".format(self.save_directory_name), info=True)
         else:
             self.save_directory_name = save_folder
             self.save_directory = os.path.join(perception_save_path, save_folder)
-            printt("Load Dir being used.", info=True)
+            printt("Load Dir being used: {}".format(self.save_directory_name), info=True)
 
         # Create the save folder
         if not(os.path.exists(self.save_directory)):
@@ -149,7 +151,7 @@ class Execution(object):
 
         # If reset, or new folder created for experiment, update the exp.
         # If custom perception_save_path used, update this as well
-        if 'experiment_id' in kwargs.keys() and 'ExperimentsManager' in locals():
+        if ('experiment_id' in kwargs.keys()) and ('ExperimentsManager' in locals()):
             ExperimentsManager[kwargs['experiment_id']] = self.save_directory_name
             if ((
              'perception_save_path' in kwargs.keys() )\
