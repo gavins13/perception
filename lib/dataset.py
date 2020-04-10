@@ -36,6 +36,8 @@ class Dataset():
     model and is purely for the Dataset API (e.g. for restarting training,
     See the skip() method for this class).
 
+    NOTE: cv_fold_number varies from 1 to cv_folds (index doesn't start at 0!).
+
     Generator mode:
     When the generator mode is used, and the generator is specified, remember
     to specify in the inherited 'generator' class a '__config__' method which
@@ -168,7 +170,9 @@ class Dataset():
 
     def skip(self, steps, current_file=None, epoch=None):
         if self.system_type.use_direct is True:
-            self.train_dataset=self.train_dataset.skip(steps)
+            steps_to_restore = int(steps % self.train_dataset_steps)
+            #print(steps_to_restore, steps, self.train_dataset_steps, 'test')
+            self.train_dataset=self.train_dataset.skip(steps_to_restore)
         elif self.system_type.use_generator is True:
             self.generator_skip(steps, current_file=current_file, epoch=epoch)
     def generator_skip(self, steps, current_file, epoch):
@@ -315,7 +319,7 @@ class Dataset():
                 train_ds = []
                 for i in range(self.config.cv_folds):
                     tmp = self.Dataset.shard(self.config.cv_folds, i)
-                    if self.config.cv_fold_number == i:
+                    if self.config.cv_fold_number == i+1:
                         test_ds = tmp
                     else:
                         train_ds.append(tmp)
