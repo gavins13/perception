@@ -15,7 +15,7 @@ then check your pip location and version is correct (it should correspond to the
 ```
 pip --version
 which pip
-pip install tensorflow-addons=0.6
+pip install --no-deps tensorflow-addons==0.6
 ```
 
 ## As a package (optional)
