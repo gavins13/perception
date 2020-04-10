@@ -63,14 +63,16 @@ class Dataset(DatasetBase):
 
     def __process_dataset__(self):
         super().__process_dataset__()
-        patch_positions = [0,30,45,60,75,90, 95]  +  list(range(100, 122, 2)) + [130, 135,150,165,180,194,224]
+        #patch_positions = [0,30,45,60,75,90, 95]  +  list(range(100, 122, 2)) + [130, 135,150,165,180,194,224]
+        patch_positions = [35,30,45,60,75,90, 95]  +  list(range(100, 122, 2)) + [130, 135,150,165,180,194,189]
         patch_size = self.config.patches.size
         init_map  = lambda d, x : d[:,:,:,x:x+patch_size]
         end_map = lambda d: tf.concat([init_map(d, x) for x in patch_positions], axis=0)
         self.train_dataset = self.train_dataset.flat_map(lambda x: tf.data.Dataset.from_tensor_slices(end_map(x)))
         self.train_dataset = self.train_dataset.shuffle(self.train_dataset_length * len(patch_positions), seed=1114)
+        self.train_dataset = self.train_dataset.batch(self.config.batch_size)
         #self.train_dataset = self.train_dataset.map(end_map)
-        self.train_dataset_length = self.train_dataset_length * len(patch_positions)
+        self.train_dataset_length = int(self.train_dataset_length * len(patch_positions))
         self.set_dataset_steps()
 
 
