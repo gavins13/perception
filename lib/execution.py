@@ -18,7 +18,7 @@ with open(os.path.join(
     "Config.perception"
   ), "r") as config_file:
     Config = json.load(config_file)
-from .misc import printt
+from .misc import printt, Logger
 
 from contextlib import ExitStack
 import sys
@@ -29,9 +29,11 @@ import time
 from tensorboard import program as tb_program
 import numpy as np
 import inspect
+from tabulate import tabulate
+import csv
+
 
 from .experiments import Experiments
-
 
 class Execution(object):
     def __init__(self, *args, **kwargs):
@@ -83,7 +85,11 @@ class Execution(object):
             model_args = {}
             if 'model_args' in kwargs.keys() and kwargs['model_args'] is not None:
                 model_args = kwargs['model_args']
+            if 'debug' in kwargs.keys() and kwargs['debug'] in [True, False]:
+                debug = kwargs['debug']
             kwargs['model'] = kwargs['model'](training=exp_type, **model_args)
+            kwargs['model'].__perception_config__.training = exp_type
+            kwargs['model'].__perception_config__.debug = debug
         if 'model' in kwargs.keys():
             # Use this dataset
             if isinstance(kwargs['model'], Model) is False:
@@ -161,20 +167,26 @@ class Execution(object):
                  kwargs['experiment_id'], 'perception_save_path',
                  kwargs['perception_save_path'])
 
-
-
-
-
-
         '''
         Create summary writer
         '''
+        # Note: the save directory is also created here with `makedirs`
         if not(os.path.exists(os.path.join(self.save_directory, 'summaries'))):
             os.makedirs(os.path.join(self.save_directory, 'summaries'))
         self.summary_writer = tf.summary.create_file_writer(
             os.path.join(self.save_directory, 'summaries'))
         self.summaries_directory = os.path.join(self.save_directory, 'summaries')
 
+        '''
+        Sort out Perception logging
+        '''
+        printt_experiment_log = os.path.join(self.save_directory, 'log.txt')
+        #self.print = lambda *args, **kwargs : printt(*args, **{**kwargs, 'full_file_path': printt_experiment_log if 'full_file_path' not in kwargs.keys() else kwargs['full_file_path']})
+        #globals()['printt'] = self.print
+        #self.Model.print = self.print
+        sys.stdout = Logger(printt_experiment_log)
+        self.metrics_enabled = False if not('metrics_enabled' in kwargs.keys()) else kwargs['metrics_enabled']
+        self.metrics_printing_enabled = True if not('metrics_printing_enabled' in kwargs.keys()) else kwargs['metrics_printing_enabled']
 
         '''
         Create checkpointer and restore
@@ -190,10 +202,12 @@ class Execution(object):
         self.ckpt = tf.train.Checkpoint(**optimisers, **models, step=step_counter, current_file=current_dataset_file_counter, epoch=epoch_counter)
         self.ckpt_manager = tf.train.CheckpointManager(
             self.ckpt, checkpoint_dir, max_to_keep=3)
-        self.ckpt.restore(self.ckpt_manager.latest_checkpoint)
+        status = self.ckpt.restore(self.ckpt_manager.latest_checkpoint)
         if self.ckpt_manager.latest_checkpoint is not None:
             printt("Restored from {}".format(self.ckpt_manager.latest_checkpoint),
                 info=True)
+            #status.assert_consumed()
+            #status.assert_existing_objects_matched()
         else:
             printt("Initializing from scratch.", debug=True)
         self.Model.__active_vars__.step = step_counter
@@ -213,6 +227,12 @@ class Execution(object):
             os.makedirs(os.path.join(self.save_directory, 'analysis'))
         self.analysis_directory = os.path.join(self.save_directory, 'analysis')
         self.Model.__analysis_directory__ = self.analysis_directory
+
+        '''
+        Some model information
+        '''
+        self.gradient_taping = ('gradient_taping' in kwargs.keys()) and\
+            (kwargs['gradient_taping'] is True)
 
         '''
         Start training?
@@ -311,11 +331,23 @@ class Execution(object):
         predict_for_input_signature_bug_run = False
         #self.Dataset.train_dataset=self.Dataset.train_dataset.skip(step)
         self.Dataset.skip(step, current_file=int(self.ckpt.current_file), epoch=int(self.ckpt.epoch))
+
+        '''
+        Metrics (and printing) enabled?
+        '''
+        if self.metrics_enabled is not True:
+            tf.keras.Model.add_metric = lambda *args, **kwargs : None
+            tf.keras.layers.Layer.add_metric = lambda *args, **kwargs : None
+        else:
+            metrics_filename = os.path.join(self.save_directory, "metrics.csv")
+            metrics_file_ = open(metrics_filename, 'a')
+            metrics_file = csv.writer(metrics_file_)
         '''
         Start Tensorboard
         '''
         self.tensorboard()
 
+        print(int(self.ckpt.current_file), int(self.ckpt.epoch), step)
         with self.summary_writer.as_default():
             with tf.summary.record_if(True):
                 while train is True: # Trains across epochs, NOT steps
@@ -328,7 +360,18 @@ class Execution(object):
                             # Start Timing
                             start_time = time.time()
                             # Execute Model
-                            self.Model.__update_weights__(data_record, summaries=add_summary, verbose_summaries=verbose_add_summary)
+                            metrics = self.Model.__update_weights__(data_record, summaries=add_summary, verbose_summaries=verbose_add_summary, gradients=self.gradient_taping)
+                            # Print metrics if enabled
+                            if self.metrics_enabled is True:
+                                if self.metrics_printing_enabled is True:
+                                    print("")
+                                    #print(tabulate([metrics.values()], headers=metrics.keys()))
+                                    print(tabulate(metrics.items(), headers=['Metric', 'Value']))
+                                if step == 1:
+                                    metrics_file.writerow(metrics.keys())
+                                metrics_file.writerow(list(metrics.values()))
+                                if add_summary is True:
+                                    metrics_file_.flush()
                             # Print training information and duration
                             print("training epoch: {}".format(epochs+1), end=";")
                             data_split_num = record_number if self.Dataset.system_type.use_generator is False else self.Dataset.current.file
@@ -337,8 +380,21 @@ class Execution(object):
                                 data_split_num+1,
                                 data_split_num_total), end=";")
                             print("step: %d / %d" % (step,self.Dataset.train_dataset_steps), end=";")
+
+
+                          # Validation
+                            if step % self.Model.__config__.validation_steps == 0:
+                                for validation_data_record in self.Dataset.validation_dataset.take(self.Dataset.validation_dataset_length):
+                                    self.Model.loss_func(validation_data_record, training=False,
+                                        validation=True, summaries=True, verbose_summaries=True,
+                                        step=tf.convert_to_tensor(self.Model.__active_vars__.step, dtype=tf.int64)
+                                    )
+
+                            # Stop Timing
                             duration = time.time() - start_time
                             print("time: %.3f" % duration, end=";")
+
+
                             # Checkpointing
                             if step %\
                              self.Model.__config__.checkpoint_steps == 0:
@@ -352,19 +408,16 @@ class Execution(object):
                                 sys.stdout.write("\033[K")
                             print("", end="\r")
 
-                            # Validation
-                            if step % self.Model.__config__.validation_steps == 0:
-                                for validation_data_record in self.Dataset.validation_dataset.take(self.Dataset.validation_dataset_length):
-                                    self.Model.loss_func(validation_data_record, training=False,
-                                        validation=True, summaries=True, verbose_summaries=True)
+
 
 
                             # Save summary of the model
-                            if step == 1:
+                            if (step == 1) or ((step+1) == self.Model.__config__.summary_steps):
                                 self.Model.__forward_pass_model__.summary(print_fn=self.logging)
                                 for optimisers_models in self.Model.__optimisers_models__:
-                                    for model in optimisers_models['models']:
-                                        model.summary(print_fn=self.logging)
+                                    #for model in optimisers_models['models']:
+                                        #model.summary(print_fn=self.logging)
+                                    _get_summary(optimisers_models['models'], self.logging)
 
                             # Increment to next step
                             step += 1
@@ -380,10 +433,14 @@ class Execution(object):
                             os.makedirs(os.path.join(self.saved_model_directory, 'epoch_'+str(epochs)))
                         this_epoch_saved_model_dir = os.path.join(self.saved_model_directory, 'epoch_'+str(epochs))
                         saving_enabled = False if tf.__version__ == '2.0.0' else True
+                        saving_enabled = False # [CHECK] []
                         if saving_enabled is True:
                             if predict_for_input_signature_bug_run is False:
                                 _ = self.Model.__forward_pass_model__.predict(data_record)
-                                self.Model.__forward_pass_model__.save(this_epoch_saved_model_dir)
+                                '''
+                                Note: You may run into
+                                '''
+                                self.Model.__forward_pass_model__.save(this_epoch_saved_model_dir+'.tf')
                                 predict_for_input_signature_bug_run = True
                                 print("TensorBoard started at {}".format(self.tb_url))
                             else:
@@ -391,3 +448,12 @@ class Execution(object):
                     if (epochs >= self.Model.__config__.epochs) and (self.Model.__config__.epochs != -1):
                         train = False
         self.tensorboard_only()
+
+def _get_summary(models, logging):
+    for model in models:
+        if isinstance(model, tf.keras.Model) is True:
+            model.summary(print_fn=logging)
+            if hasattr(model, 'models') is True and (isinstance(model.models, list) or isinstance(model.models, tuple)):
+                _get_summary(model.models, logging)
+        elif (isinstance(model, list) or isinstance(model, tuple)):
+            _get_summary(model, logging)

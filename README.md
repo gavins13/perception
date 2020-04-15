@@ -7,7 +7,7 @@
 ## Dependencies (with Anaconda)
 Install the following dependencies with Anaconda:
 ```
-conda install python=3.7 tensorflow-gpu=2.0 matplotlib imageio=2.4.1=py37_0 ipython requests scipy pillow jupyter pandas
+conda install python=3.7 tensorflow-gpu=2.0 matplotlib imageio=2.4.1=py37_0 ipython requests scipy pillow jupyter pandas tabulate
 conda install -c conda-forge nibabel scikit-image moviepy tensorflow-probability
 ```
 
