@@ -1,8 +1,6 @@
 import tensorflow as tf
 from .misc import printt
-from contextlib import ExitStack
-from .summaries import video_summary
-
+from ._model import __Model__
 '''
 Model
 
@@ -22,12 +20,12 @@ separate models. This is because whilst the generator-discrimator can be
 trained singularly, the discriminator needs to also be trained separately to
 discriminate the real images. Hence, two optimisers are needed. One operates on
 the two models (the generator + discriminator) whereas the second optimiser
-operates only on the discriminator. Also, state which loss function to use - 
+operates only on the discriminator. Also, state which loss function to use -
 Note: the loss function receives the output of the last model call.
 
 Step 2:
 Define Models (e.g. CustomModel) just as with Keras and define loss functions
-(e.g. loss_function). When adding summaries with the loss_function, be sure to 
+(e.g. loss_function). When adding summaries with the loss_function, be sure to
 use add_summary() function
 
 Step 3:
@@ -36,17 +34,24 @@ for validation, summaries, etc...)
 
 Step 4:
 Define analyse(diagnostics, idx, save_dir)
+
+NOTE: within your tf.keras.Model class, if you are going to intialise another
+tf.keras.Model, then please append the end result to tf.keras.Model attribute
+called self.models. This will allow accurate .summary()s to be produced.
 '''
 
-class Model(object):
+class Model(__Model__):
     '''
-    __init__: sets up the optimizers, learning rate, hyperparameters
+    This is an abstract interface class
+    __init__: sets up the hyperparameters, summary frequency, etc...
     '''
-    def __init__(self, training=None, **kwargs):
-        self.__tapes__ = None
-        self.__losses__ = None # This is an active variable; (delete?) Issue #1.1
-        self.__variables__ = None # This is an active variable; (delete?) Issue #1.1
-        self.__optimisers__ = None
+    def __init__(self, **kwargs):
+        '''
+        Always start by calling super() initialisation and for logging,
+        also declare `globals()['print'] = self.print`
+        '''
+        super().__init__(**kwargs)
+        self.__gradient_taping__ = None # If None or False, assume Keras API used. If None, it will use the `gradients` argument passed to __update_weights__
 
         class Config: pass
         self.__config__ = Config()
@@ -56,28 +61,7 @@ class Model(object):
         self.__config__.verbose_summary_steps = 40
         self.__config__.epochs = 300
         self.__config__.saved_model_epochs = 1
-
-
-        self.__keras_models__ = None # Typically this should describe the forward pass also
-        self.__forward_pass_model__ = None # Ideally, should be concatentation
-                                           # of __keras_models__
-
-        self.__active_vars__ = Config()
-        self.__active_vars__.summaries = False
-        self.__active_vars__.verbose_summaries = False
-        self.__active_vars__.training = False
-        self.__active_vars__.validation = False
-        self.__active_vars__.testing = False
-        self.__active_vars__.return_weights = False
-        self.__active_vars__.step = None
-        
-        self.__analysis_directory__ = None
-
-        self.__analysis__ = Config()
-        self.__analysis__.__active_vars__ = Config()
-
-    def __get_step__(self):
-        return self.__active_vars__.step
+        self.__config__.print_training_metrics = False
 
     class CustomModel(tf.keras.Model):
         '''
@@ -89,13 +73,12 @@ class Model(object):
 
     def create_models(self):
         '''
-        Create all keras models required and append them self.__kereas_models__
-        See example below
+        Create all keras models required and append them to the dictionary
+        `__optimiser_models__`
         This is called during the Execution intialisation
         '''
-        self.__keras_models__ = []
-        self.__keras_models__.append(self.CustomModel())
-        self.__forward_pass_model__ = self.__keras_models__[0]
+        __keras_model__ = self.CustomModel()
+        self.__forward_pass_model__ = __keras_model__
         self.__optimisers__ = []
         self.__optimisers__.append(tf.keras.optimizers.Adam(5.e-5))
 
@@ -104,29 +87,46 @@ class Model(object):
         '''
         self.__optimiser_models__ = []
         self.__optimiser_models__.append({
-            'models': self.__keras_models___,
+            'models': __keras_model___,
             'loss_function': self.loss_function
             })
         pass
 
     def loss_function(self, results, pass_number=None):
         '''
-        Literally just return loss. If parts used to calculate the loss
-        are useful for the analyse() function, then please store in the 
+        Literally just return single scalar loss. Please log summaries in this
+        function using the perception self.add_summary() method. Do not use
+        TensorFlow summaries directly without understanding the consequences.
+        Note: do not invoke within Keras models if using the Keras API (i.e.
+        perception gradient_taping is False and debug is False).
+
+        If there are parts to the loss_function that are useful for the testing
+        then, please call the loss_function in the forward_pass_model which
+        can be defined in a custom way.
+
+        Note: since debug is False by default, the loss_func will run as a
+        graph.
+
+        If parts used to calculate the loss
+        are useful for the analyse() function, then please store in the
         active variable self.__analysis__.__active_vars__ and remember,
         that there is access to the variable self.__active_vars__.testing
         to tell the model is the model is in testing mode or not
         '''
         pass
-        # For example
-        self = args[0]
-        results = args[1]
+
 
     def analyse(self, diagnostics, idx, save_dir):
         '''
         Save all diagnostics to a pickle.
-        Note: diagnostics has the same nested structure as the variable
+        Note: diagnostics has the same nested structure as
         self.__optimiser_models__ containing the network outputs for each
+
+        If there are parts to the loss_function that are useful for the testing
+        then, please call the loss_function in the forward_pass_model which
+        can be defined in a custom way. I.e. include an `analysis` argument
+        which allows the function to return not only a scalar but instead a
+        list of useful Tensors
         '''
         with open(save_dir + 'individual_pkle/' + str(idx) + '.p', 'wb') as handle:
             pickle.dump(diagnostics, handle)
@@ -138,7 +138,7 @@ class Model(object):
         ground_truth_path = os.path.join(save_dir, 'ground_truth')
         if not(os.path.exists(ground_truth_path)):
             os.makedirs(ground_truth_path)
-    
+
     def analysis_complete(self):
         '''
         This runs at the end of testing. Usually it involves working with a
@@ -147,126 +147,3 @@ class Model(object):
         self.__analysis__.__active_vars__
         '''
         pass
-
-    '''
-    Mild modification perhaps neccessary
-    '''
-    def loss_func(self, data, training=False, return_weights=False, validation=False,
-        summaries=False, verbose_summaries=False):
-        testing = True if (training is False and validation is False) else False
-
-        '''
-        Remember to run summary functions here
-        '''
-        self.__active_vars__.summaries = summaries
-        self.__active_vars__.verbose_summaries = verbose_summaries
-        self.__active_vars__.training = training
-        self.__active_vars__.validation = validation
-        self.__active_vars__.testing = testing
-        self.__active_vars__.return_weights = return_weights
-
-        all_trainable_variables = []
-        losses = []
-        optimisers_diagnostics = []
-        for i, models in enumerate(self.__optimisers_models__):
-            '''
-            Pass number below isn't a solid concept. But for example,
-            pass_number = 0 could represent training a generator-discriminator
-            whereas pass_number = 1 could represent training just the
-            discriminator
-            '''
-            this_optimisers_diagnostics = []
-            this_optimiser_trainable_variables = []
-            results = data
-            for model in models["models"]:
-                results = model(results, training=training, pass_number=i)
-                this_optimiser_trainable_variables += model.trainable_variables
-                this_optimisers_diagnostics.append(results)
-
-            all_trainable_variables.append(this_optimiser_trainable_variables)
-            loss = models['loss_function'](results, pass_number=i)
-            losses.append(loss)
-            optimisers_diagnostics.append(this_optimisers_diagnostics)
-
-        if training is True:
-            return all_trainable_variables, losses
-        else:
-            if testing is True:
-                return optimisers_diagnostics, losses
-    '''
-    No modification required
-    '''
-
-    def add_summary(self, name, data, **kwargs):
-        '''
-        type: string from 'scalar', 'video', 'image'
-        '''
-        if 'type' not in kwargs.keys():
-            printt("type not valid", error=True, stop=True)
-        else:
-            typ = kwargs['type']
-        del(kwargs['type'])
-        kwargs['step'] = self.__active_vars__.step
-        if not(
-          (self.__active_vars__.summaries is True and \
-            not('verbose' in kwargs.keys() and kwargs['verbose'] is True)
-          ) or (
-            ('verbose' in kwargs.keys() and kwargs['verbose'] is True)\
-              and self.__active_vars__.verbose_summaries is True
-          )
-        ):
-            return
-        else:
-
-            if 'normalise' in kwargs.keys():
-                if kwargs['normalise'] is True:
-                    data = tf.math.real(data)
-                    max_val = tf.reduce_max(data)
-                    min_val = tf.reduce_min(data)
-                    val_range = max_val - min_val
-                    data = (data - min_val)/val_range
-                    #data = data/max_val
-                del(kwargs['normalise'])
-            if 'verbose' in kwargs.keys():
-                del(kwargs['verbose'])
-
-            if 'verbose' in kwargs.keys() and kwargs['verbose'] is True:
-                name = "Verbose/" + name
-                
-            if self.__active_vars__.validation is True:
-                name = "Validation/" + name
-            else:
-                name = "Training/" + name
-
-
-
-            if typ == "scalar":
-                tf.summary.scalar(name, data, **kwargs)
-            elif typ == "image":
-                tf.summary.image(name, data, **kwargs)
-            elif typ == "video" or typ == "gif":
-                video_summary(name, data, **kwargs)
-            else:
-                printt("Invalid summary type", error=True)
-    
-
-    def __update_weights__(self, data, summaries=False, verbose_summaries=False):
-        self.__active_vars__.summaries = summaries
-        n = len(self.__optimisers__)
-        self.__tapes__ = [tf.GradientTape() for _ in range(n)]
-        with ExitStack() as stack:
-            for i, mgr in enumerate(self.__tapes__):
-                self.__tapes__[i] = stack.enter_context(mgr)
-            all_trainable_variables, losses = self.loss_func(data,
-                training=True, summaries=summaries, verbose_summaries=verbose_summaries)
-            self.__variables__ = all_trainable_variables # Issue #1.1
-            self.__losses__ = losses # Issue #1.1
-
-            for i, [tape, loss, optimiser_trainable_variables, optimiser] in enumerate(
-                zip(self.__tapes__,
-                    self.__losses__,
-                    self.__variables__,
-                    self.__optimisers__)):
-                grads = tape.gradient(loss, optimiser_trainable_variables)
-                optimiser.apply_gradients(zip(grads, optimiser_trainable_variables))
-
