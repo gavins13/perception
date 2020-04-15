@@ -3,7 +3,7 @@ import operator
 import os
 import traceback
 import sys
-
+from datetime import datetime
 import json
 
 perception_path =os.path.join(
@@ -34,7 +34,7 @@ def detect_cmd_arg(arg, retrieve_val=True, val_dtype=str, false_val=False):
             if retrieve_val is True:
                 val = this_arg.split(arg)
                 val = val_dtype(val[1])
-                printt(arg + " CMD ARG DETECTED", info=True)
+                printt(arg + " CMD ARG DETECTED: {}".format(val), info=True)
                 return val
             else:
                 return True
@@ -60,10 +60,10 @@ def printt(val, warning=False, error=False, execution=False, info=False,
         else:
             error_level = config_error_level
         for_print = None
-        if (warning is True) and (error_level > 0):
-            for_print = "WARNING: {0}".format(val)
-        elif (error is True) and (error_level > 1):
+        if (error is True) and (error_level > 0):
             for_print = "ERROR: {0}".format(val)
+        elif (warning is True) and (error_level > 1):
+            for_print = "WARNING: {0}".format(val)
         elif (info is True) and (error_level > 2):
             for_print = "INFO: {0}".format(val)
         elif (debug is True) and (error_level > 3):
@@ -83,9 +83,48 @@ def printt(val, warning=False, error=False, execution=False, info=False,
 
         if stop is True:
             print("Stopped execution.")
-            traceback.print_exc()
+            traceback.print_last()
             raise SystemExit
 
 def path(fullpath, needle="**__path__**"):
     fullpath = fullpath.replace(needle, perception_path)
     return fullpath
+
+
+flush_on_count = Config["log_flush_count"]
+flush_on_count = detect_cmd_arg("log_flush_count",
+    retrieve_val=True, val_dtype=int, false_val=flush_on_count)
+flush_on_count = detect_cmd_arg("flush_count",
+    retrieve_val=True, val_dtype=int, false_val=flush_on_count)
+flush_on_count = detect_cmd_arg("lfc",
+    retrieve_val=True, val_dtype=int, false_val=flush_on_count)
+class Logger(object):
+    def __init__(self, path):
+        self.terminal = sys.stdout
+        self.log = open(path, "a")
+        self.flush_on_count = flush_on_count # Number of lines before appending to file
+        self.flush_counter = 0
+
+    def write(self, message):
+        self.terminal.write(message)
+        #self.terminal.flush()
+        null_messages = [";", "\r"]
+        if message == "\n":
+            self.log.write(message)
+        else:
+            datetimestr = str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            datetimestr = datetimestr.replace(" ", "_")
+            if message not in null_messages:
+                self.log.write(datetimestr + ': ' + message)
+            if self.flush_counter+1 == self.flush_on_count:
+                self.log.flush()
+                self.flush_counter = 0
+            else:
+                self.flush_counter += 1
+
+
+    def flush(self):
+        #this flush method is needed for python 3 compatibility.
+        #this handles the flush command by doing nothing.
+        #you might want to specify some extra behavior here.
+        pass
