@@ -13,7 +13,7 @@ import tensorflow as tf
 def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
   tensorboard_only=False, reset=False, experiments_file=None, debug_level=None,
   gradient_taping=False, debug=False, command_line_arguments_enabled=True,
-  metrics_enabled=False, metrics_printing_enabled=False):
+  metrics_enabled=False, metrics_printing_enabled=False, save_only=False):
     '''
     experiment_id: (str) experiment_id from the JSON files
     experiment_type: (str) 'train' or 'test'. Default: 'test'
@@ -49,6 +49,9 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         metrics_enabled = detect_cmd_arg("metrics", retrieve_val=False, false_val=metrics_enabled)
         metrics_printing_enabled = detect_cmd_arg("metrics_printing_enabled", retrieve_val=False, false_val=metrics_printing_enabled)
         metrics_printing_enabled = detect_cmd_arg("metrics_printing", retrieve_val=False, false_val=metrics_printing_enabled)
+        save_only = detect_cmd_arg("save", retrieve_val=False, false_val=save_only)
+        save_only_2 = detect_cmd_arg("save_only", retrieve_val=False, false_val=save_only)
+        save_only = (save_only or save_only_2)
 
 
 
@@ -57,6 +60,10 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         gpu = None
         reset = False
         printt("Only Tensorboard starting", info=True)
+
+    if save_only is True:
+        reset = False
+        printt("Only saving the model", info=True)
 
     if debug_level is not None:
         if not(isinstance(debug_level, int)):
@@ -161,4 +168,4 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         reset=reset, perception_save_path=save_path,
         experiments_manager=experiments, gradient_taping=gradient_taping,
         debug=debug, metrics_enabled=metrics_enabled,
-        metrics_printing_enabled=metrics_printing_enabled)
+        metrics_printing_enabled=metrics_printing_enabled, save_only=save_only)

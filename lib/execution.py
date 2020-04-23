@@ -235,6 +235,13 @@ class Execution(object):
             (kwargs['gradient_taping'] is True)
 
         '''
+        Saving the model only?
+        '''
+        if 'save_only' in kwargs.keys() and kwargs['save_only'] is True:
+            printt("Start saving...", info=True)
+            self.__call__func = self.save_only
+
+        '''
         Start training?
         '''
         self.tb_url = None
@@ -429,27 +436,52 @@ class Execution(object):
 
                     epochs += 1
                     if epochs % self.Model.__config__.saved_model_epochs == 0:
-                        if not(os.path.exists(os.path.join(self.saved_model_directory, 'epoch_'+str(epochs)))):
-                            os.makedirs(os.path.join(self.saved_model_directory, 'epoch_'+str(epochs)))
                         this_epoch_saved_model_dir = os.path.join(self.saved_model_directory, 'epoch_'+str(epochs))
-                        saving_enabled = False if tf.__version__ == '2.0.0' else True
-                        saving_enabled = False # [CHECK] []
+                        if not(os.path.exists(this_epoch_saved_model_dir)):
+                            os.makedirs(this_epoch_saved_model_dir)
+                        saving_enabled = False if (tf.__version__ == '2.0.0') else True
+                        saving_enabled = False if (self.gradient_taping == True) else saving_enabled
+                        #saving_enabled = False # [CHECK] []
                         if saving_enabled is True:
-                            if predict_for_input_signature_bug_run is False:
-                                _ = self.Model.__forward_pass_model__.predict(data_record)
-                                '''
-                                Note: You may run into
-                                '''
-                                self.Model.__forward_pass_model__.save(this_epoch_saved_model_dir+'.tf')
-                                predict_for_input_signature_bug_run = True
-                                print("TensorBoard started at {}".format(self.tb_url))
-                            else:
-                                self.Model.__forward_pass_model__.save(this_epoch_saved_model_dir)
+                            self.Model.save(this_epoch_saved_model_dir)
+                            print("TensorBoard started at {}".format(self.tb_url))
                     if (epochs >= self.Model.__config__.epochs) and (self.Model.__config__.epochs != -1):
                         train = False
         self.tensorboard_only()
 
-def _get_summary(models, logging):
+    def save_only(self):
+        '''
+        Load epoch number
+        '''
+        #epochs = 0
+        #step=0
+        epochs = int(self.ckpt.epoch)
+        step=int(self.ckpt.step) # Starts on 1
+        self.Dataset.skip(step, current_file=int(self.ckpt.current_file), epoch=int(self.ckpt.epoch))
+        print("Current File: {} \nEpoch: {} \nStep: {} \n".format(int(self.ckpt.current_file), int(self.ckpt.epoch), step))
+        '''
+        Run one training iteration, without weight updates
+        '''
+        with self.summary_writer.as_default():
+            for record_number, data_record in\
+                self.Dataset.train_dataset.take(1).enumerate():
+                    # Execute Model
+                    metrics = self.Model.__update_weights__(data_record, gradients=self.gradient_taping, _no_training_updates=True)
+        '''
+        Save the model at the epoch number loaded
+        '''
+        this_epoch_saved_model_dir = os.path.join(self.saved_model_directory, 'epoch_'+str(epochs))
+        if not(os.path.exists(this_epoch_saved_model_dir)):
+            os.makedirs(this_epoch_saved_model_dir)
+        saving_enabled = False if (tf.__version__ == '2.0.0') else True
+        saving_enabled = False if (self.gradient_taping == True) else saving_enabled
+        #saving_enabled = False # [CHECK] []
+        if saving_enabled is True:
+            self.Model.save(this_epoch_saved_model_dir)#, data=data_record)
+        else:
+            printt("TF must be > 2.0 and GradientTaping must be off", stop=True, error=True)
+        print("Model saved to: {}".format(this_epoch_saved_model_dir))
+        return
     for model in models:
         if isinstance(model, tf.keras.Model) is True:
             model.summary(print_fn=logging)

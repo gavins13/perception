@@ -6,6 +6,8 @@ import copy
 import sys
 from tensorflow.python.keras.engine import training_utils
 from tensorflow.python.keras import backend as K
+import time
+import os
 
 class __Model__(object):
     def __init__(self, **kwargs):
@@ -32,6 +34,11 @@ class __Model__(object):
                                            # being used. Hence built=True indicates Keras
                                            # is being used. But please use
                                            # self.__gradient_taping__ instead.
+                                           # If built=True, the model has compiled,
+                                           # train functions have been made (soon to also
+                                           # include test, validation functions) and
+                                           # a forward pass through the model has been made
+        self.__active_vars__.saving_intialised = False
 
         self.__analysis__ = Config()
         self.__analysis__.__active_vars__ = Config()
@@ -267,6 +274,58 @@ class __Model__(object):
             loss = self.loss_function(data)
             self.add_loss(loss, inputs=True)
             return data
+
+
+    def save(self, path, data=None, initialised=True):
+        printt("Saving Temporarily disabled.", info=True)
+        return
+        '''
+        TEMPORARILY DISABLED
+
+        This function will save the TensorFlow models so that they can be
+        reloaded for deployment/simple access purposes.
+
+        In the case where Keras is being used, if the active variable `built`
+        is `True` then the model is ready for saving and active variable
+        `saving_initialised` can be set to True. If not, then a forward pass
+        needs to be made using `data` through the compiled Keras model in
+        `__optimiser_models__` using the __forward_pass__ method with the
+        argument `training` set to `False` (although it should not matter since
+        the conditioning introduced by the training argument creates conditional
+        branches which are also saved). Remember to also loop through the
+        old models in `__optimisers_models__old__`.
+
+        In the case where the GradientTaping method is used, raise a
+        NotImplementedError().
+        '''
+        start_time = time.time()
+        for i, models in enumerate(self.__optimisers_models__):
+            print("Saving Optimised Model {}".format(i))
+            if self.__active_vars__.saving_intialised is False:
+                #self.__forward_pass__(data, training=False)
+                if self.__active_vars__.built is True:
+                    self.__active_vars__.saving_intialised = True
+                else:
+                    if data is None:
+                        printt("Model needs building. Please provide data.", stop=True, error=True)
+                    self.__build__(data)
+                    #printt("Saving not implemented for gradient taping method", error=True, stop=True)
+            file_format = '.tf'
+            for j, model in enumerate(models["models"]):
+                print("Saving combined submodel {}".format(j))
+                this_filename = str(i) + "_" + str(j) + "_" + str(model.name)
+                this_filename = os.path.join(path, this_filename + '' + file_format)
+                #model.predict(data)
+                model.save(this_filename)
+
+            for j, model in enumerate(self.__optimisers_models__old__[i]["models"]):
+                print("Saving submodel {}".format(j))
+                this_filename = "_" + str(i) + "_" + str(j) + "_" + str(model.name)
+                this_filename = os.path.join(path, this_filename + '' + file_format)
+                model.save(this_filename)
+        duration = time.time() - start_time
+        printt("Model Saved. Time taken: {:.3f}".format(duration), info=True)
+        return
 
     '''
     Mild modification perhaps neccessary
