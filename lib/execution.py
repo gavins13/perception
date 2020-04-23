@@ -187,6 +187,7 @@ class Execution(object):
         sys.stdout = Logger(printt_experiment_log)
         self.metrics_enabled = False if not('metrics_enabled' in kwargs.keys()) else kwargs['metrics_enabled']
         self.metrics_printing_enabled = True if not('metrics_printing_enabled' in kwargs.keys()) else kwargs['metrics_printing_enabled']
+        self.print_model_png = False if not('print_model_png' in kwargs.keys()) else kwargs['print_model_png'] # [] should be True
 
         '''
         Create checkpointer and restore
@@ -335,7 +336,6 @@ class Execution(object):
         epochs = int(self.ckpt.epoch)
         step=int(self.ckpt.step) # Starts on 1
         train = True
-        predict_for_input_signature_bug_run = False
         #self.Dataset.train_dataset=self.Dataset.train_dataset.skip(step)
         self.Dataset.skip(step, current_file=int(self.ckpt.current_file), epoch=int(self.ckpt.epoch))
 
@@ -354,7 +354,7 @@ class Execution(object):
         '''
         self.tensorboard()
 
-        print(int(self.ckpt.current_file), int(self.ckpt.epoch), step)
+        print("Current File: {} \nEpoch: {} \nStep: {} \n".format(int(self.ckpt.current_file), int(self.ckpt.epoch), step))
         with self.summary_writer.as_default():
             with tf.summary.record_if(True):
                 while train is True: # Trains across epochs, NOT steps
@@ -377,7 +377,9 @@ class Execution(object):
                                 if step == 1:
                                     metrics_file.writerow(metrics.keys())
                                 metrics_file.writerow(list(metrics.values()))
-                                if add_summary is True:
+                                metrics_steps = int(self.Model.__config__.summary_steps / 10.)+1 # Just so that we get metrics more often
+                                add_metrics_ = (step+1) % metrics_steps
+                                if add_summary is True or add_metrics_ is True:
                                     metrics_file_.flush()
                             # Print training information and duration
                             print("training epoch: {}".format(epochs+1), end=";")
@@ -389,13 +391,15 @@ class Execution(object):
                             print("step: %d / %d" % (step,self.Dataset.train_dataset_steps), end=";")
 
 
-                          # Validation
+                            # Validation
                             if step % self.Model.__config__.validation_steps == 0:
                                 for validation_data_record in self.Dataset.validation_dataset.take(self.Dataset.validation_dataset_length):
                                     self.Model.loss_func(validation_data_record, training=False,
                                         validation=True, summaries=True, verbose_summaries=True,
                                         step=tf.convert_to_tensor(self.Model.__active_vars__.step, dtype=tf.int64)
                                     )
+                                duration = time.time() - start_time
+                                print("Validation time: %.3f" % duration)
 
                             # Stop Timing
                             duration = time.time() - start_time
@@ -419,12 +423,12 @@ class Execution(object):
 
 
                             # Save summary of the model
-                            if (step == 1) or ((step+1) == self.Model.__config__.summary_steps):
+                            if (step == 1): #or ((step+1) == self.Model.__config__.summary_steps):
                                 self.Model.__forward_pass_model__.summary(print_fn=self.logging)
                                 for optimisers_models in self.Model.__optimisers_models__:
                                     #for model in optimisers_models['models']:
                                         #model.summary(print_fn=self.logging)
-                                    _get_summary(optimisers_models['models'], self.logging)
+                                    _get_summary(optimisers_models['models'], self.logging, self.save_directory if self.print_model_png is True else None)
 
                             # Increment to next step
                             step += 1
@@ -482,10 +486,15 @@ class Execution(object):
             printt("TF must be > 2.0 and GradientTaping must be off", stop=True, error=True)
         print("Model saved to: {}".format(this_epoch_saved_model_dir))
         return
+
+def _get_summary(models, logging, dir, i=0):
     for model in models:
         if isinstance(model, tf.keras.Model) is True:
             model.summary(print_fn=logging)
+            if dir is not None:
+                tf.keras.utils.plot_model(model, to_file=os.path.join(dir,"model_"+str(i)+".png"), show_shapes=True, expand_nested=True)
+            i=i+1
             if hasattr(model, 'models') is True and (isinstance(model.models, list) or isinstance(model.models, tuple)):
-                _get_summary(model.models, logging)
+                _get_summary(model.models, logging, dir, i=i)
         elif (isinstance(model, list) or isinstance(model, tuple)):
-            _get_summary(model, logging)
+            _get_summary(model, logging, dir, i=i)
