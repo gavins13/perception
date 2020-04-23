@@ -8,6 +8,7 @@ from tensorflow.python.keras.engine import training_utils
 from tensorflow.python.keras import backend as K
 import time
 import os
+import inspect
 
 class __Model__(object):
     def __init__(self, **kwargs):
@@ -55,6 +56,22 @@ class __Model__(object):
 
     def __get_step__(self):
         return self.__active_vars__.step
+
+    def __finalise__(self):
+        '''
+        Code to run before initialisation of the Keras models during first pass
+        '''
+        for i, models in enumerate(self.__optimisers_models__):
+            models["__validation_flag__"] = [False]*len(models["models"])
+            models["__training_flag__"] = [False]*len(models["models"])
+            for j, model in enumerate(models["models"]):
+                args, varargs, varkw, defaults = inspect.getargspec(model.call)
+                val_flag = True if 'validation' in args else False
+                train_flag = True if 'training' in args else False
+                print(i,j,"training flag, validation flag", train_flag, val_flag)
+                models["__validation_flag__"][j] = val_flag
+                models["__training_flag__"][j] = train_flag
+        pass
 
     def module_arg(self, arg_name, instance_check=None, false_val=None, kwargs=None, force_user=False, convert_type=None):
         kwargs = self.__kwargs__ if kwargs is None else kwargs
@@ -215,13 +232,17 @@ class __Model__(object):
                     optimizer_models["models"] = [
                         self.__model_combiner__(
                             *optimizer_models["models"],
-                            loss_function=optimizer_models["loss_function"]
+                            loss_function=optimizer_models["loss_function"],
+                            validation_flags=optimizer_models["__validation_flag__"],
+                            training_flags=optimizer_models["__training_flag__"]
                         )
                     ]
                     optimizer_models["models"][0].compile(
                         optimizer=optimizer,
                         loss=optimizer_models["keras_loss_functions"] if 'keras_loss_functions' in optimizer_models.keys() else None
                     )
+                    optimizer_models["__validation_flag__"] = [True]
+                    optimizer_models["__training_flag__"] = [True]
                     if tf.__version__ == '2.2.0' or tf.__version__ == '2.2.0-dev20200301':
                         self.__TEMP__trainfunctions.append(optimizer_models["models"][0].make_train_function())
                     elif tf.__version__ == '2.1.0':
@@ -267,10 +288,17 @@ class __Model__(object):
             super().__init__()
             self.models = args
             self.loss_function = kwargs['loss_function']
+            self.validation_flags = kwargs['validation_flags']
+            self.training_flags = kwargs['training_flags']
 
-        def call(self, data, training=False, pass_number=None):
-            for model in self.models:
-                data = model(data, training=training)
+        def call(self, data, training=False, pass_number=None, validation=False):
+            for model, val_flag, train_flag in zip(self.models, self.validation_flags, self.training_flags):
+                dict_ = {}
+                if train_flag is True:
+                    dict_["training"] = training
+                if val_flag is True:
+                    dict_["validation"] = validation
+                data = model(data, **dict_)
             loss = self.loss_function(data)
             self.add_loss(loss, inputs=True)
             return data
@@ -373,8 +401,13 @@ class __Model__(object):
             this_optimisers_diagnostics = []
             this_optimiser_trainable_variables = []
             results = data
-            for model in models["models"]:
-                results = model(results, training=training, pass_number=i)
+            for model, training_flag, validation_flag in zip(models["models"], models["__training_flag__"], models["__validation_flag__"]):
+                dict_ = {}
+                if training_flag is True:
+                    dict_["training"] = training
+                if validation_flag is True:
+                    dict_["validation"] = validation
+                results = model(results, pass_number=i, **dict_)
                 this_optimiser_trainable_variables += model.trainable_variables
                 this_optimisers_diagnostics.append(results)
 

@@ -96,6 +96,7 @@ class Execution(object):
                 printt("Instance check for chosen Model failed.", warning=True)
             self.Model = kwargs['model']
             self.Model.create_models()
+            self.Model.__finalise__()
         else:
             printt(kwargs.keys(), debug=True)
             printt(kwargs['model'], debug=True)
