@@ -261,9 +261,9 @@ class __Model__(object):
             self.models = args
             self.loss_function = kwargs['loss_function']
 
-        def call(self, data, training=True, pass_number=None):
+        def call(self, data, training=False, pass_number=None):
             for model in self.models:
-                data = model(data)
+                data = model(data, training=training)
             loss = self.loss_function(data)
             self.add_loss(loss, inputs=True)
             return data
