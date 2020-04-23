@@ -18,6 +18,31 @@ which pip
 pip install --no-deps tensorflow-addons==0.6
 ```
 
+## Installation Issues
+If issues with tensorflow-addons arises, please ignore the instructions above and install this way:
+```
+... activate conda environment ...
+conda install python=3.7 matplotlib imageio=2.4.1=py37_0 ipython requests scipy pillow jupyter pandas tabulate
+conda install -c conda-forge nibabel scikit-image moviepy
+export CUDA_HOME=/vol/cuda/10.1.105-cudnn7.6.5.32 # Insert your CUDA path
+export PATH=${CUDA_HOME}/bin:$PATH
+export LD_LIBRARY_PATH=${CUDA_HOME}/lib64:$LD_LIBRARY_PATH
+export CPATH=${CUDA_HOME}/include:$CPATH
+which pip # check conda pip is being used
+pip install tensorflow tensorflow-addons tensorflow-probability tensorboard=2.1.0 # May need to select tensorboard 2.1.0
+```
+Test with:
+```
+import tensorflow as tf, numpy as np, tensorflow_addons as tfa
+a = tf.zeros([1,256,256,3])
+b = tfa.image.translate(a, [[5,4]])
+```
+
+You may receive the error 'libnvinfer.so.6' or 'libnvinfer_plugin.so.6' cannot be found regarding TensorRT. This is address here: https://github.com/tensorflow/tensorflow/issues/35968.
+Otherwise, you may downgrade to tensorflow==2.0.0
+
+
+
 ## As a package (optional)
 To install perception as a package, move the directory containing this file to your local python "site-packages" or alternatively
 
