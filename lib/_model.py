@@ -181,7 +181,12 @@ class __Model__(object):
                     grads = tape.gradient(loss, optimiser_trainable_variables)
                     optimiser.apply_gradients(zip(grads, optimiser_trainable_variables))
 
-    def __update_weights__(self, data, summaries=False, verbose_summaries=False, gradients=False):
+    def __build__(self, *args, **kwargs):
+        kwargs = {**kwargs, _no_training_updates: True}
+        _ = self.__update_weights__(self, *args, **kwargs)
+        return
+
+    def __update_weights__(self, data, summaries=False, verbose_summaries=False, gradients=False, _no_training_updates=False):
         gradients = self.__gradient_taping__ if self.__gradient_taping__ is not None else gradients
         if gradients is True:
             '''
@@ -210,7 +215,7 @@ class __Model__(object):
                         optimizer=optimizer,
                         loss=optimizer_models["keras_loss_functions"] if 'keras_loss_functions' in optimizer_models.keys() else None
                     )
-                    if tf.__version__ == '2.2.0':
+                    if tf.__version__ == '2.2.0' or tf.__version__ == '2.2.0-dev20200301':
                         self.__TEMP__trainfunctions.append(optimizer_models["models"][0].make_train_function())
                     elif tf.__version__ == '2.1.0':
                         _,_,sampleweights_none = optimizer_models["models"][0]._standardize_user_data(
@@ -225,8 +230,10 @@ class __Model__(object):
                     self.__optimisers_models__old__.append(optimizer_models_old)
                 self.__active_vars__.built = True
 
+            if _no_training_updates == True:
+                return {}
             for i, optimizer_models in enumerate(self.__optimisers_models__):
-                if tf.__version__ == '2.2.0' or tf.__version__ == '2.1.0':
+                if tf.__version__ == '2.2.0' or tf.__version__ == '2.1.0' or tf.__version__ == '2.2.0-dev20200301':
                     if tf.__version__ == '2.1.0':
                         original_data = data
                         data,data_y_None,data_sampleweights_None = optimizer_models["models"][0]._standardize_user_data(
