@@ -273,7 +273,7 @@ class __Model__(object):
     '''
 
     def _loss_func(self, data, training=False, return_weights=False, validation=False,
-        summaries=False, verbose_summaries=False, **kwargs):
+        summaries=False, verbose_summaries=False, step=None, **kwargs):
         '''
         This function makes the appropriate __call__ of all required models,
         before then passing through the loss functions specified.
@@ -297,7 +297,7 @@ class __Model__(object):
         self.__active_vars__.return_weights = return_weights
         if not(self.__gradient_taping__ is True):
             # Using Keras API:
-            self.__active_vars__.step = kwargs['step']
+            self.__active_vars__.step = step #kwargs['step']
 
         __optimisers_models__ = self.__optimisers_models__ if self.__gradient_taping__ is True else self.__optimisers_models__old__
 
