@@ -265,7 +265,7 @@ class __Model__(object):
             for model in self.models:
                 data = model(data)
             loss = self.loss_function(data)
-            self.add_loss(loss)
+            self.add_loss(loss, inputs=True)
             return data
 
     '''
