@@ -26,3 +26,5 @@ for features, labels in dataset:
  * Issue #3.1: When using a generator for the dataset, the TF Dataset API function .skip() does not work. Hence, this method needs to be specified in the Perception Dataset API
 
  * Issue #4.1: 'image' summaries do not work. Please use GIF summaries instead. (see https://github.com/tensorflow/tensorflow/issues/28007 - Issue due to using tf.summary.image within tf.function; tf.function encapsulates the entire loss when perception debug flag is set to False.)
+
+* Issue #4.2: Do not use the '\' character for multiline Python code. AutoGraph fails with this character for some reason.
