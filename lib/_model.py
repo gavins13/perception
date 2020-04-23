@@ -151,13 +151,16 @@ class __Model__(object):
                 return
 
 
-    def __forward_pass__(self, data, summaries=False, verbose_summaries=False, gradient_update=False):
+    def __forward_pass__(self, data, summaries=False, verbose_summaries=False, gradient_update=False, training=None):
         '''
-        If `gradient_update' is True, the weights will be updated using the GradientTaping method
+        If `gradient_update' is True, the weights will be updated using the GradientTaping method.
+        By default, it is assumed that this is being called by a training function, hence when training=None usually results in loss_func being called with argument training=True
         '''
         if gradient_update is False:
+            if training is None:
+                training = True
             all_trainable_variables, losses = self.loss_func(data,
-                training=False, summaries=summaries, verbose_summaries=verbose_summaries,
+                training=training, summaries=summaries, verbose_summaries=verbose_summaries,
                 step=tf.convert_to_tensor(self.__active_vars__.step, dtype=tf.int64))
         elif gradient_update is True:
             n = len(self.__optimisers__)
