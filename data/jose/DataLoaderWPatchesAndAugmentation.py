@@ -100,6 +100,13 @@ class Dataset(DatasetBase):
         self.set_dataset_steps()
 
 
+    def skip(self, steps, current_file=None, epoch=None):
+        '''
+        The Dataset API of TensorFlow has a .skip() method that doesn't work
+        with the random seeds. Hence do nothing on .skip()
+        '''
+        pass
+
     def __config__(self):
         '''
         This is executed when create() is called. It is the first method
