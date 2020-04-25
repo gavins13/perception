@@ -28,3 +28,13 @@ for features, labels in dataset:
  * Issue #4.1: 'image' summaries do not work. Please use GIF summaries instead. (see https://github.com/tensorflow/tensorflow/issues/28007 - Issue due to using tf.summary.image within tf.function; tf.function encapsulates the entire loss when perception debug flag is set to False.)
 
 * Issue #4.2: Do not use the '\' character for multiline Python code. AutoGraph fails with this character for some reason.
+
+* Issue #4.3: If using random seeds in a TF .map() for the Dataset, please ensure that the .skip() method of Perception knows to not use the TF .skip() method. Replace with this code:
+        `
+        def skip(self, steps, current_file=None, epoch=None):
+            '''
+            The Dataset API of TensorFlow has a .skip() method that doesn't work
+            with the random seeds. Hence do nothing on .skip()
+            '''
+            pass
+        `
