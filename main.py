@@ -13,7 +13,8 @@ import tensorflow as tf
 def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
   tensorboard_only=False, reset=False, experiments_file=None, debug_level=None,
   gradient_taping=False, debug=False, command_line_arguments_enabled=True,
-  metrics_enabled=False, metrics_printing_enabled=False, save_only=False):
+  metrics_enabled=False, metrics_printing_enabled=False, save_only=False,
+  auto_gpu=False):
     '''
     experiment_id: (str) experiment_id from the JSON files
     experiment_type: (str) 'train' or 'test'. Default: 'test'
@@ -31,6 +32,8 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
     NOTE: the command line argument 'debug_level' is not affected by the command_line_arguments_enabled option
 
     NOTE: for full debugging mode, gradient_taping should be True, and debug should be True. Future versions of Perception will probably automatically switch gradient_taping to True when debug is True.
+
+    NOTE: if using with a High Performance Computing cluster or Collab, then please use auto_gpu=True to leave it to the parent execution node to decide which GPU to select (e.g. via PBS)
     '''
 
     if command_line_arguments_enabled is True:
@@ -52,6 +55,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         save_only = detect_cmd_arg("save", retrieve_val=False, false_val=save_only)
         save_only_2 = detect_cmd_arg("save_only", retrieve_val=False, false_val=save_only)
         save_only = (save_only or save_only_2)
+        auto_gpu = detect_cmd_arg("auto_gpu", retrieve_val=False, false_val=auto_gpu)
 
 
 
@@ -71,14 +75,15 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         os.environ["PYTHON_PERCEPTION_DEBUG_LEVEL"] = str(debug_level)
         printt("DEBUG LEVEL {} being used".format(debug_level), info=True)
 
-    if gpu is not None:
-        if not(isinstance(gpu, int)):
-            raise ValueError('GPU number invalid')
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
-        printt("GPU {} being used".format(gpu), warning=True)
-    else:
-        os.environ["CUDA_VISIBLE_DEVICES"] = ''
-        printt("GPU not being used", warning=True)
+    if auto_gpu is False:
+        if gpu is not None:
+            if not(isinstance(gpu, int)):
+                raise ValueError('GPU number invalid')
+            os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
+            printt("GPU {} being used".format(gpu), warning=True)
+        else:
+            os.environ["CUDA_VISIBLE_DEVICES"] = ''
+            printt("GPU not being used", warning=True)
 
     memory_growth = detect_cmd_arg("memory_growth", retrieve_val=False, false_val=False)
     if memory_growth is True:
