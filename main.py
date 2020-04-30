@@ -14,7 +14,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
   tensorboard_only=False, reset=False, experiments_file=None, debug_level=None,
   gradient_taping=False, debug=False, command_line_arguments_enabled=True,
   metrics_enabled=False, metrics_printing_enabled=False, save_only=False,
-  auto_gpu=False):
+  auto_gpu=False, perception_save_path=None):
     '''
     experiment_id: (str) experiment_id from the JSON files
     experiment_type: (str) 'train' or 'test'. Default: 'test'
@@ -56,6 +56,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         save_only_2 = detect_cmd_arg("save_only", retrieve_val=False, false_val=save_only)
         save_only = (save_only or save_only_2)
         auto_gpu = detect_cmd_arg("auto_gpu", retrieve_val=False, false_val=auto_gpu)
+        perception_save_path = detect_cmd_arg("perception_save_path", false_val=perception_save_path)
 
 
 
@@ -159,10 +160,13 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
     '''
     Perception save path
     '''
-    if 'perception_save_path' in experiments[experiment_id].keys():
-        save_path = experiments[experiment_id]["perception_save_path"]
+    if perception_save_path is None:
+        if 'perception_save_path' in experiments[experiment_id].keys():
+            save_path = experiments[experiment_id]["perception_save_path"]
+        else:
+            save_path = None
     else:
-        save_path = None
+        save_path = perception_save_path
 
 
     return Execution(dataset=Dataset, experiment_name=experiment_name,
