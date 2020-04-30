@@ -163,16 +163,16 @@ class __Model__(object):
 
 
 
-
-            if typ == "scalar":
-                return tf.summary.scalar(name, data, **kwargs)
-            elif typ == "image":
-                return tf.summary.image(name, data, **kwargs)
-            elif typ == "video" or typ == "gif":
-                return video_summary(name, data, **kwargs)
-            else:
-                printt("Invalid summary type", error=True)
-                return
+            with tf.summary.experimental.summary_scope("", default_name="") as (tag, scope):
+                if typ == "scalar":
+                    return tf.summary.scalar(name, data, **kwargs)
+                elif typ == "image":
+                    return tf.summary.image(name, data, **kwargs)
+                elif typ == "video" or typ == "gif":
+                    return video_summary(name, data, **kwargs)
+                else:
+                    printt("Invalid summary type", error=True)
+                    return
 
 
     def __forward_pass__(self, data, summaries=False, verbose_summaries=False, gradient_update=False, training=None):
