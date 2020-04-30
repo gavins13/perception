@@ -159,8 +159,8 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
     '''
     Perception save path
     '''
-    if 'save_path' in experiments[experiment_id].keys():
-        save_path = experiments[experiment_id]["save_path"]
+    if 'perception_save_path' in experiments[experiment_id].keys():
+        save_path = experiments[experiment_id]["perception_save_path"]
     else:
         save_path = None
 
