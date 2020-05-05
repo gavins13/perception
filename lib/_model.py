@@ -90,6 +90,7 @@ class __Model__(object):
                 )) else converter(kwargs[arg_name])
 
     def add_summary(self, name, data, **kwargs):
+        #tf.summary.trace_off()
         '''
         type: string from 'scalar', 'video', 'image'
         '''
