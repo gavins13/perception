@@ -169,6 +169,21 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         save_path = perception_save_path
 
 
+    '''
+    Experiment load weights folder name (relative to the perception save path
+    or `save_path').
+
+    This is useful when you want to load the weights of a pretrained model,
+    and then resume training
+    '''
+    if 'load_weights_folder_name' in experiments[experiment_id].keys():
+        load_weights_folder_name = experiments[experiment_id]["load_weights_folder_name"]
+        printt("Load weights folder name: {}".format(load_weights_folder_name), info=True)
+    else:
+        load_weights_folder_name = None
+        printt("No load weights folder from another experiment.", info=True)
+
+
     return Execution(dataset=Dataset, experiment_name=experiment_name,
         save_folder=save_folder_name, model=Model,
         model_args=module_args,
@@ -177,4 +192,5 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         reset=reset, perception_save_path=save_path,
         experiments_manager=experiments, gradient_taping=gradient_taping,
         debug=debug, metrics_enabled=metrics_enabled,
-        metrics_printing_enabled=metrics_printing_enabled, save_only=save_only)
+        metrics_printing_enabled=metrics_printing_enabled, save_only=save_only,
+        load_weights_folder_name=load_weights_folder_name)

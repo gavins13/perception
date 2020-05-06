@@ -202,9 +202,31 @@ class Execution(object):
             self.Model.__keras_models__)}
 
         self.ckpt = tf.train.Checkpoint(**optimisers, **models, step=step_counter, current_file=current_dataset_file_counter, epoch=epoch_counter)
-        self.ckpt_manager = tf.train.CheckpointManager(
-            self.ckpt, checkpoint_dir, max_to_keep=3)
-        status = self.ckpt.restore(self.ckpt_manager.latest_checkpoint)
+        if (('load_weights_folder_name' in kwargs.keys()) and (
+          kwargs['load_weights_folder_name'] is not None
+        )):
+            initialise_weights_save_directory = os.path.join(perception_save_path, kwargs['load_weights_folder_name'])
+            initialise_weights_checkpoint_dir = os.path.join(initialise_weights_save_directory, 'checkpoints')
+            #self.initialise_weights_ckpt_manager = tf.train.CheckpointManager(
+            #    self.ckpt, initialise_weights_checkpoint_dir, max_to_keep=3)
+            #status = self.ckpt.restore(self.initialise_weights_ckpt_manager.latest_checkpoint)
+            #self.ckpt_manager = tf.train.CheckpointManager(
+            #    self.ckpt, checkpoint_dir, max_to_keep=3)
+            self.ckpt_manager = tf.train.CheckpointManager(
+                self.ckpt, checkpoint_dir, max_to_keep=3)
+            load_weights_file = tf.train.latest_checkpoint(initialise_weights_checkpoint_dir)
+            status = self.ckpt.restore(load_weights_file)
+            if load_weights_file is not None:
+                printt("Restored Weights from a separate experiment from {}".format(load_weights_file),
+                    info=True)
+                #status.assert_consumed()
+                #status.assert_existing_objects_matched()
+            else:
+                printt("Loading weights from another experiment failed.", error=True, stop=True)
+        else:
+            self.ckpt_manager = tf.train.CheckpointManager(
+                self.ckpt, checkpoint_dir, max_to_keep=3)
+            status = self.ckpt.restore(self.ckpt_manager.latest_checkpoint)
         if self.ckpt_manager.latest_checkpoint is not None:
             printt("Restored from {}".format(self.ckpt_manager.latest_checkpoint),
                 info=True)
