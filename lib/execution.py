@@ -236,6 +236,13 @@ class Execution(object):
             printt("Initializing from scratch.", debug=True)
         self.Model.__active_vars__.step = step_counter
 
+        '''
+        Reset Optimisers in Perception Model?
+        '''
+        self.Model.__perception_config__.reset_optimisers = (
+            ('reset_optimisers' in kwargs.keys()) and\
+            (kwargs['reset_optimisers'] is True))
+
 
         '''
         Create Saved Model and directory

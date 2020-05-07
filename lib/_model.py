@@ -48,6 +48,7 @@ class __Model__(object):
         self.__perception_config__ = Config()
         self.__perception_config__.debug = False
         self.__perception_config__.training = True
+        self.__perception_config__.reset_optimisers = False
         #self.__perception_config__.printt = None
         self.__analysis_directory__ = None
         self.__kwargs__ = kwargs # Required for adding module arguments in JSON
@@ -211,12 +212,22 @@ class __Model__(object):
         _ = self.__update_weights__(self, *args, **kwargs)
         return
 
+    def __reset_optimisers__(self):
+        self.__optimisers_before_reset__= self.__optimisers__[:]
+        for i, optimiser in enumerate(self.__optimisers__):
+            config = optimiser.get_config()
+            cls = optimiser.__class__
+            self.__optimisers__[i] = None
+            optimiser = cls.from_config(config)
+
     def __update_weights__(self, data, summaries=False, verbose_summaries=False, gradients=False, _no_training_updates=False):
         gradients = self.__gradient_taping__ if self.__gradient_taping__ is not None else gradients
         if gradients is True:
             '''
             Use Gradient Taping method
             '''
+            if self.__perception_config__.reset_optimisers is True:
+                print("Optimisers have been asked to reset but method not implemented in Perception 2.0 yet for Gradient Taped training", stop=True, error=True)
             self.__forward_pass__(data, summaries=summaries, verbose_summaries=verbose_summaries, gradient_update=True)
         else:
             '''
@@ -242,6 +253,14 @@ class __Model__(object):
                         optimizer=optimizer,
                         loss=optimizer_models["keras_loss_functions"] if 'keras_loss_functions' in optimizer_models.keys() else None
                     )
+
+                    if self.__perception_config__.reset_optimisers is True:
+                        self.__reset_optimisers__()
+                        optimizer_models["models"][0].compile(
+                            optimizer=optimizer,
+                            loss=optimizer_models["keras_loss_functions"] if 'keras_loss_functions' in optimizer_models.keys() else None
+                        )
+
                     optimizer_models["__validation_flag__"] = [True]
                     optimizer_models["__training_flag__"] = [True]
                     if tf.__version__ == '2.2.0' or tf.__version__ == '2.2.0-dev20200301':

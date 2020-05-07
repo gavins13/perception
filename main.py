@@ -183,6 +183,19 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         load_weights_folder_name = None
         printt("No load weights folder from another experiment.", info=True)
 
+    '''
+    Reset optimisers?
+
+    This is useful when you want to load the weights of a pretrained model,
+    and then resume training but without the optimiser momentums.
+    '''
+    if 'reset_optimisers' in experiments[experiment_id].keys():
+        reset_optimisers = experiments[experiment_id]["reset_optimisers"]
+        printt("Optimisers to be reset according to JSON config", info=True)
+    else:
+        reset_optimisers = False
+        printt("Optimiser state to be reloaded", info=True)
+
 
     return Execution(dataset=Dataset, experiment_name=experiment_name,
         save_folder=save_folder_name, model=Model,
@@ -193,4 +206,5 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         experiments_manager=experiments, gradient_taping=gradient_taping,
         debug=debug, metrics_enabled=metrics_enabled,
         metrics_printing_enabled=metrics_printing_enabled, save_only=save_only,
-        load_weights_folder_name=load_weights_folder_name)
+        load_weights_folder_name=load_weights_folder_name,
+        reset_optimisers=reset_optimisers)
