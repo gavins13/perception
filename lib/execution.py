@@ -168,6 +168,16 @@ class Execution(object):
                 ExperimentsManager.update_experiment(
                  kwargs['experiment_id'], 'perception_save_path',
                  kwargs['perception_save_path'])
+
+        '''
+        [] [check]
+        This block of code for the experiments manager needs to be reviewed.
+        '''
+        if 'ExperimentsManager' not in locals():
+            if 'experiments_manager' in kwargs.keys():
+                ExperimentsManager = kwargs['experiments_manager']
+            else:
+                ExperimentsManager = Experiments()
         self.ExperimentsManager = ExperimentsManager
 
         '''
