@@ -168,7 +168,7 @@ class Execution(object):
                 ExperimentsManager.update_experiment(
                  kwargs['experiment_id'], 'perception_save_path',
                  kwargs['perception_save_path'])
-         self.ExperimentsManager = ExperimentsManager
+        self.ExperimentsManager = ExperimentsManager
 
         '''
         Create summary writer
