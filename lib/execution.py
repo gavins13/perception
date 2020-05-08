@@ -204,7 +204,7 @@ class Execution(object):
         self.ckpt = tf.train.Checkpoint(**optimisers, **models, step=step_counter, current_file=current_dataset_file_counter, epoch=epoch_counter)
         if (('load_weights_folder_name' in kwargs.keys()) and (
           kwargs['load_weights_folder_name'] is not None
-        )):
+        )) and (save_folder is None):
             initialise_weights_save_directory = os.path.join(perception_save_path, kwargs['load_weights_folder_name'])
             initialise_weights_checkpoint_dir = os.path.join(initialise_weights_save_directory, 'checkpoints')
             #self.initialise_weights_ckpt_manager = tf.train.CheckpointManager(
