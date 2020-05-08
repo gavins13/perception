@@ -60,6 +60,7 @@ class Model(__Model__):
         self.__config__.summary_steps = 20
         self.__config__.verbose_summary_steps = 40
         self.__config__.epochs = 300
+        self.__config__.test_epochs = 1
         self.__config__.saved_model_epochs = 1
         self.__config__.print_training_metrics = False
 

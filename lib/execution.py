@@ -285,27 +285,31 @@ class Execution(object):
         return self.__call__func(*args, **kwargs)
 
     def testing(self):
+        n_epochs = 1
+        if hasattr(self.Model.__config__, 'test_epochs'):
+            n_epochs = self.Model.__config__.test_epochs
         printt("Entering testing loop", debug=True)
         epochs = 0
         step = 0
-        for record_number, data_record in self.Dataset.test_dataset.enumerate():
-            #diagnostics = self.Model.loss_func(data, training=False)
-            #analysis_output = self.Model.analyse(diagnostics, step, self.analysis_directory)
+        while epochs < n_epochs:
+            for record_number, data_record in self.Dataset.test_dataset.enumerate():
+                #diagnostics = self.Model.loss_func(data, training=False)
+                #analysis_output = self.Model.analyse(diagnostics, step, self.analysis_directory)
 
-            diagnostics, analysis_output = self.run(data_record,
-                return_analysis=True,
-                return_diagnostics=True, step=step)
-            '''
-            Print to console and save checkpoint
-            '''
-            data_split_num = record_number if self.Dataset.system_type.use_generator is False else self.Dataset.current.test_file
-            data_split_num_total = self.Dataset.test_dataset_steps if self.Dataset.system_type.use_generator is False else self.Dataset.num_test_files
-            print("testing epoch: %d" % epochs, end=";")
-            print("data split: %d of %d" % (data_split_num, data_split_num_total), end=";")
-            print("step: %d of %d" % (step+1, self.Dataset.test_dataset_steps), end=";")
-            sys.stdout.write("\033[K")
-            step += 1
-        epochs += 1
+                diagnostics, analysis_output = self.run(data_record,
+                    return_analysis=True,
+                    return_diagnostics=True, step=step)
+                '''
+                Print to console and save checkpoint
+                '''
+                data_split_num = record_number if self.Dataset.system_type.use_generator is False else self.Dataset.current.test_file
+                data_split_num_total = self.Dataset.test_dataset_steps if self.Dataset.system_type.use_generator is False else self.Dataset.num_test_files
+                print("testing epoch: %d" % epochs, end=";")
+                print("data split: %d of %d" % (data_split_num, data_split_num_total), end=";")
+                print("step: %d of %d" % (step+1, self.Dataset.test_dataset_steps), end=";")
+                sys.stdout.write("\033[K")
+                step += 1
+            epochs += 1
         self.Model.analysis_complete()
 
     def run(self, input_data, return_diagnostics=True, execute_analysis=False,
