@@ -375,6 +375,8 @@ class Execution(object):
         #self.Dataset.train_dataset=self.Dataset.train_dataset.skip(step)
         self.Dataset.skip(step, current_file=int(self.ckpt.current_file), epoch=int(self.ckpt.epoch))
 
+        if (epochs >= self.Model.__config__.epochs) and (self.Model.__config__.epochs != -1):
+            train = False
         '''
         Metrics (and printing) enabled?
         '''
