@@ -158,6 +158,7 @@ class Execution(object):
 
         # If reset, or new folder created for experiment, update the exp.
         # If custom perception_save_path used, update this as well
+        self.experiment_id = kwargs['experiment_id']
         if ('experiment_id' in kwargs.keys()) and ('ExperimentsManager' in locals()):
             ExperimentsManager[kwargs['experiment_id']] = self.save_directory_name
             if ((
@@ -167,6 +168,7 @@ class Execution(object):
                 ExperimentsManager.update_experiment(
                  kwargs['experiment_id'], 'perception_save_path',
                  kwargs['perception_save_path'])
+         self.ExperimentsManager = ExperimentsManager
 
         '''
         Create summary writer
@@ -481,6 +483,9 @@ class Execution(object):
                             print("TensorBoard started at {}".format(self.tb_url))
                     if (epochs >= self.Model.__config__.epochs) and (self.Model.__config__.epochs != -1):
                         train = False
+        self.ExperimentsManager.update_experiment(
+         self.experiment_id, 'training_finished',
+         True)
         self.tensorboard_only()
 
     def save_only(self):
