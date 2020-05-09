@@ -20,6 +20,7 @@ printt("List of experiment files: " + '\n'.join('{}: {}'.format(*k) for k in enu
 
 class Experiments(object):
     def __init__(self, experiments_file=None):
+        self.experiments_file = experiments_file
         json_dict = {}
         json_dicts = {}
         json_locations = {}
@@ -96,11 +97,13 @@ class Experiments(object):
         folder_name = val
         self.save(experiment_id, folder_name)
     def update_experiment(self, experiment_id, attr, val):
+        self.__init__(experiments_file=self.experiments_file)
         file_location = self.json_locations[experiment_id]
         self.experiments[experiment_id][attr] = val
         self.experiments_json_files[file_location][experiment_id][attr] = val
         self.update_json_file(file_location)
     def save(self, experiment_id, folder_name):
+        self.__init__(experiments_file=self.experiments_file)
         file_location = self.json_locations[experiment_id]
         self.experiments[experiment_id]["save_folder_name"] = folder_name
         self.experiments_json_files[file_location][experiment_id]["save_folder_name"] = folder_name
