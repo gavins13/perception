@@ -180,6 +180,11 @@ class Execution(object):
                 ExperimentsManager = Experiments()
         self.ExperimentsManager = ExperimentsManager
 
+        if (exp_type == 'train') and \
+          hasattr(ExperimentsManager[self.experiment_id], 'training_finished') and \
+          (ExperimentsManager[self.experiment_id]["training_finished"] == True):
+            printt("Experiment has already finished training", stop=True, error=True)
+
         '''
         Create summary writer
         '''
