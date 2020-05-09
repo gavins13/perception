@@ -253,7 +253,7 @@ class Execution(object):
         '''
         self.Model.__perception_config__.reset_optimisers = (
             ('reset_optimisers' in kwargs.keys()) and\
-            (kwargs['reset_optimisers'] is True))
+            (kwargs['reset_optimisers'] is True)) and (save_folder is None)
 
 
         '''
