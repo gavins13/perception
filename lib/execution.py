@@ -306,8 +306,14 @@ class Execution(object):
         printt("Entering testing loop", debug=True)
         epochs = 0
         step = 0
+        built = False
         while epochs < n_epochs:
             for record_number, data_record in self.Dataset.test_dataset.enumerate():
+                start_time = time.time()
+                if built == False:
+                    self.Model.__update_weights__(data_record, _no_training_updates=True)
+                    built = True
+
                 #diagnostics = self.Model.loss_func(data, training=False)
                 #analysis_output = self.Model.analyse(diagnostics, step, self.analysis_directory)
 
@@ -322,6 +328,9 @@ class Execution(object):
                 print("testing epoch: %d" % epochs, end=";")
                 print("data split: %d of %d" % (data_split_num, data_split_num_total), end=";")
                 print("step: %d of %d" % (step+1, self.Dataset.test_dataset_steps), end=";")
+                duration = time.time() - start_time
+                print("time: {}".format(duration))
+                print("")
                 sys.stdout.write("\033[K")
                 step += 1
             epochs += 1
