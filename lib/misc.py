@@ -115,7 +115,7 @@ class Logger(object):
             datetimestr = str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             datetimestr = datetimestr.replace(" ", "_")
             if message not in null_messages:
-                self.log.write(datetimestr + ': ' + message)
+                self.log.write(datetimestr + ': ' + message + "\n")
             if self.flush_counter+1 == self.flush_on_count:
                 self.log.flush()
                 self.flush_counter = 0
