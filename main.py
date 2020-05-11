@@ -57,6 +57,12 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         save_only = (save_only or save_only_2)
         auto_gpu = detect_cmd_arg("auto_gpu", retrieve_val=False, false_val=auto_gpu)
         perception_save_path = detect_cmd_arg("perception_save_path", false_val=perception_save_path)
+        ncpus = detect_cmd_arg("ncpus", false_val=None, val_dtype=int)
+        ncpus = detect_cmd_arg("n_cpus", false_val=ncpus, val_dtype=int)
+
+    if ncpus is not None:
+        tf.config.threading.set_inter_op_parallelism_threads(ncpus)
+        tf.config.threading.set_intra_op_parallelism_threads(ncpus)
 
 
 
