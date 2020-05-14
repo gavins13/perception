@@ -81,6 +81,8 @@ class Dataset(DatasetBase):
         if 'patch_size' in kwargs.keys() and isinstance(kwargs['patch_size'], int):
             self.config.patches.size = kwargs['patch_size']
 
+        tf.random.set_seed(1114)
+
 
     def __process_dataset__(self):
         super().__process_dataset__()
