@@ -8,13 +8,15 @@ from .lib.misc import detect_cmd_arg, path as prepare_path
 import sys
 import importlib
 import tensorflow as tf
+import random
+import numpy as np
 
 
 def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
   tensorboard_only=False, reset=False, experiments_file=None, debug_level=None,
   gradient_taping=False, debug=False, command_line_arguments_enabled=True,
   metrics_enabled=False, metrics_printing_enabled=False, save_only=False,
-  auto_gpu=False, perception_save_path=None):
+  auto_gpu=False, perception_save_path=None, deterministic=False, set_seed=False, seed=None):
     '''
     experiment_id: (str) experiment_id from the JSON files
     experiment_type: (str) 'train' or 'test'. Default: 'test'
@@ -59,6 +61,26 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         perception_save_path = detect_cmd_arg("perception_save_path", false_val=perception_save_path)
         ncpus = detect_cmd_arg("ncpus", false_val=None, val_dtype=int)
         ncpus = detect_cmd_arg("n_cpus", false_val=ncpus, val_dtype=int)
+        deterministic = detect_cmd_arg("deterministic", retrieve_val=False, false_val=deterministic)
+        set_seed = detect_cmd_arg("set_seed", retrieve_val=False, false_val=set_seed)
+        seed_cmd = detect_cmd_arg("seed", false_val=None, val_dtype=int)
+        if seed_cmd is not None:
+            set_seed = True
+            seed = seed_cmd
+    if deterministic is True:
+        set_seed = True # []
+    if (seed is None) and (set_seed is True):
+        seed = 1114
+    if deterministic is True:
+        os.environ['TF_DETERMINISTIC_OPS'] = '1'
+        os.environ['TF_CUDNN_DETERMINISTIC'] = '1'
+        os.environ['TF_USE_CUDNN_AUTOTUNE'] = ''
+    if set_seed is True:
+        os.environ['PYTHONHASHSEED'] = str(seed)
+        random.seed(seed)
+        np.random.seed(seed)
+        tf.random.set_seed(seed)
+
 
     if ncpus is not None:
         tf.config.threading.set_inter_op_parallelism_threads(ncpus)
