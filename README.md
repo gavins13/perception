@@ -43,6 +43,32 @@ Otherwise, you may downgrade to tensorflow==2.0.0
 
 
 
+### Patches (important)
+
+Please run install.py via your conda python installation. Otherwise, you can apply the patches manually below:
+
+Reproducibility and potentially unexpected behaviour can occur due to non-deterministic GPU calcuations on backprop of the `tf.gather()` function. Please see [Issue 39751](https://github.com/tensorflow/tensorflow/issues/39751). In order to fix this, please follow the following instructions.
+
+1. Locate `array_grad.py` in `tensorflow/python/ops`
+2. Find and replace `math_ops.unsorted_segment_sum` with `unsorted_segment_sum_fix`.
+3. Copy and paste the following code after package imports:
+```
+def unsorted_segment_sum_fix(*args, **kwargs):
+  args = list(args)
+  params = args[0]
+  orig_dtype = params.dtype
+  if 'float' in str(params.dtype):
+    params = math_ops.cast(params, dtype=dtypes.float64)
+  elif 'complex' in str(params.dtype):
+    params = math_ops.cost(params, dtype=dtypes.complex128)
+  args[0] = params
+  result = math_ops.unsorted_segment_sum(*args, **kwargs)
+  result = math_ops.cast(result, dtype=orig_dtype)
+  return result
+```
+
+
+
 ## As a package (optional)
 To install perception as a package, move the directory containing this file to your local python "site-packages" or alternatively
 
