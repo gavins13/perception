@@ -126,6 +126,34 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
     if not(experiment_id in experiments.keys()):
         printt("Experiment doesn't exist", error=True, stop=True)
 
+
+    '''
+    Set determinism/random seed properties
+    '''
+    if 'deterministic' in experiments[experiment_id].keys():
+        if experiments[experiment_id]['deterministic'] is True:
+            os.environ['TF_DETERMINISTIC_OPS'] = '1'
+            os.environ['TF_CUDNN_DETERMINISTIC'] = '1'
+            os.environ['TF_USE_CUDNN_AUTOTUNE'] = ''
+            set_seed_ = True
+    if 'set_seed' in experiments[experiment_id].keys():
+        set_seed_ = experiments[experiment_id]['set_seed']
+    if 'seed' in experiments[experiment_id].keys():
+        seed_ = experiments[experiment_id]['seed']
+    elif set_seed_ is True:
+        if seed is None:
+            seed_ = 1114
+        else:
+            seed_ = seed
+    if set_seed_ is True:
+        os.environ['PYTHONHASHSEED'] = str(seed_)
+        random.seed(seed_)
+        np.random.seed(seed_)
+        tf.random.set_seed(seed_)
+
+    '''
+    Start loading modules
+    '''
     if 'module' in experiments[experiment_id].keys():
         if 'module_path' in experiments[experiment_id].keys():
             sys.path.insert(0, prepare_path(
