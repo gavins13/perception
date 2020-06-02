@@ -130,6 +130,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
     '''
     Set determinism/random seed properties
     '''
+    set_seed_ = None
     if 'deterministic' in experiments[experiment_id].keys():
         if experiments[experiment_id]['deterministic'] is True:
             os.environ['TF_DETERMINISTIC_OPS'] = '1'
