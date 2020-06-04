@@ -9,8 +9,9 @@ from tensorflow.python.keras import backend as K
 import time
 import os
 import inspect
+from .customiser import CustomUserModule
 
-class __Model__(object):
+class __Model__(CustomUserModule):
     def __init__(self, **kwargs):
         self.__tapes__ = None
         self.__losses__ = None # This is an active variable; (delete?) Issue #1.1
@@ -73,22 +74,6 @@ class __Model__(object):
                 models["__validation_flag__"][j] = val_flag
                 models["__training_flag__"][j] = train_flag
         pass
-
-    def module_arg(self, arg_name, instance_check=None, false_val=None, kwargs=None, force_user=False, convert_type=None):
-        kwargs = self.__kwargs__ if kwargs is None else kwargs
-        if convert_type is None:
-          converter = lambda x : x
-        else:
-          converter = convert_type
-        if force_user is True and arg_name not in kwargs.keys():
-            printt("{} is required but not specified by the user".format(arg_name), error=True, stop=True)
-        return false_val if not(
-            arg_name in kwargs.keys() and (
-                instance_check is None or (
-                    isinstance(
-                      kwargs[arg_name], instance_check
-                    ) if convert_type is None else True)
-                )) else converter(kwargs[arg_name])
 
     def add_summary(self, name, data, **kwargs):
         #tf.summary.trace_off()

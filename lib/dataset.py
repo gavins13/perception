@@ -2,9 +2,9 @@ import numpy as np
 #from random import shuffle, seed as __seed__
 import tensorflow as tf
 from .misc import printt
+from .customiser import CustomUserModule
 
-
-class Dataset():
+class Dataset(CustomUserModule):
     '''
     The Dataset class provides the abstraction that allows:
         1. Automatic handling of training, testing and validation splitting
@@ -31,6 +31,7 @@ class Dataset():
     In __config__ (or __init__), remember to set:
      - self.train_dataset_length (along with validation and test)
      - self.train_dataset_steps
+     - self.config.batch_size (int or list [train,val,test])
 
     NOTE: the variable self.current.steps is not used in the main Executor
     model and is purely for the Dataset API (e.g. for restarting training,
@@ -133,6 +134,7 @@ class Dataset():
         else:
             printt("Threads not specified. USING 4 THREADS", info=True)
             self.config.threads = 4
+        self.__kwargs__ = kwargs # Required for adding module arguments in JSON
 
     def use(self, *args):
         if args is not None:
@@ -299,6 +301,18 @@ class Dataset():
         '''
         For direct: Creates validation folds
         For generator: access the three generators neccesssary
+
+        If you are replacing this method, things to be set include:
+         - self.config.batch_size
+         - self.Datasets : list - List of datasets in order: Train, Val, Test
+         - self.train_dataset_length
+         - self.test_dataset_length
+         - self.train_dataset
+         - self.validation_dataset
+         - self.test_dataset
+        If you're not running set_dataset_steps(), then also:
+        - self.train_dataset_steps
+        - self.test_dataset_steps
         '''
         if self.config.batch_size is None:
             printt("Batch size is not set so Default is set to 1", warning=True)
