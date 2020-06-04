@@ -176,7 +176,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
     else:
         module_args = None
 
-    if 'dataset_path' in experiments[experiment_id].keys():
+    if 'dataset' in experiments[experiment_id].keys():
         if 'dataset_path' in experiments[experiment_id].keys():
             printt("DATASET PATH: "+prepare_path(
                 experiments[experiment_id]['dataset_path']), debug=True)
@@ -187,6 +187,8 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         _tmp_mod_name = experiments[experiment_id]["dataset"]
         dataset_module = importlib.import_module(_tmp_mod_name)
         Dataset = dataset_module.Dataset
+    else:
+        printt("Dataset not specified. Using Perception default.", warning=True)
 
 
     if 'experiment_name' in experiments[experiment_id].keys():
