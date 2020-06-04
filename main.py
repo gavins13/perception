@@ -83,6 +83,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
 
 
     if ncpus is not None:
+        printt("Limiting Number of CPUs to {}".format(ncpus))
         tf.config.threading.set_inter_op_parallelism_threads(ncpus)
         tf.config.threading.set_intra_op_parallelism_threads(ncpus)
 
