@@ -164,6 +164,7 @@ class Dataset(CustomUserModule):
         dataset = tf.data.Dataset.from_tensor_slices((inputs, outputs))
         '''
         self.Dataset = tf.data.Dataset.from_tensor_slices((dataset))
+        self.dataset_length = len(dataset)
         #raise NotImplementedError()
     def use_developer_mode(self, dataset=None):
         self.dev.on = True
@@ -348,6 +349,10 @@ class Dataset(CustomUserModule):
                     self.Datasets = [x.batch(batch_size=batch_sizes[ii]) for ii, x in enumerate(self.Datasets)]
                 #self.Datasets = [x.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor) for x in self.Datasets]
                 self.Datasets = [x.prefetch(tf.data.experimental.AUTOTUNE) if i != 2 else x for i, x in enumerate(self.Datasets) ]
+
+                self.test_dataset_length = len([x for x in range(self.dataset_length) if (x % self.config.cv_folds) == (self.config.cv_fold_number-1)])
+                self.train_dataset_length = len([x for x in range(self.dataset_length) if (x % self.config.cv_folds) != (self.config.cv_fold_number-1)])
+
             elif self.config.dataset_split is not None:
                 raise NotImplementedError('Dataset splitting not implemented yet')
         else:
