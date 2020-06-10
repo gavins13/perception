@@ -253,7 +253,7 @@ class Dataset(CustomUserModule):
         pass
 
     def __check__(self):
-        if self.train_dataset_length is None:
+        if (self.train_dataset_length is None) and (self.system_type.use_direct is False):
             printt("Dataset length not set", error=True, stop=True)
 
     def __call__(self, *args, **kwargs):
