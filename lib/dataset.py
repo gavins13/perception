@@ -458,3 +458,129 @@ class Dataset(CustomUserModule):
         #np.random.seed(seed)
         #__seed__(seed)
         self.operation_seed = seed
+
+
+    @tf.function
+    def rotate_and_translate(self, image, axes=[1,2], rotate=np.pi/2, translate=16):
+        '''
+        else if ndims = 3, then assume [H, W, C]
+        if ndims >= 4: then assume [B, ... axes[0], ...., axes[1].... C]
+
+        This function will apply a random 2D translation and rotation to images
+        with a range specified by rotate and translate.
+
+        Rotate can be None in which case no rotation is applied
+        Translate can be None in which case no translation is applied
+
+        Rotate can be a float which is half of the rotation range
+        Rotate can be a list : [min. rotation value, max. rotation value]
+        Translate can be a list of integers:
+            [ half of translate_H range, half of translate_W range]
+        Translate can be a list of lists of integers:
+            [
+                [min_translate_H value, max_translate_H value].
+                [min_translate_W value, max_translate_W value].
+            ]
+
+        image can be float or complex.
+
+        Note: H and W correspond to "Height" and "Width", usually the axes
+        numbers 1 and 2 respectively.
+        '''
+
+        '''
+        Construct translation and rotation values
+        '''
+        if isinstance(rotate, list):
+            rotate_minval = rotate[0]
+            rotate_maxval = rotate[1]
+        elif rotate is not None:
+            rotate_minval = -rotate
+            rotate_maxval = rotate
+
+        if isinstance(translate, list):
+            # 1st entry is x, 2nd is y
+            translate_x = translate[0]
+            translate_y = translate[1]
+            if isinstance(translate_x, list):
+                translate_x_minval = translate_x[0]
+                translate_x_maxval = translate_x[1]
+            else:
+                translate_x_minval = -translate_x
+                translate_x_maxval = translate_x
+            if isinstance(translate_y, list):
+                translate_y_minval = translate_y[0]
+                translate_y_maxval = translate_y[1]
+            else:
+                translate_y_minval = -translate_y
+                translate_y_maxval = translate_y
+        elif translate is not None:
+            translate_x_minval = -translate
+            translate_y_minval = -translate
+            translate_x_maxval = translate
+            translate_y_maxval = translate
+
+        '''
+        Transpose and reshape image to correct shape for TF
+        '''
+        original_shape = tf.shape(image)
+        if (len(original_shape) > 3) and (axes is not None):
+            to_transpose = list(range(len(tf.shape(image))))
+            to_transpose_original = to_transpose[:]
+            to_transpose[1] = axes[0]
+            to_transpose[2] = axes[1]
+            to_transpose[axes[0]] = 1
+            to_transpose[axes[1]] = 2
+            image = tf.transpose(image, to_transpose)
+            after_transpose_shape = tf.shape(image)
+            image = tf.reshape(image, [original_shape[0], original_shape[axes[0]], original_shape[axes[1]], -1])
+
+        expanded = False
+        if image.shape.__len__() ==3:
+            image = tf.expand_dims(image, axis=0)
+            expanded = True
+        '''
+        Construct TF translate and rotation tensors
+        '''
+        random_angles = tf.random.uniform(shape = (tf.shape(image)[0], ), minval = rotate_minval, maxval = rotate_maxval)
+
+        random_x = tf.random.uniform(shape = (tf.shape(image)[0], 1), minval = translate_x_minval, maxval = translate_x_maxval)
+        random_y = tf.random.uniform(shape = (tf.shape(image)[0], 1), minval = translate_y_minval, maxval = translate_y_maxval)
+        translate = tf.concat([random_y, random_x], axis=1)
+
+        '''
+        Apply translation and rotation with TF
+        '''
+        if "complex" in str(image.dtype):
+            if rotate is not None:
+                real = tfa.image.rotate(tf.math.real(image),random_angles, interpolation="BILINEAR")
+                imag = tfa.image.rotate(tf.math.imag(image),random_angles, interpolation="BILINEAR")
+            else:
+                real = tf.math.real(image)
+                imag = tf.math.real(imag)
+            if translate is not None:
+                real = tfa.image.translate(real, translate, interpolation="NEAREST")
+                imag = tfa.image.translate(imag, translate, interpolation="NEAREST")
+            image = tf.complex(real, imag)
+        else:
+            if rotate is not None:
+                image = tfa.image.rotate(image, random_angles, interpolation="BILINEAR")
+            if translate is not None:
+                image = tfa.image.translate(image, translate, interpolation="NEAREST")
+
+        '''
+        Transpose and reshape back to original shape
+        '''
+        if expanded is True:
+            image = tf.squeeze(image, axis=0)
+
+        if (len(original_shape) > 3) and (axes is not None):
+            image = tf.reshape(image, after_transpose_shape)
+            from_transpose = to_transpose[:]
+            from_transpose[1] = axes[0]
+            from_transpose[2] = axes[1]
+            from_transpose[axes[0]] = 1
+            from_transpose[axes[1]] = 2
+            image = tf.transpose(image, from_transpose)
+
+        return image
