@@ -111,6 +111,17 @@ class Dataset(CustomUserModule):
         self.config.cv_fold_number = None
         self.config.validation_size = 1
 
+        '''
+        Select folds and fold number
+        '''
+        if 'cv_folds' in kwargs.keys():
+            self.config.cv_folds = kwargs['cv_folds']
+            if 'cv_fold_number' in kwargs.keys():
+                self.config.cv_fold_number = kwargs['cv_fold_number']
+            else:
+                self.config.cv_fold_number = 1
+
+
         self.current = Config()
         self.current.epoch = None # -1
         self.current.step = None
