@@ -36,7 +36,8 @@ def rotate_tf(image):
 
 class Dataset(DatasetBase):
     def __init__(self, *args, **kwargs):
-        super().__init__()
+        kwargs['cv_folds'] = 3
+        super().__init__(*args, **kwargs)
         '''
         Override default options
         '''
@@ -49,30 +50,9 @@ class Dataset(DatasetBase):
         '''
         self.config.batch_size = 1
 
-
-        self.train_dataset_length = 7
-        self.test_dataset_length = 3
         self.validation_dataset_length = 1
-
-        self.train_dataset_steps = 7 # Should be the same as
-                                        # train_data_length for batch_size
-                                        # = 1, otherwise, =
-                                        # train_dataset_length / batch_size
-        self.test_dataset_steps = 3
         self.validation_dataset_steps = 1
 
-        '''
-        Select folds and fold number
-        '''
-        if 'cv_folds' in kwargs.keys():
-            self.config.cv_folds = kwargs['cv_folds']
-            if 'cv_fold_number' in kwargs.keys():
-                self.config.cv_fold_number = kwargs['cv_fold_number']
-            else:
-                self.config.cv_fold_number = 1
-        else:
-            self.config.cv_fold_number = 1
-            self.config.cv_folds = 3
 
         # Start Customising class
         class Config: pass
