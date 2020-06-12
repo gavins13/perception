@@ -455,10 +455,11 @@ class Execution(object):
 
                             # Validation
                             if step % self.Model.__config__.validation_steps == 0:
+                                this_step = tf.convert_to_tensor(self.Model.__active_vars__.step, dtype=tf.int64)
                                 for validation_data_record in self.Dataset.validation_dataset: #.take(self.Dataset.validation_dataset_length):
                                     self.Model.loss_func(validation_data_record, training=False,
                                         validation=True, summaries=True, verbose_summaries=True,
-                                        step=tf.convert_to_tensor(self.Model.__active_vars__.step, dtype=tf.int64)
+                                        step=this_step
                                     )
                                 duration = time.time() - start_time
                                 print("Validation time: %.3f" % duration)
