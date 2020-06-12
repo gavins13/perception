@@ -72,10 +72,12 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
     if (seed is None) and (set_seed is True):
         seed = 1114
     if deterministic is True:
+        printt("Using deterministic kernels only", info=True)
         os.environ['TF_DETERMINISTIC_OPS'] = '1'
         os.environ['TF_CUDNN_DETERMINISTIC'] = '1'
         os.environ['TF_USE_CUDNN_AUTOTUNE'] = ''
     if set_seed is True:
+        printt("Seeds set", info=True)
         os.environ['PYTHONHASHSEED'] = str(seed)
         random.seed(seed)
         np.random.seed(seed)
@@ -134,6 +136,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
     set_seed_ = None
     if 'deterministic' in experiments[experiment_id].keys():
         if experiments[experiment_id]['deterministic'] is True:
+            printt("Using deterministic kernels only", info=True)
             os.environ['TF_DETERMINISTIC_OPS'] = '1'
             os.environ['TF_CUDNN_DETERMINISTIC'] = '1'
             os.environ['TF_USE_CUDNN_AUTOTUNE'] = ''
@@ -148,6 +151,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         else:
             seed_ = seed
     if set_seed_ is True:
+        printt("Seeds set", info=True)
         os.environ['PYTHONHASHSEED'] = str(seed_)
         random.seed(seed_)
         np.random.seed(seed_)
