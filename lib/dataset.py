@@ -120,6 +120,7 @@ class Dataset(CustomUserModule):
                 self.config.cv_fold_number = kwargs['cv_fold_number']
             else:
                 self.config.cv_fold_number = 1
+            printt("Using {} folds, fold number {}".format(self.config.cv_folds, self.config.cv_fold_number))
 
 
         self.current = Config()
