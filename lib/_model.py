@@ -182,6 +182,17 @@ class __Model__(CustomUserModule):
             self.__optimisers__[i] = None
             optimiser = cls.from_config(config)
 
+    def __built__(self):
+        return self.__active_vars__.built
+
+    def __build__(self):
+        self.__active_vars__.built = False
+        self.__update_weights__(None, _no_training_updates=True)
+
+    def __build_once__(self):
+        self.__update_weights__(None, _no_training_updates=True)
+
+
     def __update_weights__(self, data, summaries=False, verbose_summaries=False, gradients=False, _no_training_updates=False):
         gradients = self.__gradient_taping__ if self.__gradient_taping__ is not None else gradients
         if gradients is True:

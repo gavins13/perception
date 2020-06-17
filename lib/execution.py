@@ -344,6 +344,7 @@ class Execution(object):
          - input_data : list of input data to be executed
          -
         '''
+        self.Model.__build_once__()
 
         analysis_directory = self.analysis_directory if analysis_directory is None else analysis_directory
 
