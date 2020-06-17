@@ -547,7 +547,7 @@ class Execution(object):
         saving_enabled = False if (self.gradient_taping == True) else saving_enabled
         #saving_enabled = False # [CHECK] []
         if saving_enabled is True:
-            self.Model.save(this_epoch_saved_model_dir)#, data=data_record)
+            self.Model.save(this_epoch_saved_model_dir, data=data_record)
         else:
             printt("TF must be > 2.0 and GradientTaping must be off", stop=True, error=True)
         print("Model saved to: {}".format(this_epoch_saved_model_dir))

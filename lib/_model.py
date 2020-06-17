@@ -86,31 +86,7 @@ class __Model__(CustomUserModule):
             typ = kwargs['type']
         del(kwargs['type'])
         kwargs['step'] = self.__active_vars__.step
-        #print("")
-        #print("Some information about summaries")
-        #print(self.__active_vars__)
-        #print(self.__active_vars__.summaries)
-        #print(self.__active_vars__.validation)
-        #self.__active_vars__.summaries = tf.compat.v1.Print(self.__active_vars__.summaries, [self.__active_vars__.summaries])
-        #print("")
-        #tf.print(self.__active_vars__.summaries, output_stream=sys.stdout)
-        '''
-        Start
-        '''
-        '''
-        cond_1 = tf.logical_and(
-            self.__active_vars__.summaries,
-            not('verbose' in kwargs.keys() and (kwargs['verbose'] == True))
-        )
-        cond_2 = tf.logical_and(
-            self.__active_vars__.verbose_summaries == True,
-            ('verbose' in kwargs.keys() and (kwargs['verbose'] == True))
-        )
-        cond_3 = ('force' in kwargs.keys()) and (kwargs['force'] == True)
-        cond_final = tf.logical_or(tf.logical_or(cond_1, cond_2), cond_3)
-        '''
-        '''
-        '''
+
         if not(
           ((self.__active_vars__.summaries == True) and (
             not('verbose' in kwargs.keys() and (kwargs['verbose'] == True)))
@@ -193,6 +169,7 @@ class __Model__(CustomUserModule):
                     optimiser.apply_gradients(zip(grads, optimiser_trainable_variables))
 
     def __build__(self, *args, **kwargs):
+        printt("Building model", info=True)
         kwargs = {**kwargs, _no_training_updates: True}
         _ = self.__update_weights__(self, *args, **kwargs)
         return
@@ -349,7 +326,7 @@ class __Model__(CustomUserModule):
                 print("Saving combined submodel {}".format(j))
                 this_filename = str(i) + "_" + str(j) + "_" + str(model.name)
                 this_filename = os.path.join(path, this_filename + '' + file_format)
-                #model.predict(data)
+                model.predict(data)
                 model.save(this_filename)
 
             for j, model in enumerate(self.__optimisers_models__old__[i]["models"]):
@@ -416,14 +393,8 @@ class __Model__(CustomUserModule):
                 results = model(results, pass_number=i, **dict_)
                 this_optimiser_trainable_variables += model.trainable_variables
                 this_optimisers_diagnostics.append(results)
-
             all_trainable_variables.append(this_optimiser_trainable_variables)
 
-            #print("Just after")
-            #print(self.__active_vars__.validation)
-            #print(self.__active_vars__.summaries)
-            #print(self.__active_vars__)
-            #print("")
             loss = models['loss_function'](results, pass_number=i)
             losses.append(loss)
             optimisers_diagnostics.append(this_optimisers_diagnostics)
