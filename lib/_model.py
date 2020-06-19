@@ -254,9 +254,9 @@ class __Model__(CustomUserModule):
             if _no_training_updates == True:
                 return {}
             for i, optimizer_models in enumerate(self.__optimisers_models__):
-                if tf.__version__ == '2.2.0' or tf.__version__ == '2.1.0' or tf.__version__ == '2.2.0-dev20200301':
+                if tf.__version__[0:5] == '2.2.0' or tf.__version__[0:5] == '2.1.0':
                     original_data = data
-                    if tf.__version__ == '2.1.0':
+                    if tf.__version__[0:5] == '2.1.0':
                         data,data_y_None,data_sampleweights_None = optimizer_models["models"][0]._standardize_user_data(
                             data, None, sample_weight=None, class_weight=None,
                             extract_tensors_from_dataset=True)
@@ -264,7 +264,7 @@ class __Model__(CustomUserModule):
                         data = data + list(data_y_None or []) + list(data_sampleweights_None or [])
                         if not isinstance(K.symbolic_learning_phase(), int):
                             data += [True]  # Add learning phase value.
-                    elif tf.__version__ == '2.2.0':
+                    elif tf.__version__[0:5] == '2.2.0':
                         data = tf.compat.v1.data.make_one_shot_iterator(tf.data.Dataset.from_tensors(data))
                     vals = self.__TEMP__trainfunctions[i](data)
                     data = original_data
