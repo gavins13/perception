@@ -236,9 +236,9 @@ class __Model__(CustomUserModule):
 
                     optimizer_models["__validation_flag__"] = [True]
                     optimizer_models["__training_flag__"] = [True]
-                    if tf.__version__ == '2.2.0' or tf.__version__ == '2.2.0-dev20200301':
+                    if tf.__version__[0:5] == '2.2.0':
                         self.__TEMP__trainfunctions.append(optimizer_models["models"][0].make_train_function())
-                    elif tf.__version__ == '2.1.0':
+                    elif tf.__version__[0:5] == '2.1.0':
                         _,_,sampleweights_none = optimizer_models["models"][0]._standardize_user_data(
                             data, None, sample_weight=None, class_weight=None,
                             extract_tensors_from_dataset=True)
