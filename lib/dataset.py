@@ -431,9 +431,9 @@ class Dataset(CustomUserModule):
             printt("Test dataset size not set!", error=True, stop=True)
 
         batch_sizes = self.get_batch_sizes()
-        self.train_dataset_steps = np.floor(np.divide(self.train_dataset_length,
+        self.train_dataset_steps = np.ceil(np.divide(self.train_dataset_length,
             batch_sizes[0]))
-        self.test_dataset_steps = np.floor(np.divide(self.test_dataset_length,
+        self.test_dataset_steps = np.ceil(np.divide(self.test_dataset_length,
             batch_sizes[2]))
 
     def get_batch_sizes(self):
