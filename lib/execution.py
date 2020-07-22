@@ -20,7 +20,7 @@ with open(os.path.join(
     Config = json.load(config_file)
 from .misc import printt, Logger
 
-from contextlib import ExitStack
+from contextlib import ExitStack, nullcontext
 import sys
 from datetime import datetime
 from .model import Model
@@ -185,6 +185,12 @@ class Execution(object):
           (ExperimentsManager[self.experiment_id]["training_finished"] == True):
             printt("Experiment has already finished training", stop=True, error=True)
 
+        
+        if (exp_type == 'evaluate') and \
+          hasattr(ExperimentsManager[self.experiment_id], 'evaluation_finished') and \
+          (ExperimentsManager[self.experiment_id]["evaluation_finished"] == True):
+            printt("Experiment has already finished evaluation", stop=True, error=True)
+
         '''
         Create summary writer
         '''
@@ -283,6 +289,13 @@ class Execution(object):
             (kwargs['gradient_taping'] is True)
 
         '''
+        Running validation on CPU?
+        '''
+        self.validation_on_cpu = (('validation_on_cpu' in kwargs.keys()) and (
+            kwargs['validation_on_cpu'] is True))
+        if self.validation_on_cpu is False:
+            printt("Validation is operating on the GPU. For some applications, this will invoke the building of a new graph on the GPU and thus occupy more memory leading to training issues. Please use the 'validation_on_cpu' option in Experiment() or use command-line flag", warning=True)
+        '''
         Saving the model only?
         '''
         if 'save_only' in kwargs.keys() and kwargs['save_only'] is True:
@@ -335,6 +348,9 @@ class Execution(object):
                 step += 1
             epochs += 1
         self.Model.analysis_complete()
+        self.ExperimentsManager.update_experiment(
+            self.experiment_id, 'evaluation_finished',
+            True)
 
     def run(self, input_data, return_diagnostics=True, execute_analysis=False,
         return_analysis=False, step=None, analysis_directory=None):
@@ -458,10 +474,11 @@ class Execution(object):
                             if step % self.Model.__config__.validation_steps == 0:
                                 this_step = tf.convert_to_tensor(self.Model.__active_vars__.step, dtype=tf.int64)
                                 for validation_data_record in self.Dataset.validation_dataset: #.take(self.Dataset.validation_dataset_length):
-                                    self.Model.loss_func(validation_data_record, training=False,
-                                        validation=True, summaries=True, verbose_summaries=True,
-                                        step=this_step
-                                    )
+                                    with tf.device('/cpu:0') if self.validation_on_cpu is True else nullcontext():
+                                        self.Model.loss_func(validation_data_record, training=False,
+                                            validation=True, summaries=True, verbose_summaries=True,
+                                            step=this_step
+                                        )
                                 duration = time.time() - start_time
                                 print("Validation time: %.3f" % duration)
 

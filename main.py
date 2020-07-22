@@ -16,10 +16,11 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
   tensorboard_only=False, reset=False, experiments_file=None, debug_level=None,
   gradient_taping=False, debug=False, command_line_arguments_enabled=True,
   metrics_enabled=False, metrics_printing_enabled=False, save_only=False,
-  auto_gpu=False, perception_save_path=None, deterministic=False, set_seed=False, seed=None):
+  auto_gpu=False, perception_save_path=None, deterministic=False, set_seed=False,
+  seed=None, validation_on_cpu=False):
     '''
     experiment_id: (str) experiment_id from the JSON files
-    experiment_type: (str) 'train' or 'test'. Default: 'test'
+    experiment_type: (str) 'train' or 'evaluate'. Default: 'test'
     (optional) execute: (bool) Execute before returning?. Default: False
     (optional) gpu: (int) Which GPU number to use
     (optional) tensorboard_only: (bool) Only start TensorBoard (TB)? Default: False (i.e. start TB if training, otherwise do not start)
@@ -64,6 +65,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         deterministic = detect_cmd_arg("deterministic", retrieve_val=False, false_val=deterministic)
         set_seed = detect_cmd_arg("set_seed", retrieve_val=False, false_val=set_seed)
         seed_cmd = detect_cmd_arg("seed", false_val=None, val_dtype=int)
+        validation_on_cpu = detect_cmd_arg("validation_on_cpu", retrieve_val=False, false_val=validation_on_cpu)
         if seed_cmd is not None:
             set_seed = True
             seed = seed_cmd
@@ -271,4 +273,4 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         debug=debug, metrics_enabled=metrics_enabled,
         metrics_printing_enabled=metrics_printing_enabled, save_only=save_only,
         load_weights_folder_name=load_weights_folder_name,
-        reset_optimisers=reset_optimisers)
+        reset_optimisers=reset_optimisers, validation_on_cpu=validation_on_cpu)
