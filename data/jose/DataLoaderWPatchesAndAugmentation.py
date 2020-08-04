@@ -6,11 +6,8 @@ from __init__ import *
 from scipy import stats
 import pickle
 
-#path = '/vol/biomedic/users/kgs13/PhD/projects/datasets/'
-#jose_data = pickle.load(open(path+'MICCAI_cardiac_data.pkl', 'rb'), encoding='bytes')
-
-path = '/vol/medic02/users/kgs13/datasets/jose/'
-jose_data = pickle.load(open(path+'cardiac_cine_mri_data.pkl', 'rb'), encoding='bytes')
+path = '/rds/general/user/kgs13/home/_Home/PhD/projects/datasets/jose/'
+jose_data = pickle.load(open(path+'MICCAI_cardiac_data.pkl', 'rb'), encoding='bytes')
 
 # This dataset is simple a (10, 30, 256, 256) complex128 matrix
 
