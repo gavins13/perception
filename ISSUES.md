@@ -1,5 +1,7 @@
 ISSUES.md
 
+* Issue 0.1: Need an option for Experiment(**) and Executor that allows the line setting sys.stdout = Logger() to be turned off.
+
 * Issue #1.1: __variables__ and __losses__ are returned in the call but is it better to set them as properties in the object i.e. within __active_vars__?
 
 * Issue #1.2: What is the purpose of having epoch control in execution.py as well as in dataset.py? This redundancy needs fixing. Preferably keep epoch management in execution.py rather than dataset.py (which would use the TF Dataset API and method .repeat() - do not advise this method)

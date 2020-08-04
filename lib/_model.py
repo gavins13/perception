@@ -86,31 +86,7 @@ class __Model__(CustomUserModule):
             typ = kwargs['type']
         del(kwargs['type'])
         kwargs['step'] = self.__active_vars__.step
-        #print("")
-        #print("Some information about summaries")
-        #print(self.__active_vars__)
-        #print(self.__active_vars__.summaries)
-        #print(self.__active_vars__.validation)
-        #self.__active_vars__.summaries = tf.compat.v1.Print(self.__active_vars__.summaries, [self.__active_vars__.summaries])
-        #print("")
-        #tf.print(self.__active_vars__.summaries, output_stream=sys.stdout)
-        '''
-        Start
-        '''
-        '''
-        cond_1 = tf.logical_and(
-            self.__active_vars__.summaries,
-            not('verbose' in kwargs.keys() and (kwargs['verbose'] == True))
-        )
-        cond_2 = tf.logical_and(
-            self.__active_vars__.verbose_summaries == True,
-            ('verbose' in kwargs.keys() and (kwargs['verbose'] == True))
-        )
-        cond_3 = ('force' in kwargs.keys()) and (kwargs['force'] == True)
-        cond_final = tf.logical_or(tf.logical_or(cond_1, cond_2), cond_3)
-        '''
-        '''
-        '''
+
         if not(
           ((self.__active_vars__.summaries == True) and (
             not('verbose' in kwargs.keys() and (kwargs['verbose'] == True)))
@@ -193,6 +169,7 @@ class __Model__(CustomUserModule):
                     optimiser.apply_gradients(zip(grads, optimiser_trainable_variables))
 
     def __build__(self, *args, **kwargs):
+        printt("Building model", info=True)
         kwargs = {**kwargs, _no_training_updates: True}
         _ = self.__update_weights__(self, *args, **kwargs)
         return
@@ -204,6 +181,17 @@ class __Model__(CustomUserModule):
             cls = optimiser.__class__
             self.__optimisers__[i] = None
             optimiser = cls.from_config(config)
+
+    def __built__(self):
+        return self.__active_vars__.built
+
+    def __build__(self):
+        self.__active_vars__.built = False
+        self.__update_weights__(None, _no_training_updates=True)
+
+    def __build_once__(self):
+        self.__update_weights__(None, _no_training_updates=True)
+
 
     def __update_weights__(self, data, summaries=False, verbose_summaries=False, gradients=False, _no_training_updates=False):
         gradients = self.__gradient_taping__ if self.__gradient_taping__ is not None else gradients
@@ -248,9 +236,9 @@ class __Model__(CustomUserModule):
 
                     optimizer_models["__validation_flag__"] = [True]
                     optimizer_models["__training_flag__"] = [True]
-                    if tf.__version__ == '2.2.0' or tf.__version__ == '2.2.0-dev20200301':
+                    if tf.__version__[0:5] == '2.2.0':
                         self.__TEMP__trainfunctions.append(optimizer_models["models"][0].make_train_function())
-                    elif tf.__version__ == '2.1.0':
+                    elif tf.__version__[0:5] == '2.1.0':
                         _,_,sampleweights_none = optimizer_models["models"][0]._standardize_user_data(
                             data, None, sample_weight=None, class_weight=None,
                             extract_tensors_from_dataset=True)
@@ -266,9 +254,9 @@ class __Model__(CustomUserModule):
             if _no_training_updates == True:
                 return {}
             for i, optimizer_models in enumerate(self.__optimisers_models__):
-                if tf.__version__ == '2.2.0' or tf.__version__ == '2.1.0' or tf.__version__ == '2.2.0-dev20200301':
+                if tf.__version__[0:5] == '2.2.0' or tf.__version__[0:5] == '2.1.0':
                     original_data = data
-                    if tf.__version__ == '2.1.0':
+                    if tf.__version__[0:5] == '2.1.0':
                         data,data_y_None,data_sampleweights_None = optimizer_models["models"][0]._standardize_user_data(
                             data, None, sample_weight=None, class_weight=None,
                             extract_tensors_from_dataset=True)
@@ -276,7 +264,7 @@ class __Model__(CustomUserModule):
                         data = data + list(data_y_None or []) + list(data_sampleweights_None or [])
                         if not isinstance(K.symbolic_learning_phase(), int):
                             data += [True]  # Add learning phase value.
-                    elif tf.__version__ == '2.2.0':
+                    elif tf.__version__[0:5] == '2.2.0':
                         data = tf.compat.v1.data.make_one_shot_iterator(tf.data.Dataset.from_tensors(data))
                     vals = self.__TEMP__trainfunctions[i](data)
                     data = original_data
@@ -349,7 +337,7 @@ class __Model__(CustomUserModule):
                 print("Saving combined submodel {}".format(j))
                 this_filename = str(i) + "_" + str(j) + "_" + str(model.name)
                 this_filename = os.path.join(path, this_filename + '' + file_format)
-                #model.predict(data)
+                model.predict(data)
                 model.save(this_filename)
 
             for j, model in enumerate(self.__optimisers_models__old__[i]["models"]):
@@ -416,14 +404,8 @@ class __Model__(CustomUserModule):
                 results = model(results, pass_number=i, **dict_)
                 this_optimiser_trainable_variables += model.trainable_variables
                 this_optimisers_diagnostics.append(results)
-
             all_trainable_variables.append(this_optimiser_trainable_variables)
 
-            #print("Just after")
-            #print(self.__active_vars__.validation)
-            #print(self.__active_vars__.summaries)
-            #print(self.__active_vars__)
-            #print("")
             loss = models['loss_function'](results, pass_number=i)
             losses.append(loss)
             optimisers_diagnostics.append(this_optimisers_diagnostics)
