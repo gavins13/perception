@@ -1,5 +1,4 @@
 import numpy as np
-#from random import shuffle, seed as __seed__
 import tensorflow as tf
 from .misc import printt
 from .customiser import CustomUserModule
@@ -30,7 +29,6 @@ class Dataset(CustomUserModule):
 
     In __config__ (or __init__), remember to set:
      - self.train_dataset_length (along with validation and test)
-     - self.train_dataset_steps
      - self.config.batch_size (int or list [train,val,test])
 
     NOTE: the variable self.current.steps is not used in the main Executor
@@ -46,8 +44,8 @@ class Dataset(CustomUserModule):
     number of folds, and then also select a fold that the class' Python
     generators can use.
 
-    It is advisable to set "self.num_files" to the number of training files, so
-    that training display is more informative.
+    It is advisable to set "self.generator.num_files" to the number of training
+    files, so that training display is more informative.
 
     Remember to define self.train_dataset_length, self.test_dataset_length
     and self.validation_dataset_length in the class
@@ -78,31 +76,38 @@ class Dataset(CustomUserModule):
     '''
     counter=0 # counter for threads
     def __init__(self, *args, **kwargs):
-        #self.counter = 0
         self.gen_num = Dataset.counter
         Dataset.counter += 1
+
+        # Define System Configuration
         class Config: pass
         self.system_type = Config()
         self.system_type.use_generator = False # Use TF Generator
         self.system_type.use_direct = False # Load all into memory
 
+        # Define Developer Mode Settings
         self.dev = Config()
         self.dev.on = True
         self.dev.dataset = 'cifar10'
 
+        # Define Generator Mode Settings
         self.generator = Config()
         self.generator.data_types = None
-        self.num_files = None
+        self.generator.num_files = None
 
+        # Define Dataset Settings
         self.config = Config()
         self.config.type = 'train' # 'train', 'test', 'validate'
         self.config.batch_size = None # Can be int or list [train, val, test]
                                       # or dict(train,validation,test)
-        self.config.prefetch_factor = 4
-        self.config.epochs = None
+
+        # Define Advanced Dataset Settings
+        self.config.epochs = None # Better to define epochs in .JSON experiment
         self.config.disable_batching = False
         self.generator.single_thread_test_dataset = True
+        self.generator.single_thread = False
 
+        # Set default data splitting values according to kwargs
         '''
         Only valid when the using direct method
         '''
@@ -110,7 +115,6 @@ class Dataset(CustomUserModule):
         self.config.cv_folds = None
         self.config.cv_fold_number = None
         self.config.validation_size = 1
-
         '''
         Select folds and fold number
         '''
@@ -122,23 +126,22 @@ class Dataset(CustomUserModule):
                 self.config.cv_fold_number = 1
             printt("Using {} folds, fold number {}".format(self.config.cv_folds, self.config.cv_fold_number))
 
-
-        self.current = Config()
-        self.current.epoch = None # -1
-        self.current.step = None
-        self.current.file = -1 # -1
-
+        # Some important variables that need setting by the user
         self.train_dataset_length = None
         self.test_dataset_length = None
         self.validation_dataset_length = None
+        self.operation_seed = None
 
-        self.train_dataset_steps = None # Should be the same as
-                                        # train_data_length for batch_size
-                                        # = 1, otherwise, =
-                                        # train_dataset_length / batch_size
+        # Variables set by Perception
+        self.train_dataset_steps = None
         self.test_dataset_steps = None
         self.validation_dataset_steps = None
-        self.operation_seed = None
+
+        # Define Active Variables for this Data Loader
+        self.current = Config()
+        self.current.epoch = None
+        self.current.step = None
+        self.current.file = -1
 
         if 'threads' in kwargs.keys():
             printt("Threads specified. USING %d THREADS" % kwargs['threads'], info=True)
@@ -299,17 +302,25 @@ class Dataset(CustomUserModule):
                 printt("-")
         self.__process_dataset__()
     def create_generator(self, generator_name='py_gen_train', threads=4):
-        dummy_ds = tf.data.Dataset.from_tensor_slices(['DataGenerator']*threads)
-        dummy_ds = dummy_ds.interleave(
-            lambda x: tf.data.Dataset.from_generator(
-                #lambda x: self.__class__().py_gen(x),
-                lambda x: getattr(self, generator_name)(x),
-                output_types=self.generator_data_types, args=(x,)
-            ),
-            cycle_length=threads,
-            block_length=1,
-            num_parallel_calls=threads)
-        return dummy_ds
+        if self.generator.single_thread is False:
+            dummy_ds = tf.data.Dataset.from_tensor_slices(['DataGenerator']*threads)
+            dummy_ds = dummy_ds.interleave(
+                lambda x: tf.data.Dataset.from_generator(
+                    lambda x: getattr(self, generator_name)(x),
+                    output_types=self.generator_data_types, args=(x,)
+                ),
+                cycle_length=threads,
+                block_length=1,
+                num_parallel_calls=threads)
+            return dummy_ds
+        else:
+            printt("Using a single-thread-mode for generator", warning=True)
+            dataset = tf.data.Dataset.from_generator(
+                getattr(self, generator_name),
+                output_types=self.generator_data_types,
+                args=(generator_name+'_0_',)
+            )
+            return dataset
     def __process_dataset__(self):
         '''
         For direct: Creates validation folds
@@ -320,12 +331,14 @@ class Dataset(CustomUserModule):
          - self.Datasets : list - List of datasets in order: Train, Val, Test
          - self.train_dataset_length
          - self.test_dataset_length
+         - self.validation_dataset_length
          - self.train_dataset
          - self.validation_dataset
          - self.test_dataset
         If you're not running set_dataset_steps(), then also:
         - self.train_dataset_steps
         - self.test_dataset_steps
+        - self.validation_dataset_steps
         '''
         if self.config.batch_size is None:
             printt("Batch size is not set so Default is set to 1", warning=True)
@@ -359,7 +372,6 @@ class Dataset(CustomUserModule):
                 self.Datasets = [train_ds, validation_ds, test_ds]
                 if self.config.disable_batching is False:
                     self.Datasets = [x.batch(batch_size=batch_sizes[ii]) for ii, x in enumerate(self.Datasets)]
-                #self.Datasets = [x.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor) for x in self.Datasets]
                 self.Datasets = [x.prefetch(tf.data.experimental.AUTOTUNE) if i != 2 else x for i, x in enumerate(self.Datasets) ]
 
                 self.test_dataset_length = len([x for x in range(self.dataset_length) if (x % self.config.cv_folds) == (self.config.cv_fold_number-1)])
@@ -369,57 +381,12 @@ class Dataset(CustomUserModule):
                 raise NotImplementedError('Dataset splitting not implemented yet')
         else:
             if self.config.disable_batching is False:
-                #self.Datasets = [x.batch(batch_size=self.config.batch_size) for x in self.Datasets]
                 self.Datasets = [x.batch(batch_size=batch_sizes[ii]) for ii, x in enumerate(self.Datasets)]
-            #self.Datasets = [x.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor) for x in self.Datasets]
             self.Datasets = [x.prefetch(tf.data.experimental.AUTOTUNE) if i != 2 else x for i, x in enumerate(self.Datasets) ]
-            #self.Dataset = self.Dataset.batch(batch_size=self.config.batch_size)
-            #self.Dataset = self.Dataset.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor)
         self.set_dataset_steps()
         self.train_dataset = self.Datasets[0]
         self.validation_dataset = self.Datasets[1]
         self.test_dataset = self.Datasets[2]
-
-
-    def cifar10(self):
-        self.config.cv_folds = None
-        self.config.dataset_split = None
-        self.config.batch_size = 256
-        # Load training and eval data from tf.keras
-        (train_data, train_labels), (test_data, test_labels) = tf.keras.datasets.cifar10.load_data()
-        printt('CIFAR10 shapes train_data, test_data, test_data, test_labels', debug=True)
-        printt(train_data.shape, debug=True)
-        printt(test_data.shape, debug=True)
-        printt(train_labels.shape, debug=True)
-        printt(test_labels.shape, debug=True)
-
-
-        #train_data = train_data.reshape(-1, 32, 32, 3).astype('float32')
-        train_data = np.float32(train_data) / 255.
-        test_data = np.float32(test_data) / 255.
-
-        train_labels = np.asarray(train_labels, dtype=np.int32)
-        test_labels = np.asarray(test_labels, dtype=np.int32)
-
-        #train_data = train_data[0:49920]
-        #train_labels = train_labels[0:49920]
-
-        self.train_dataset_length = train_labels.shape[0] # 50,000
-        self.test_dataset_length = test_labels.shape[0] # 10,000
-        self.validation_dataset_length = 1
-        # for train
-        train_dataset = tf.data.Dataset.from_tensor_slices((train_data, train_labels))
-        #train_dataset_data = tf.data.Dataset.from_tensor_slices(train_data)
-        #train_dataset_labels = tf.data.Dataset.from_tensor_slices(train_labels)
-        #train_dataset = tf.data.Dataset.zip((train_dataset_data, train_dataset_labels))
-
-        test_dataset = tf.data.Dataset.from_tensor_slices((test_data, test_labels))
-        validation_dataset = test_dataset.take(self.validation_dataset_length)
-
-        self.Datasets = [train_dataset, test_dataset, validation_dataset]
-        printt(self.Datasets, debug=True)
-        self.Datasets = [x.batch(batch_size=self.config.batch_size) for x in self.Datasets]
-        self.Datasets = [x.prefetch(buffer_size=self.config.batch_size*self.config.prefetch_factor) for x in self.Datasets]
 
 
     def set_dataset_steps(self):
@@ -455,20 +422,25 @@ class Dataset(CustomUserModule):
         return batch_sizes
 
     def set_operation_seed(self, seed=1114):
-        #tf.random.set_seed(seed)
-        #np.random.seed(seed)
-        #__seed__(seed)
+        '''
+        Note: Other seeds are not set here anymore and are off-loaded to the
+        Perception Experiment()
+        '''
         self.operation_seed = seed
 
 
     @tf.function
     def rotate_and_translate(self, image, axes=[1,2], rotate=np.pi/2, translate=16):
         '''
-        else if ndims = 3, then assume [H, W, C]
+        Data Augmentation function.
+        May be moved elsewhere in future releases.
+
+        if ndims = 3, then assume [H, W, C]
         if ndims >= 4: then assume [B, ... axes[0], ...., axes[1].... C]
 
         This function will apply a random 2D translation and rotation to images
-        with a range specified by rotate and translate.
+        with a range specified by rotate and translate. Works with complex-
+        vauled images
 
         Rotate can be None in which case no rotation is applied
         Translate can be None in which case no translation is applied
@@ -585,3 +557,43 @@ class Dataset(CustomUserModule):
             image = tf.transpose(image, from_transpose)
 
         return image
+
+    def cifar10(self):
+        self.config.cv_folds = None
+        self.config.dataset_split = None
+        self.config.batch_size = 256
+        # Load training and eval data from tf.keras
+        (train_data, train_labels), (test_data, test_labels) = tf.keras.datasets.cifar10.load_data()
+        printt('CIFAR10 shapes train_data, test_data, test_data, test_labels', debug=True)
+        printt(train_data.shape, debug=True)
+        printt(test_data.shape, debug=True)
+        printt(train_labels.shape, debug=True)
+        printt(test_labels.shape, debug=True)
+
+
+        #train_data = train_data.reshape(-1, 32, 32, 3).astype('float32')
+        train_data = np.float32(train_data) / 255.
+        test_data = np.float32(test_data) / 255.
+
+        train_labels = np.asarray(train_labels, dtype=np.int32)
+        test_labels = np.asarray(test_labels, dtype=np.int32)
+
+        #train_data = train_data[0:49920]
+        #train_labels = train_labels[0:49920]
+
+        self.train_dataset_length = train_labels.shape[0] # 50,000
+        self.test_dataset_length = test_labels.shape[0] # 10,000
+        self.validation_dataset_length = 1
+        # for train
+        train_dataset = tf.data.Dataset.from_tensor_slices((train_data, train_labels))
+        #train_dataset_data = tf.data.Dataset.from_tensor_slices(train_data)
+        #train_dataset_labels = tf.data.Dataset.from_tensor_slices(train_labels)
+        #train_dataset = tf.data.Dataset.zip((train_dataset_data, train_dataset_labels))
+
+        test_dataset = tf.data.Dataset.from_tensor_slices((test_data, test_labels))
+        validation_dataset = test_dataset.take(self.validation_dataset_length)
+
+        self.Datasets = [train_dataset, test_dataset, validation_dataset]
+        printt(self.Datasets, debug=True)
+        self.Datasets = [x.batch(batch_size=self.config.batch_size) for x in self.Datasets]
+        self.Datasets = [x.prefetch(tf.data.experimental.AUTOTUNE) for x in self.Datasets]
