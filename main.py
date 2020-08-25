@@ -17,7 +17,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
   gradient_taping=False, debug=False, command_line_arguments_enabled=True,
   metrics_enabled=False, metrics_printing_enabled=False, save_only=False,
   auto_gpu=False, perception_save_path=None, deterministic=False, set_seed=False,
-  seed=None, validation_on_cpu=False):
+  seed=None, validation_on_cpu=False, json_injection=None, ignore_json_evaluation_finished=False):
     '''
     experiment_id: (str) experiment_id from the JSON files
     experiment_type: (str) 'train' or 'evaluate'. Default: 'test'
@@ -66,6 +66,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         set_seed = detect_cmd_arg("set_seed", retrieve_val=False, false_val=set_seed)
         seed_cmd = detect_cmd_arg("seed", false_val=None, val_dtype=int)
         validation_on_cpu = detect_cmd_arg("validation_on_cpu", retrieve_val=False, false_val=validation_on_cpu)
+        ignore_json_evaluation_finished = detect_cmd_arg("ignore_json_evaluation_finished", retrieve_val=False, false_val=ignore_json_evaluation_finished)
         if seed_cmd is not None:
             set_seed = True
             seed = seed_cmd
@@ -131,6 +132,26 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
     if not(experiment_id in experiments.keys()):
         printt("Experiment doesn't exist", error=True, stop=True)
 
+    def injection(current, injectee):
+        if current is None:
+            return injectee
+        if not(isinstance(current, dict)):
+            return injectee
+        else:
+            if isinstance(injectee, dict):
+                current = current.copy()
+                for key in injectee.keys():
+                    current[key] = injection(current.get(key), injectee[key])
+                return current
+            else:
+                return injectee # or raise Error?
+    if json_injection is not None:
+        if not(isinstance(json_injection, dict)):
+            printt("JSON Injection is not in a valid format", error=True, stop=True)
+        for injection_key in json_injection.keys():
+            experiments[experiment_id][injection_key] = injection(experiments[experiment_id].get(injection_key), json_injection[injection_key])
+        printt("The following JSON data was injected into the existing experiment:", info=True)
+        printt(json_injection, info=True)
 
     '''
     Set determinism/random seed properties
@@ -273,4 +294,5 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         debug=debug, metrics_enabled=metrics_enabled,
         metrics_printing_enabled=metrics_printing_enabled, save_only=save_only,
         load_weights_folder_name=load_weights_folder_name,
-        reset_optimisers=reset_optimisers, validation_on_cpu=validation_on_cpu)
+        reset_optimisers=reset_optimisers, validation_on_cpu=validation_on_cpu,
+        ignore_json_evaluation_finished=ignore_json_evaluation_finished)
