@@ -23,7 +23,7 @@ class Dataset(DatasetBase):
         '''
         self.dev.on = False
         self.use_generator(tf.float32)
-        self.num_files = None # needs setting
+        self.generator.num_files = None # needs setting
 
         '''
         Set some default properties
@@ -65,7 +65,7 @@ class Dataset(DatasetBase):
     '''
     def import_list(self):
         self.file_list = json.load(open(biobank_list_path, 'rb'))
-        self.num_files = len(self.file_list)
+        self.generator.num_files = len(self.file_list)
     def shuffle_and_split(self, cv_folds=3, cv_fold_num=1):
         n = len(self.file_list)
         #self.file_list = np.random.shuffle(self.file_list)
