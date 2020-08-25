@@ -188,7 +188,11 @@ class Execution(object):
         
         if (exp_type == 'evaluate') and \
           hasattr(ExperimentsManager[self.experiment_id], 'evaluation_finished') and \
-          (ExperimentsManager[self.experiment_id]["evaluation_finished"] == True):
+          (ExperimentsManager[self.experiment_id]["evaluation_finished"] == True) and \
+          not(
+              ("ignore_json_evaluation_finished" in kwargs.keys()) and \
+              (kwargs["ignore_json_evaluation_finished"] is True)
+          ):
             printt("Experiment has already finished evaluation", stop=True, error=True)
 
         '''
