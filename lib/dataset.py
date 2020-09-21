@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import tensorflow_addons as tfa
 from .misc import printt
 from .customiser import CustomUserModule
 
@@ -69,6 +70,24 @@ class Dataset(CustomUserModule):
     this scenerio, you can disabled the TF.Dataset batch() call by using
     self.config.disable_batching = True.
 
+    You may also wish to preset the generator output shape. You can do this via
+    the attribute
+    ```
+    self.generator.output_shape
+    ```
+    which may be a list of ints describe the output shape of the generator
+    (all three generators - train, validation and test) OR it may be a list
+    of lists (which the latter lists being lists of ints). The former list
+    will be of size 3: train, validation and test. For example:
+    ```
+    self.generator.output_shape = [
+        train_output_shape(or_structure),
+        validation_output_shape(or_structure),
+        test_output_shape(or_structure)
+    ]
+    ```
+    This can be set in __init__ or __config__
+
     Developer mode:
     If using developer mode, remember to set self.dev.dataset before calling
     use()
@@ -94,6 +113,7 @@ class Dataset(CustomUserModule):
         self.generator = Config()
         self.generator.data_types = None
         self.generator.num_files = None
+        self.generator.output_shape = None
 
         # Define Dataset Settings
         self.config = Config()
@@ -166,7 +186,7 @@ class Dataset(CustomUserModule):
     def use_generator(self, data_types):
         self.system_type.use_generator = True
         self.system_type.use_direct = False
-        self.generator_data_types = data_types
+        self.generator.data_types = data_types
         self.dev.on = False
     def use_direct(self, dataset):
         self.system_type.use_direct = True
@@ -275,6 +295,23 @@ class Dataset(CustomUserModule):
         self.create(*args, **kwargs)
         return self
 
+    def __process_generator_shapes__(self):
+        if self.generator.output_shape is None:
+            self.generator.output_shape = [None, None, None]
+        elif isinstance(self.generator.output_shape, int) is True:
+            printt("Generator shape error. Check your property `self.generator.`.",
+                error=True, stop=True)
+        elif isinstance(self.generator.output_shape, list) is True:
+            if isinstance(self.generator.output_shape[0], int) or isinstance(self.generator.output_shape[0], np.int):
+                '''
+                Either it's a list of ints or a single shape that needs to be replicated.
+                Assume replication
+                '''
+                self.generator.output_shape = [self.generator.output_shape]*3
+        else:
+            self.generator.output_shape = [self.generator.output_shape]*3
+        
+
     def create(self, threads=None):
         threads = threads if threads is not None else self.config.threads
         self.set_operation_seed()
@@ -290,24 +327,26 @@ class Dataset(CustomUserModule):
                 raise NotImplementedError()
         elif self.dev.on is False:
             if self.system_type.use_generator is True:
+                self.__process_generator_shapes__()
                 test_threads = 1 if self.generator.single_thread_test_dataset is True else threads
                 self.Datasets = [
-                    self.create_generator('py_gen_train', threads=threads),
-                    self.create_generator('py_gen_validation', threads=threads),
-                    self.create_generator('py_gen_test', threads=test_threads)
+                    self.create_generator('py_gen_train', threads=threads, output_shape=self.generator.output_shape[0]),
+                    self.create_generator('py_gen_validation', threads=threads, output_shape=self.generator.output_shape[1]),
+                    self.create_generator('py_gen_test', threads=test_threads, output_shape=self.generator.output_shape[2])
                 ]
                 self.Dataset = self.Datasets[0]
             elif self.system_type.use_direct is True:
                 # Nothing?
                 printt("-")
         self.__process_dataset__()
-    def create_generator(self, generator_name='py_gen_train', threads=4):
+    def create_generator(self, generator_name='py_gen_train', threads=4, output_shape=None):
         if self.generator.single_thread is False:
             dummy_ds = tf.data.Dataset.from_tensor_slices(['DataGenerator']*threads)
             dummy_ds = dummy_ds.interleave(
                 lambda x: tf.data.Dataset.from_generator(
                     lambda x: getattr(self, generator_name)(x),
-                    output_types=self.generator_data_types, args=(x,)
+                    output_types=self.generator.data_types, args=(x,),
+                    output_shapes=output_shape
                 ),
                 cycle_length=threads,
                 block_length=1,
@@ -317,8 +356,9 @@ class Dataset(CustomUserModule):
             printt("Using a single-thread-mode for generator", warning=True)
             dataset = tf.data.Dataset.from_generator(
                 getattr(self, generator_name),
-                output_types=self.generator_data_types,
-                args=(generator_name+'_0_',)
+                output_types=self.generator.data_types,
+                args=(generator_name+'_0_',),
+                output_shapes=output_shape
             )
             return dataset
     def __process_dataset__(self):
@@ -399,9 +439,9 @@ class Dataset(CustomUserModule):
 
         batch_sizes = self.get_batch_sizes()
         self.train_dataset_steps = np.ceil(np.divide(self.train_dataset_length,
-            batch_sizes[0]))
+            batch_sizes[0])).astype(np.int)
         self.test_dataset_steps = np.ceil(np.divide(self.test_dataset_length,
-            batch_sizes[2]))
+            batch_sizes[2])).astype(np.int)
 
     def get_batch_sizes(self):
         '''
