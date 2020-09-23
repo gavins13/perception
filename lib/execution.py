@@ -65,6 +65,13 @@ class Execution(object):
             kwargs['execute'] = True
 
         '''
+        Tensorboard port
+        '''
+        self.tensorboard_port = None
+        if 'tensorboard_port' in kwargs.keys() and kwargs['tensorboard_port'] is not None:
+            self.tensorboard_port = kwargs['tensorboard_port']
+
+        '''
         Handle Dataset
         '''
         printt("Loading dataset...", info=True)
@@ -389,11 +396,13 @@ class Execution(object):
         '''
         Start tensorboard
         '''
+        if port is None:
+            port = self.tensorboard_port
         tb = tb_program.TensorBoard()
         args = [None, '--logdir', self.summaries_directory, '--host', '0.0.0.0']
         if port is not None:
             args.append('--port')
-            args.append(port)
+            args.append(str(port))
         tb.configure(argv=args)
         tb_url = tb.launch()
         print("TensorBoard started at {}".format(tb_url))
