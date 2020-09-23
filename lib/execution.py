@@ -67,6 +67,7 @@ class Execution(object):
         '''
         Handle Dataset
         '''
+        printt("Loading dataset...", info=True)
         if 'dataset' in kwargs.keys():
             # Use this dataset
             if isinstance(kwargs['dataset'], Dataset) is False:
@@ -76,7 +77,8 @@ class Execution(object):
             self.Dataset = Dataset()
             self.Dataset.use('developer_mode', 'cifar10')
             self.Dataset.create()
-
+        printt("Finished loading dataset...", info=True)
+        
         '''
         Handle Model
         '''
@@ -341,7 +343,7 @@ class Execution(object):
                 Print to console and save checkpoint
                 '''
                 data_split_num = record_number if self.Dataset.system_type.use_generator is False else self.Dataset.current.test_file
-                data_split_num_total = self.Dataset.test_dataset_steps if self.Dataset.system_type.use_generator is False else self.Dataset.num_test_files
+                data_split_num_total = self.Dataset.test_dataset_steps if self.Dataset.system_type.use_generator is False else self.Dataset.generator.num_test_files
                 print("testing epoch: %d" % epochs, end=";")
                 print("data split: %d of %d" % (data_split_num, data_split_num_total), end=";")
                 print("step: %d of %d" % (step+1, self.Dataset.test_dataset_steps), end=";")
@@ -467,7 +469,7 @@ class Execution(object):
                             # Print training information and duration
                             print("training epoch: {}".format(epochs+1), end=";")
                             data_split_num = record_number if self.Dataset.system_type.use_generator is False else self.Dataset.current.file
-                            data_split_num_total = self.Dataset.train_dataset_steps if self.Dataset.system_type.use_generator is False else self.Dataset.num_files
+                            data_split_num_total = self.Dataset.train_dataset_steps if self.Dataset.system_type.use_generator is False else self.Dataset.generator.num_files
                             print("data split: %d of %d" % (
                                 data_split_num+1,
                                 data_split_num_total), end=";")
