@@ -130,7 +130,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         printt('Execution mode invalid', error=True, stop=True)
 
     if not(experiment_id in experiments.keys()):
-        printt("Experiment doesn't exist", error=True, stop=True)
+        printt("Experiment \"{}\" doesn't exist".format(experiment_id), error=True, stop=True)
 
     def injection(current, injectee):
         if current is None:
@@ -225,14 +225,17 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         experiment_name = 'TODELETE'
 
 
-
+    printt("(main.py) Dataset loading...", info=True)
     if 'dataset_args' in experiments[experiment_id].keys():
+        printt("(main.py) Dataset loading with arguments", info=True)
         Dataset_Frame = Dataset(**experiments[experiment_id]['dataset_args'])
     else:
+        printt("(main.py) Dataset loading without arguments", info=True)
         Dataset_Frame = Dataset()
 
     Dataset = Dataset_Frame()
     # Dataset_Frame.create(); Dataset = Dataset_Frame
+    printt("(main.py) Dataset loaded!", info=True)
 
     '''
     Experiment save path (relative to the perception save path or `save_path')
