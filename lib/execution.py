@@ -559,6 +559,7 @@ class Execution(object):
         self.ExperimentsManager.update_experiment(
          self.experiment_id, 'training_finished',
          True)
+        tf.keras.backend.clear_session()
         self.tensorboard_only()
 
     def save_only(self):
