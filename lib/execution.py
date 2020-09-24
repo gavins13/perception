@@ -453,7 +453,7 @@ class Execution(object):
             with tf.summary.record_if(True):
                 while train is True: # Trains across epochs, NOT steps
                     for record_number, data_record in\
-                        self.Dataset.train_dataset.enumerate():
+                        self.Dataset.train_dataset.enumerate(): # Avoid tqdm progress bar
                             add_summary = (step+1) % self.Model.__config__.summary_steps
                             add_summary = True if add_summary == 0 else False
                             verbose_add_summary = (step+1) % self.Model.__config__.verbose_summary_steps
