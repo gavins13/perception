@@ -533,9 +533,18 @@ class Execution(object):
                             if self.Dataset.system_type.use_generator is False:
                                 self.Dataset.current.epoch = epochs
                                 self.Dataset.current.step = step
+                            elif self.Dataset.system_type.use_generator is True:
+                                epochs = self.Dataset.current.epoch
+                                if (epochs >= self.Model.__config__.epochs) and (self.Model.__config__.epochs != -1):
+                                    train = False
+                                    break # Exit For loop iterating over generator dataset
 
                     epochs += 1
                     if epochs % self.Model.__config__.saved_model_epochs == 0:
+                        # NOTE: There is a bug caused by the generator dataset being in an endless
+                        #       for loop which will cause this next bit of code not to run. Lines
+                        #       involve "train=False" have been copied to a special generator mode
+                        #       case above (lines 536-540)
                         this_epoch_saved_model_dir = os.path.join(self.saved_model_directory, 'epoch_'+str(epochs))
                         if not(os.path.exists(this_epoch_saved_model_dir)):
                             os.makedirs(this_epoch_saved_model_dir)
