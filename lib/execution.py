@@ -211,7 +211,7 @@ class Execution(object):
         if not(os.path.exists(os.path.join(self.save_directory, 'summaries'))):
             os.makedirs(os.path.join(self.save_directory, 'summaries'))
         self.summary_writer = tf.summary.create_file_writer(
-            os.path.join(self.save_directory, 'summaries'))
+            os.path.join(self.save_directory, 'summaries')) if (exp_type == 'train') else tf.summary.create_noop_writer()
         self.summaries_directory = os.path.join(self.save_directory, 'summaries')
 
         '''
@@ -494,6 +494,7 @@ class Execution(object):
                                             validation=True, summaries=True, verbose_summaries=True,
                                             step=this_step
                                         )
+                                        print("validation")
                                 duration = time.time() - start_time
                                 print("Validation time: %.3f" % duration)
 
