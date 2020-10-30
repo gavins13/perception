@@ -65,8 +65,16 @@ class Execution(object):
             kwargs['execute'] = True
 
         '''
+        Tensorboard port
+        '''
+        self.tensorboard_port = None
+        if 'tensorboard_port' in kwargs.keys() and kwargs['tensorboard_port'] is not None:
+            self.tensorboard_port = kwargs['tensorboard_port']
+
+        '''
         Handle Dataset
         '''
+        printt("Loading dataset...", info=True)
         if 'dataset' in kwargs.keys():
             # Use this dataset
             if isinstance(kwargs['dataset'], Dataset) is False:
@@ -76,7 +84,8 @@ class Execution(object):
             self.Dataset = Dataset()
             self.Dataset.use('developer_mode', 'cifar10')
             self.Dataset.create()
-
+        printt("Finished loading dataset...", info=True)
+        
         '''
         Handle Model
         '''
@@ -202,7 +211,7 @@ class Execution(object):
         if not(os.path.exists(os.path.join(self.save_directory, 'summaries'))):
             os.makedirs(os.path.join(self.save_directory, 'summaries'))
         self.summary_writer = tf.summary.create_file_writer(
-            os.path.join(self.save_directory, 'summaries'))
+            os.path.join(self.save_directory, 'summaries')) if (exp_type == 'train') else tf.summary.create_noop_writer()
         self.summaries_directory = os.path.join(self.save_directory, 'summaries')
 
         '''
@@ -341,7 +350,7 @@ class Execution(object):
                 Print to console and save checkpoint
                 '''
                 data_split_num = record_number if self.Dataset.system_type.use_generator is False else self.Dataset.current.test_file
-                data_split_num_total = self.Dataset.test_dataset_steps if self.Dataset.system_type.use_generator is False else self.Dataset.num_test_files
+                data_split_num_total = self.Dataset.test_dataset_steps if self.Dataset.system_type.use_generator is False else self.Dataset.generator.num_test_files
                 print("testing epoch: %d" % epochs, end=";")
                 print("data split: %d of %d" % (data_split_num, data_split_num_total), end=";")
                 print("step: %d of %d" % (step+1, self.Dataset.test_dataset_steps), end=";")
@@ -387,11 +396,13 @@ class Execution(object):
         '''
         Start tensorboard
         '''
+        if port is None:
+            port = self.tensorboard_port
         tb = tb_program.TensorBoard()
         args = [None, '--logdir', self.summaries_directory, '--host', '0.0.0.0']
         if port is not None:
             args.append('--port')
-            args.append(port)
+            args.append(str(port))
         tb.configure(argv=args)
         tb_url = tb.launch()
         print("TensorBoard started at {}".format(tb_url))
@@ -442,7 +453,7 @@ class Execution(object):
             with tf.summary.record_if(True):
                 while train is True: # Trains across epochs, NOT steps
                     for record_number, data_record in\
-                        self.Dataset.train_dataset.enumerate():
+                        self.Dataset.train_dataset.enumerate(): # Avoid tqdm progress bar
                             add_summary = (step+1) % self.Model.__config__.summary_steps
                             add_summary = True if add_summary == 0 else False
                             verbose_add_summary = (step+1) % self.Model.__config__.verbose_summary_steps
@@ -467,7 +478,7 @@ class Execution(object):
                             # Print training information and duration
                             print("training epoch: {}".format(epochs+1), end=";")
                             data_split_num = record_number if self.Dataset.system_type.use_generator is False else self.Dataset.current.file
-                            data_split_num_total = self.Dataset.train_dataset_steps if self.Dataset.system_type.use_generator is False else self.Dataset.num_files
+                            data_split_num_total = self.Dataset.train_dataset_steps if self.Dataset.system_type.use_generator is False else self.Dataset.generator.num_files
                             print("data split: %d of %d" % (
                                 data_split_num+1,
                                 data_split_num_total), end=";")
@@ -483,6 +494,7 @@ class Execution(object):
                                             validation=True, summaries=True, verbose_summaries=True,
                                             step=this_step
                                         )
+                                        print("validation")
                                 duration = time.time() - start_time
                                 print("Validation time: %.3f" % duration)
 
@@ -522,9 +534,18 @@ class Execution(object):
                             if self.Dataset.system_type.use_generator is False:
                                 self.Dataset.current.epoch = epochs
                                 self.Dataset.current.step = step
+                            elif self.Dataset.system_type.use_generator is True:
+                                epochs = self.Dataset.current.epoch
+                                if (epochs >= self.Model.__config__.epochs) and (self.Model.__config__.epochs != -1):
+                                    train = False
+                                    break # Exit For loop iterating over generator dataset
 
                     epochs += 1
                     if epochs % self.Model.__config__.saved_model_epochs == 0:
+                        # NOTE: There is a bug caused by the generator dataset being in an endless
+                        #       for loop which will cause this next bit of code not to run. Lines
+                        #       involve "train=False" have been copied to a special generator mode
+                        #       case above (lines 536-540)
                         this_epoch_saved_model_dir = os.path.join(self.saved_model_directory, 'epoch_'+str(epochs))
                         if not(os.path.exists(this_epoch_saved_model_dir)):
                             os.makedirs(this_epoch_saved_model_dir)
@@ -539,6 +560,7 @@ class Execution(object):
         self.ExperimentsManager.update_experiment(
          self.experiment_id, 'training_finished',
          True)
+        tf.keras.backend.clear_session()
         self.tensorboard_only()
 
     def save_only(self):

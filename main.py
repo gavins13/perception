@@ -17,7 +17,8 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
   gradient_taping=False, debug=False, command_line_arguments_enabled=True,
   metrics_enabled=False, metrics_printing_enabled=False, save_only=False,
   auto_gpu=False, perception_save_path=None, deterministic=False, set_seed=False,
-  seed=None, validation_on_cpu=False, json_injection=None, ignore_json_evaluation_finished=False):
+  seed=None, validation_on_cpu=False, json_injection=None, ignore_json_evaluation_finished=False,
+  tensorboard_port=None, ncpus=None):
     '''
     experiment_id: (str) experiment_id from the JSON files
     experiment_type: (str) 'train' or 'evaluate'. Default: 'test'
@@ -48,6 +49,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         tensorboard_only = detect_cmd_arg("tensorboard", retrieve_val=False, false_val=tensorboard_only)
         tensorboard_only_2 = detect_cmd_arg("tensorboard_only", retrieve_val=False, false_val=tensorboard_only)
         tensorboard_only = (tensorboard_only or tensorboard_only_2)
+        tensorboard_port = detect_cmd_arg("tensorboard_port", false_val=tensorboard_port, val_dtype=int)
         reset = detect_cmd_arg("reset", retrieve_val=False, false_val=reset)
         gradient_taping = detect_cmd_arg("gradient_taping", retrieve_val=False, false_val=gradient_taping)
         debug = detect_cmd_arg("debug", retrieve_val=False, false_val=debug)
@@ -60,7 +62,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         save_only = (save_only or save_only_2)
         auto_gpu = detect_cmd_arg("auto_gpu", retrieve_val=False, false_val=auto_gpu)
         perception_save_path = detect_cmd_arg("perception_save_path", false_val=perception_save_path)
-        ncpus = detect_cmd_arg("ncpus", false_val=None, val_dtype=int)
+        ncpus = detect_cmd_arg("ncpus", false_val=ncpus, val_dtype=int)
         ncpus = detect_cmd_arg("n_cpus", false_val=ncpus, val_dtype=int)
         deterministic = detect_cmd_arg("deterministic", retrieve_val=False, false_val=deterministic)
         set_seed = detect_cmd_arg("set_seed", retrieve_val=False, false_val=set_seed)
@@ -130,7 +132,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         printt('Execution mode invalid', error=True, stop=True)
 
     if not(experiment_id in experiments.keys()):
-        printt("Experiment doesn't exist", error=True, stop=True)
+        printt("Experiment \"{}\" doesn't exist".format(experiment_id), error=True, stop=True)
 
     def injection(current, injectee):
         if current is None:
@@ -205,7 +207,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         module_args = None
 
     if 'dataset' in experiments[experiment_id].keys():
-        if 'dataset_path' in experiments[experiment_id].keys():
+        if ('dataset_path' in experiments[experiment_id].keys()) and (experiments[experiment_id]["dataset_path"] is not None):
             printt("DATASET PATH: "+prepare_path(
                 experiments[experiment_id]['dataset_path']), debug=True)
             sys.path.insert(0, prepare_path(
@@ -225,14 +227,17 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         experiment_name = 'TODELETE'
 
 
-
+    printt("(main.py) Dataset loading...", info=True)
     if 'dataset_args' in experiments[experiment_id].keys():
+        printt("(main.py) Dataset loading with arguments", info=True)
         Dataset_Frame = Dataset(**experiments[experiment_id]['dataset_args'])
     else:
+        printt("(main.py) Dataset loading without arguments", info=True)
         Dataset_Frame = Dataset()
 
     Dataset = Dataset_Frame()
     # Dataset_Frame.create(); Dataset = Dataset_Frame
+    printt("(main.py) Dataset loaded!", info=True)
 
     '''
     Experiment save path (relative to the perception save path or `save_path')
@@ -295,4 +300,5 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         metrics_printing_enabled=metrics_printing_enabled, save_only=save_only,
         load_weights_folder_name=load_weights_folder_name,
         reset_optimisers=reset_optimisers, validation_on_cpu=validation_on_cpu,
-        ignore_json_evaluation_finished=ignore_json_evaluation_finished)
+        ignore_json_evaluation_finished=ignore_json_evaluation_finished,
+        tensorboard_port=tensorboard_port)
