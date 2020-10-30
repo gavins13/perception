@@ -442,6 +442,9 @@ class Dataset(CustomUserModule):
             batch_sizes[0])).astype(np.int)
         self.test_dataset_steps = np.ceil(np.divide(self.test_dataset_length,
             batch_sizes[2])).astype(np.int)
+        if self.validation_dataset_length is not None:
+            self.validation_dataset_steps = np.ceil(np.divide(self.validation_dataset_length,
+            batch_sizes[1])).astype(np.int)
 
     def get_batch_sizes(self):
         '''
