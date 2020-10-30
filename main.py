@@ -18,7 +18,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
   metrics_enabled=False, metrics_printing_enabled=False, save_only=False,
   auto_gpu=False, perception_save_path=None, deterministic=False, set_seed=False,
   seed=None, validation_on_cpu=False, json_injection=None, ignore_json_evaluation_finished=False,
-  tensorboard_port=None):
+  tensorboard_port=None, ncpus=None):
     '''
     experiment_id: (str) experiment_id from the JSON files
     experiment_type: (str) 'train' or 'evaluate'. Default: 'test'
@@ -62,7 +62,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         save_only = (save_only or save_only_2)
         auto_gpu = detect_cmd_arg("auto_gpu", retrieve_val=False, false_val=auto_gpu)
         perception_save_path = detect_cmd_arg("perception_save_path", false_val=perception_save_path)
-        ncpus = detect_cmd_arg("ncpus", false_val=None, val_dtype=int)
+        ncpus = detect_cmd_arg("ncpus", false_val=ncpus, val_dtype=int)
         ncpus = detect_cmd_arg("n_cpus", false_val=ncpus, val_dtype=int)
         deterministic = detect_cmd_arg("deterministic", retrieve_val=False, false_val=deterministic)
         set_seed = detect_cmd_arg("set_seed", retrieve_val=False, false_val=set_seed)
@@ -207,7 +207,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         module_args = None
 
     if 'dataset' in experiments[experiment_id].keys():
-        if 'dataset_path' in experiments[experiment_id].keys():
+        if ('dataset_path' in experiments[experiment_id].keys()) and (experiments[experiment_id]["dataset_path"] is not None):
             printt("DATASET PATH: "+prepare_path(
                 experiments[experiment_id]['dataset_path']), debug=True)
             sys.path.insert(0, prepare_path(
