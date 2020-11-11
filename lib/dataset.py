@@ -640,3 +640,10 @@ class Dataset(CustomUserModule):
         printt(self.Datasets, debug=True)
         self.Datasets = [x.batch(batch_size=self.config.batch_size) for x in self.Datasets]
         self.Datasets = [x.prefetch(tf.data.experimental.AUTOTUNE) for x in self.Datasets]
+
+    def reset(self):
+        '''
+        Reset generator counters
+        '''
+        self.current.file=0
+        self.current.epoch=0
