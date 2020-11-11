@@ -18,6 +18,18 @@ which pip
 pip install --no-deps tensorflow-addons==0.6
 ```
 
+### Other Dependencies that you might use:
+
+NLTK
+```
+conda install -c anaconda nltk
+```
+
+SkLearn
+```
+conda install -c anaconda scikit-learn
+```
+
 ## Installation Issues
 If issues with tensorflow-addons arises, please ignore the instructions above and install this way:
 ```

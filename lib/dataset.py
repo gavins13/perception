@@ -7,15 +7,15 @@ from .customiser import CustomUserModule
 class Dataset(CustomUserModule):
     '''
     The Dataset class provides the abstraction that allows:
-        1. Automatic handling of training, testing and validation splitting
+        1. Automatic handling of training, validation and testing splitting
         2. Dataset shuffling (with automatic seed setting)
         3. Prefetching and multi-threading for Python generator functions
         4. Automatic test mode
 
     Usage:
     To use, simply initialise, call use(), then create().
-    Afer this, self.Datasets is a list of 3 items: the training, testing and
-    validation datasets that you can loop through during training/testing/etc.
+    Afer this, self.Datasets is a list of 3 items: the training, validation and
+    testing datasets that you can loop through during training/validation/etc.
 
     Additionally, after inheritance of Dataset, you can invoke use() in the
     __init__ method (which will need to call super().__init__())
