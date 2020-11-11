@@ -11,11 +11,11 @@ sys.path.insert(0, perception_path)
 #import perception_tf2 as perception
 printt = perception.printt
 DatasetBase = perception.Dataset
-path = '/rds/general/user/kgs13/home/_Home/PhD/projects/datasets/jose/'
-jose_data = pickle.load(open(path+'MICCAI_cardiac_data.pkl', 'rb'), encoding='bytes')
+#path = '/rds/general/user/kgs13/home/_Home/PhD/projects/datasets/jose/'
+#jose_data = pickle.load(open(path+'MICCAI_cardiac_data.pkl', 'rb'), encoding='bytes')
 
-#path = '/vol/medic02/users/kgs13/datasets/jose/'
-#jose_data = pickle.load(open(path+'cardiac_cine_mri_data.pkl', 'rb'), encoding='bytes')
+path = '/vol/medic02/users/kgs13/datasets/jose/'
+jose_data = pickle.load(open(path+'cardiac_cine_mri_data.pkl', 'rb'), encoding='bytes')
 
 # This dataset is simple a (10, 30, 256, 256) complex128 matrix
 
