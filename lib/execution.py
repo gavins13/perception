@@ -419,20 +419,14 @@ class Execution(object):
 
     def training(self):
         '''
-        Training Loop
+        Training initialisation
         '''
         printt("Entering training loop", debug=True)
-        epochs = 0
-        step=0
-        #epochs = int(tf.floor(tf.divide(self.ckpt.step, self.Dataset.train_dataset_steps)))
         epochs = int(self.ckpt.epoch)
         step=int(self.ckpt.step) # Starts on 1
-        train = True
-        #self.Dataset.train_dataset=self.Dataset.train_dataset.skip(step)
+        train = not ( (epochs >= self.Model.__config__.epochs) and (self.Model.__config__.epochs != -1) )
         self.Dataset.skip(step, current_file=int(self.ckpt.current_file), epoch=int(self.ckpt.epoch))
 
-        if (epochs >= self.Model.__config__.epochs) and (self.Model.__config__.epochs != -1):
-            train = False
         '''
         Metrics (and printing) enabled?
         '''
@@ -447,24 +441,22 @@ class Execution(object):
         Start Tensorboard
         '''
         self.tensorboard()
-
-        this_train_dataset = self.Dataset.train_dataset
-        #if self.Dataset.system_type.use_generator is False:
-        this_train_dataset = this_train_dataset.repeat()
-
+        
+        '''
+        Enter training loop
+        '''
         print("Current File: {} \nEpoch: {} \nStep: {} \n".format(int(self.ckpt.current_file), int(self.ckpt.epoch), step))
         with self.summary_writer.as_default():
             with tf.summary.record_if(True):
-                while train is True: # Trains across epochs, NOT steps
+                while train is True: # Train across epochs, NOT steps
                     for record_number, data_record in\
-                        this_train_dataset.enumerate(): # Avoid tqdm progress bar
-                            add_summary = (step+1) % self.Model.__config__.summary_steps
-                            add_summary = True if add_summary == 0 else False
-                            verbose_add_summary = (step+1) % self.Model.__config__.verbose_summary_steps
-                            verbose_add_summary = True if verbose_add_summary == 0 else False
+                        self.Dataset.train_dataset.repeat().enumerate(): # Avoid tqdm progress bar
+                            # Summaries on or off?
+                            add_summary = True if ((step+1) % self.Model.__config__.summary_steps) == 0 else False
+                            verbose_add_summary = True if ((step+1) % self.Model.__config__.verbose_summary_steps) == 0 else False
                             # Start Timing
                             start_time = time.time()
-                            # Execute Model
+                            # Execute Model, Implement Gradients
                             metrics = self.Model.__update_weights__(data_record, summaries=add_summary, verbose_summaries=verbose_add_summary, gradients=self.gradient_taping)
                             # Print metrics if enabled
                             if self.metrics_enabled is True:
