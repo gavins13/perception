@@ -448,12 +448,16 @@ class Execution(object):
         '''
         self.tensorboard()
 
+        this_train_dataset = self.Dataset.train_dataset
+        #if self.Dataset.system_type.use_generator is False:
+        this_train_dataset = this_train_dataset.repeat()
+
         print("Current File: {} \nEpoch: {} \nStep: {} \n".format(int(self.ckpt.current_file), int(self.ckpt.epoch), step))
         with self.summary_writer.as_default():
             with tf.summary.record_if(True):
                 while train is True: # Trains across epochs, NOT steps
                     for record_number, data_record in\
-                        self.Dataset.train_dataset.enumerate(): # Avoid tqdm progress bar
+                        this_train_dataset.enumerate(): # Avoid tqdm progress bar
                             add_summary = (step+1) % self.Model.__config__.summary_steps
                             add_summary = True if add_summary == 0 else False
                             verbose_add_summary = (step+1) % self.Model.__config__.verbose_summary_steps
@@ -477,7 +481,7 @@ class Execution(object):
                                     metrics_file_.flush()
                             # Print training information and duration
                             print("training epoch: {}".format(epochs+1), end=";")
-                            data_split_num = record_number if self.Dataset.system_type.use_generator is False else self.Dataset.current.file
+                            data_split_num = (record_number % self.Dataset.train_dataset_steps) if self.Dataset.system_type.use_generator is False else self.Dataset.current.file
                             data_split_num_total = self.Dataset.train_dataset_steps if self.Dataset.system_type.use_generator is False else self.Dataset.generator.num_files
                             print("data split: %d of %d" % (
                                 data_split_num+1,
@@ -540,23 +544,27 @@ class Execution(object):
                                     train = False
                                     break # Exit For loop iterating over generator dataset
 
-                    epochs += 1
-                    if epochs % self.Model.__config__.saved_model_epochs == 0:
-                        # NOTE: There is a bug caused by the generator dataset being in an endless
-                        #       for loop which will cause this next bit of code not to run. Lines
-                        #       involve "train=False" have been copied to a special generator mode
-                        #       case above (lines 536-540)
-                        this_epoch_saved_model_dir = os.path.join(self.saved_model_directory, 'epoch_'+str(epochs))
-                        if not(os.path.exists(this_epoch_saved_model_dir)):
-                            os.makedirs(this_epoch_saved_model_dir)
-                        saving_enabled = False if (tf.__version__ == '2.0.0') else True
-                        saving_enabled = False if (self.gradient_taping == True) else saving_enabled
-                        #saving_enabled = False # [CHECK] []
-                        if saving_enabled is True:
-                            self.Model.save(this_epoch_saved_model_dir)
-                            print("TensorBoard started at {}".format(self.tb_url))
-                    if (epochs >= self.Model.__config__.epochs) and (self.Model.__config__.epochs != -1):
-                        train = False
+                            # End of epoch tasks : Model saving, detect training end
+                            if step % self.Dataset.train_dataset_steps == 0:
+                                epochs += 1
+                                if epochs % self.Model.__config__.saved_model_epochs == 0:
+                                    # NOTE: There is a bug caused by the generator dataset being in an endless
+                                    #       for loop which will cause this next bit of code not to run. Lines
+                                    #       involve "train=False" have been copied to a special generator mode
+                                    #       case above (lines 536-540)
+                                    this_epoch_saved_model_dir = os.path.join(self.saved_model_directory, 'epoch_'+str(epochs))
+                                    if not(os.path.exists(this_epoch_saved_model_dir)):
+                                        os.makedirs(this_epoch_saved_model_dir)
+                                    saving_enabled = False if (tf.__version__ == '2.0.0') else True
+                                    saving_enabled = False if (self.gradient_taping == True) else saving_enabled
+                                    #saving_enabled = False # [CHECK] []
+                                    if saving_enabled is True:
+                                        self.Model.save(this_epoch_saved_model_dir)
+                                        print("TensorBoard started at {}".format(self.tb_url))
+                                if (epochs >= self.Model.__config__.epochs) and (self.Model.__config__.epochs != -1):
+                                    train = False
+                                    break
+                    # ..
         self.ExperimentsManager.update_experiment(
          self.experiment_id, 'training_finished',
          True)
