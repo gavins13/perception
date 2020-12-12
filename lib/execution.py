@@ -327,7 +327,7 @@ class Execution(object):
 
     def testing(self):
         n_epochs = 1
-        if hasattr(self.Model.__config__, 'test_epochs'):
+        if hasattr(self.Model.__config__, 'test_epochs') and self.Model.__config__.test_epochs is not None:
             n_epochs = self.Model.__config__.test_epochs
         printt("Entering testing loop", debug=True)
         epochs = 0
@@ -351,9 +351,9 @@ class Execution(object):
                 '''
                 data_split_num = record_number if self.Dataset.system_type.use_generator is False else self.Dataset.current.test_file
                 data_split_num_total = self.Dataset.test_dataset_steps if self.Dataset.system_type.use_generator is False else self.Dataset.generator.num_test_files
-                print("testing epoch: %d" % epochs, end=";")
+                print("testing epoch: %d" % (epochs+1), end=";")
                 print("data split: %d of %d" % (data_split_num, data_split_num_total), end=";")
-                print("step: %d of %d" % (step+1, self.Dataset.test_dataset_steps), end=";")
+                print("step: %d of %d" % (step+1, self.Dataset.test_dataset_steps*n_epochs), end=";")
                 duration = time.time() - start_time
                 print("time: {}".format(duration))
                 print("")
