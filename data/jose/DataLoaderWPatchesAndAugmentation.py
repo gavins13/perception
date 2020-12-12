@@ -39,8 +39,28 @@ def rotate_tf(image):
     rotated = tf.complex(real, imag)
     return tf.transpose(rotated, [0,3,1,2])
 
+def gaussian_noise_layer(input_layer, std):
+    noise = tf.random_normal(shape=tf.shape(input_layer), mean=0.0, stddev=std, dtype=tf.float32) 
+    return input_layer + noise
+
+
+@tf.function
+def add_noise(image, std=1.):
+    #image = tf.transpose(image, [0,2,3,1]) # [B, H, W, T]
+    noise = tf.random.normal(shape=tf.shape(image), mean=0.0, stddev=std, dtype=tf.float64, seed=1117)
+    noise_2 = tf.random.normal(shape=tf.shape(image), mean=0.0, stddev=std, dtype=tf.float64, seed=1118)
+    complex_noise = tf.complex(noise, noise_2)
+    #return tf.transpose(image + noise, [0,3,1,2])
+    return image+complex_noise
+
 class Dataset(DatasetBase):
     def __init__(self, *args, **kwargs):
+        '''
+        Options:
+
+        biobank_test_dataset: (bool) Set to True if you wish to access the
+                                     reduced BioBank test dataset
+        '''
         kwargs['cv_folds'] = 3
         super().__init__(*args, **kwargs)
         '''
@@ -69,24 +89,61 @@ class Dataset(DatasetBase):
         if 'patch_size' in kwargs.keys() and isinstance(kwargs['patch_size'], int):
             self.config.patches.size = kwargs['patch_size']
 
+        self.config.biobank_test_dataset = (
+            'biobank_test_dataset' in kwargs.keys() and \
+                 isinstance(kwargs['biobank_test_dataset'], bool)
+            ) and kwargs['biobank_test_dataset']
+
+        self.config.add_noise = (
+            'add_test_dataset_noise' in kwargs.keys() and \
+                 isinstance(kwargs['add_test_dataset_noise'], bool)
+            ) and kwargs['add_test_dataset_noise']
+
+        
+        self.config.noise = self.module_arg('noise_val', false_val=0.02)
         tf.random.set_seed(1114)
+        self.add_noise_func = lambda image : add_noise(image, std=self.config.noise)
 
-
+        self.config.patches.sparse = self.module_arg('sparse_patches', false_val=False)
+        
     def __process_dataset__(self):
         super().__process_dataset__()
         # Augmentation step
         self.train_dataset=self.train_dataset.map(rotate_tf)
+        if self.config.patches.enabled is True:
+            printt("Patches enabled", info=True)
+            #patch_positions = [0,30,45,60,75,90, 95]  +  list(range(100, 122, 2)) + [130, 135,150,165,180,194,224]
+            if self.config.patches.sparse is False:
+                patch_positions = [35,30,45,60,75,90, 95]  +  list(range(100, 122, 2)) + [130, 135,150,165,180,194,189]
+            else:
+                printt("Using sparse patches!", info=True)
+                #patch_positions = list(range(35, 195, 20))
+                patch_positions = [35, 55, 75, 95, 115, 120, 125, 135, 140, 145, 155, 175, 195, 215]
+            patch_size = self.config.patches.size
+            init_map  = lambda d, x : d[:,:,:,x:x+patch_size]
+            end_map = lambda d: tf.concat([init_map(d, x) for x in patch_positions], axis=0)
+            #self.train_dataset = self.train_dataset.flat_map(lambda x: tf.data.Dataset.from_tensor_slices(end_map(x)))
+            self.train_dataset = self.train_dataset.map(end_map)
+            self.train_dataset = self.train_dataset.flat_map(lambda x: tf.data.Dataset.from_tensor_slices(x))
+            self.train_dataset = self.train_dataset.shuffle(self.train_dataset_length * len(patch_positions), seed=1114)
+            self.train_dataset = self.train_dataset.batch(self.config.batch_size)
+            #self.train_dataset = self.train_dataset.map(end_map)
+            self.train_dataset_length = int(self.train_dataset_length * len(patch_positions))
 
-        #patch_positions = [0,30,45,60,75,90, 95]  +  list(range(100, 122, 2)) + [130, 135,150,165,180,194,224]
-        patch_positions = [35,30,45,60,75,90, 95]  +  list(range(100, 122, 2)) + [130, 135,150,165,180,194,189]
-        patch_size = self.config.patches.size
-        init_map  = lambda d, x : d[:,:,:,x:x+patch_size]
-        end_map = lambda d: tf.concat([init_map(d, x) for x in patch_positions], axis=0)
-        self.train_dataset = self.train_dataset.flat_map(lambda x: tf.data.Dataset.from_tensor_slices(end_map(x)))
-        self.train_dataset = self.train_dataset.shuffle(self.train_dataset_length * len(patch_positions), seed=1114)
-        self.train_dataset = self.train_dataset.batch(self.config.batch_size)
-        #self.train_dataset = self.train_dataset.map(end_map)
-        self.train_dataset_length = int(self.train_dataset_length * len(patch_positions))
+        if self.config.biobank_test_dataset is True:
+            printt("Using Biobank Test Dataset!!", info=True)
+            self.test_dataset = tf.data.Dataset.from_tensor_slices((biobank_data))
+            self.test_dataset = self.test_dataset.shuffle(
+                buffer_size=biobank_data.shape[0],
+                seed=1114
+            )
+            b = self.get_batch_sizes()
+            self.test_dataset = self.test_dataset.batch(batch_size=b[2])
+            self.test_dataset_length = biobank_data.shape[0]
+
+        if self.config.add_noise is True:
+            self.test_dataset = self.test_dataset.map(self.add_noise_func, deterministic=True)
+
         self.set_dataset_steps()
 
 
