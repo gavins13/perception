@@ -78,10 +78,10 @@ class __Model__(CustomUserModule):
     def add_summary(self, name, data, **kwargs):
         #tf.summary.trace_off()
         '''
-        type: string from 'scalar', 'video', 'image'
+        type: string from 'scalar', 'video', 'image', 'text'
         '''
         if 'type' not in kwargs.keys():
-            printt("type not valid", error=True, stop=True)
+            printt("type not supplied", error=True, stop=True)
         else:
             typ = kwargs['type']
         del(kwargs['type'])
@@ -133,6 +133,8 @@ class __Model__(CustomUserModule):
                     return tf.summary.image(name, data, **kwargs)
                 elif typ == "video" or typ == "gif":
                     return video_summary(name, data, **kwargs)
+                elif typ == "text":
+                    return tf.summary.text(name, data, **kwargs)
                 else:
                     printt("Invalid summary type", error=True)
                     return
