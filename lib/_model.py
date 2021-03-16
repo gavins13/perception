@@ -431,3 +431,43 @@ class __Model__(CustomUserModule):
         else:
             if testing is True:
                 return optimisers_diagnostics, losses
+
+    @classmethod
+    def from_tf_model(cls, model,
+        epochs=300,
+        checkpoint_steps=100,
+        validation_steps=100,
+        summary_steps=10,
+        verbose_summary_steps=50,
+        learning_rate=1.e-3,
+        optimizer=tf.keras.optimizers.Adam
+    ):
+        '''
+        Use this method to automate the creation of a perception model from
+        a TensorFlow or Keras-based model.
+        '''
+        assert isinstance(model, tf.keras.Model)
+        PerceptionModel = cls()
+        PerceptionModel.__config__.checkpoint_steps = checkpoint_steps
+        PerceptionModel.__config__.validation_steps = validation_steps
+        PerceptionModel.__config__.summary_steps = summary_steps
+        PerceptionModel.__config__.verbose_summary_steps = verbose_summary_steps
+        PerceptionModel.__config__.epochs = epochs
+        PerceptionModel.__config__.test_epochs = 1
+        PerceptionModel.__config__.saved_model_epochs = 1
+        PerceptionModel.__config__.print_training_metrics = False
+
+        __keras_model__ = model
+
+        PerceptionModel.__forward_pass_model__ = __keras_model__
+        PerceptionModel.__optimisers__ = [optimizer(learning_rate)]
+        PerceptionModel.__optimisers_models__ = [
+            {
+                'models': [__keras_model__],
+                'loss_function': lambda *args, **kwargs : 0.
+            }
+        ]
+        
+    @classmethod
+    def from_keras_model(cls, *args, **kwargs):
+        return cls.from_tf_model(*args, **kwargs)
