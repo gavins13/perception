@@ -175,12 +175,19 @@ class __Model__(CustomUserModule):
         return
 
     def __reset_optimisers__(self):
+        printt("Optimisers are being reset!", debug=True)
+        self.__optimisers_before_reset__= self.__optimisers__[:]
+        for optimiser in self.__optimisers__:
+            for var in optimiser.variables():
+                var.assign(tf.zeros_like(var))
+        '''
         self.__optimisers_before_reset__= self.__optimisers__[:]
         for i, optimiser in enumerate(self.__optimisers__):
             config = optimiser.get_config()
             cls = optimiser.__class__
             self.__optimisers__[i] = None
             optimiser = cls.from_config(config)
+        '''
 
     def __built__(self):
         return self.__active_vars__.built
@@ -208,6 +215,12 @@ class __Model__(CustomUserModule):
             '''
             if self.__active_vars__.built is False:
                 '''
+                Reset optimisers if requested
+                '''
+                if self.__perception_config__.reset_optimisers is True:
+                    self.__reset_optimisers__()
+                    
+                '''
                 Compile Models
                 '''
                 self.__optimisers_models__old__ = []
@@ -222,21 +235,24 @@ class __Model__(CustomUserModule):
                             training_flags=optimizer_models["__training_flag__"]
                         )
                     ]
+
                     optimizer_models["models"][0].compile(
                         optimizer=optimizer,
                         loss=optimizer_models["keras_loss_functions"] if 'keras_loss_functions' in optimizer_models.keys() else None
                     )
 
+                    '''
                     if self.__perception_config__.reset_optimisers is True:
                         self.__reset_optimisers__()
                         optimizer_models["models"][0].compile(
                             optimizer=optimizer,
                             loss=optimizer_models["keras_loss_functions"] if 'keras_loss_functions' in optimizer_models.keys() else None
                         )
+                    '''
 
                     optimizer_models["__validation_flag__"] = [True]
                     optimizer_models["__training_flag__"] = [True]
-                    if tf.__version__[0:5] == '2.2.0':
+                    if tf.__version__[0:5] == '2.2.0' or tf.__version__[0:3] == '2.3':
                         self.__TEMP__trainfunctions.append(optimizer_models["models"][0].make_train_function())
                     elif tf.__version__[0:5] == '2.1.0':
                         _,_,sampleweights_none = optimizer_models["models"][0]._standardize_user_data(
@@ -254,7 +270,7 @@ class __Model__(CustomUserModule):
             if _no_training_updates == True:
                 return {}
             for i, optimizer_models in enumerate(self.__optimisers_models__):
-                if tf.__version__[0:5] == '2.2.0' or tf.__version__[0:5] == '2.1.0':
+                if tf.__version__[0:5] == '2.2.0' or tf.__version__[0:5] == '2.1.0' or tf.__version__[0:3] == '2.3':
                     original_data = data
                     if tf.__version__[0:5] == '2.1.0':
                         data,data_y_None,data_sampleweights_None = optimizer_models["models"][0]._standardize_user_data(
@@ -264,7 +280,7 @@ class __Model__(CustomUserModule):
                         data = data + list(data_y_None or []) + list(data_sampleweights_None or [])
                         if not isinstance(K.symbolic_learning_phase(), int):
                             data += [True]  # Add learning phase value.
-                    elif tf.__version__[0:5] == '2.2.0':
+                    elif tf.__version__[0:5] == '2.2.0' or tf.__version__[0:3] == '2.3':
                         data = tf.compat.v1.data.make_one_shot_iterator(tf.data.Dataset.from_tensors(data))
                     vals = self.__TEMP__trainfunctions[i](data)
                     data = original_data
