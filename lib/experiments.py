@@ -84,6 +84,8 @@ class Experiments(object):
         '''
         return self.experiments.keys()
     def __getitem__(self, attr):
+        if attr is None:
+            return
         if not(attr in self.experiments.keys()):
             printt("Experiment doesn't exist (retrieval)", error=True, stop=True)
         return self.experiments_w_inheritance[attr]
@@ -91,18 +93,25 @@ class Experiments(object):
         '''
         Let's use __setitem__ for updating the folder name of an experiment
         '''
+        if attr is None:
+            return
         if not(attr in self.experiments.keys()):
             printt("Experiment doesn't exist (setting)", error=True, stop=True)
         experiment_id = attr
         folder_name = val
         self.save(experiment_id, folder_name)
     def update_experiment(self, experiment_id, attr, val):
-        self.__init__(experiments_file=self.experiments_file)
-        file_location = self.json_locations[experiment_id]
-        self.experiments[experiment_id][attr] = val
-        self.experiments_json_files[file_location][experiment_id][attr] = val
-        self.update_json_file(file_location)
+        if experiment_id is None:
+            return
+        else:
+            self.__init__(experiments_file=self.experiments_file)
+            file_location = self.json_locations[experiment_id]
+            self.experiments[experiment_id][attr] = val
+            self.experiments_json_files[file_location][experiment_id][attr] = val
+            self.update_json_file(file_location)
     def save(self, experiment_id, folder_name):
+        if experiment_id is None:
+            return
         self.__init__(experiments_file=self.experiments_file)
         file_location = self.json_locations[experiment_id]
         self.experiments[experiment_id]["save_folder_name"] = folder_name
@@ -116,6 +125,8 @@ class Experiments(object):
         '''
         Set the save_folder for an experiment to None
         '''
+        if experiment_id is None:
+            return
         file_location = self.json_locations[experiment_id]
         self.experiments[experiment_id]["save_folder_name"] = None
         self.experiments_json_files[file_location][experiment_id]["save_folder_name"] = None
