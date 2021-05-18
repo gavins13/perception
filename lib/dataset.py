@@ -124,6 +124,7 @@ class Dataset(CustomUserModule):
         # Define Advanced Dataset Settings
         self.config.epochs = None # Better to define epochs in .JSON experiment
         self.config.disable_batching = False
+        self.config.disable_prefetch = False
         self.generator.single_thread_test_dataset = True
         self.generator.single_thread = False
 
@@ -340,7 +341,7 @@ class Dataset(CustomUserModule):
                 printt("-")
         self.__process_dataset__()
     def create_generator(self, generator_name='py_gen_train', threads=4, output_shape=None):
-        if self.generator.single_thread is False:
+        if (self.generator.single_thread is False) and (threads != 1):
             dummy_ds = tf.data.Dataset.from_tensor_slices(['DataGenerator']*threads)
             dummy_ds = dummy_ds.interleave(
                 lambda x: tf.data.Dataset.from_generator(
@@ -412,17 +413,20 @@ class Dataset(CustomUserModule):
                 self.Datasets = [train_ds, validation_ds, test_ds]
                 if self.config.disable_batching is False:
                     self.Datasets = [x.batch(batch_size=batch_sizes[ii]) for ii, x in enumerate(self.Datasets)]
-                self.Datasets = [x.prefetch(tf.data.experimental.AUTOTUNE) if i != 2 else x for i, x in enumerate(self.Datasets) ]
+                if self.config.disable_prefetch is False:
+                    self.Datasets = [x.prefetch(tf.data.experimental.AUTOTUNE) if i != 2 else x for i, x in enumerate(self.Datasets) ]
 
                 self.test_dataset_length = len([x for x in range(self.dataset_length) if (x % self.config.cv_folds) == (self.config.cv_fold_number-1)])
                 self.train_dataset_length = len([x for x in range(self.dataset_length) if (x % self.config.cv_folds) != (self.config.cv_fold_number-1)])
+                self.validation_dataset_length = self.config.validation_size
 
             elif self.config.dataset_split is not None:
                 raise NotImplementedError('Dataset splitting not implemented yet')
         else:
             if self.config.disable_batching is False:
                 self.Datasets = [x.batch(batch_size=batch_sizes[ii]) for ii, x in enumerate(self.Datasets)]
-            self.Datasets = [x.prefetch(tf.data.experimental.AUTOTUNE) if i != 2 else x for i, x in enumerate(self.Datasets) ]
+            if self.config.disable_prefetch is False:
+                self.Datasets = [x.prefetch(tf.data.experimental.AUTOTUNE) if i != 2 else x for i, x in enumerate(self.Datasets) ]
         self.set_dataset_steps()
         self.train_dataset = self.Datasets[0]
         self.validation_dataset = self.Datasets[1]
@@ -434,6 +438,8 @@ class Dataset(CustomUserModule):
             printt("Batch size not set!", error=True, stop=True)
         if self.train_dataset_length is None:
             printt("Training dataset size not set!", error=True, stop=True)
+        if self.validation_dataset_length is None:
+            printt("Validation dataset size not set!", error=True, stop=True)
         if self.test_dataset_length is None:
             printt("Test dataset size not set!", error=True, stop=True)
 
