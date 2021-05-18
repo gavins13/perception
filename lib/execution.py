@@ -71,6 +71,7 @@ class Execution(object):
         if 'tensorboard_port' in kwargs.keys() and kwargs['tensorboard_port'] is not None:
             self.tensorboard_port = kwargs['tensorboard_port']
 
+
         '''
         Handle Dataset
         '''
@@ -96,6 +97,16 @@ class Execution(object):
                 model_args = kwargs['model_args']
             if 'debug' in kwargs.keys() and kwargs['debug'] in [True, False]:
                 debug = kwargs['debug']
+
+            '''
+            Check if we want to replace the summary function
+            '''
+            if ('summary_function' in kwargs) and kwargs['summary_function'] is not None:
+                printt("Adding custom summary function.", debug=True)
+                #self.Model.add_summary = kwargs['summary_function']
+                #kwargs['model'].add_summary = kwargs['summary_function']
+                model_args['__perception__summary_function'] = kwargs['summary_function']
+
             kwargs['model'] = kwargs['model'](training=exp_type, **model_args)
             kwargs['model'].__perception_config__.training = exp_type
             kwargs['model'].__perception_config__.debug = debug
@@ -104,7 +115,17 @@ class Execution(object):
             if isinstance(kwargs['model'], Model) is False:
                 printt("Instance check for chosen Model failed.", warning=True)
             self.Model = kwargs['model']
-            self.Model.create_models()
+            self.Model.__perception_config__._multi_gpu = False
+
+            '''
+            Detect if use a distributed multi-gpu strategy
+            '''
+            multi_gpu = ('multi_gpu' in kwargs.keys() and kwargs['multi_gpu'] is True)
+            multi_gpu_strategy = tf.distribute.MirroredStrategy() if multi_gpu is True else None
+            self.Model.__perception_config__.multi_gpu = multi_gpu
+            with multi_gpu_strategy.scope() if multi_gpu is True else nullcontext():
+                self.Model.__perception_config__.multi_gpu_strategy = multi_gpu_strategy
+                self.Model.create_models()
             self.Model.__finalise__()
         else:
             printt(kwargs.keys(), debug=True)

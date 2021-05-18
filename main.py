@@ -18,7 +18,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
   metrics_enabled=False, metrics_printing_enabled=False, save_only=False,
   auto_gpu=False, perception_save_path=None, deterministic=False, set_seed=False,
   seed=None, validation_on_cpu=False, json_injection=None, ignore_json_evaluation_finished=False,
-  tensorboard_port=None, ncpus=None):
+  tensorboard_port=None, ncpus=None, multi_gpu=False, summary_function=None):
     '''
     experiment_id: (str) experiment_id from the JSON files
     experiment_type: (str) 'train' or 'evaluate'. Default: 'test'
@@ -46,6 +46,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         experiments_file = detect_cmd_arg("experiments_file", false_val=experiments_file)
         experiment_type = detect_cmd_arg("type", retrieve_val=True, false_val=experiment_type, val_dtype=str)
         gpu = detect_cmd_arg("gpu", false_val=gpu, val_dtype=int)
+        multi_gpu = detect_cmd_arg("multi_gpu", false_val=multi_gpu, retrieve_val=False)
         tensorboard_only = detect_cmd_arg("tensorboard", retrieve_val=False, false_val=tensorboard_only)
         tensorboard_only_2 = detect_cmd_arg("tensorboard_only", retrieve_val=False, false_val=tensorboard_only)
         tensorboard_only = (tensorboard_only or tensorboard_only_2)
@@ -99,12 +100,18 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
     experiments = ExperimentsManager(experiments_file=experiments_file)
     if tensorboard_only is True:
         gpu = None
+        multi_gpu = False
         reset = False
         printt("Only Tensorboard starting", info=True)
 
     if save_only is True:
         reset = False
+        multi_gpu = False
         printt("Only saving the model", info=True)
+
+    if multi_gpu is True:
+        auto_gpu = True
+        printt("Distributing load over multiple GPUs on this node", info=True)
 
     if debug_level is not None:
         if not(isinstance(debug_level, int)):
@@ -301,4 +308,6 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         load_weights_folder_name=load_weights_folder_name,
         reset_optimisers=reset_optimisers, validation_on_cpu=validation_on_cpu,
         ignore_json_evaluation_finished=ignore_json_evaluation_finished,
-        tensorboard_port=tensorboard_port)
+        tensorboard_port=tensorboard_port,
+        multi_gpu=multi_gpu,
+        summary_function=summary_function)

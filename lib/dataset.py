@@ -328,10 +328,11 @@ class Dataset(CustomUserModule):
         elif self.dev.on is False:
             if self.system_type.use_generator is True:
                 self.__process_generator_shapes__()
-                test_threads = 1 if self.generator.single_thread_test_dataset is True else threads
+                these_threads = [threads]*3 if isinstance(threads, int) else threads
+                test_threads = 1 if self.generator.single_thread_test_dataset is True else threads[2]
                 self.Datasets = [
-                    self.create_generator('py_gen_train', threads=threads, output_shape=self.generator.output_shape[0]),
-                    self.create_generator('py_gen_validation', threads=threads, output_shape=self.generator.output_shape[1]),
+                    self.create_generator('py_gen_train', threads=threads[0], output_shape=self.generator.output_shape[0]),
+                    self.create_generator('py_gen_validation', threads=threads[1], output_shape=self.generator.output_shape[1]),
                     self.create_generator('py_gen_test', threads=test_threads, output_shape=self.generator.output_shape[2])
                 ]
                 self.Dataset = self.Datasets[0]

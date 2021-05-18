@@ -1,6 +1,6 @@
 import tensorflow as tf
 from .misc import printt
-from contextlib import ExitStack
+from contextlib import ExitStack, nullcontext
 from .summaries import video_summary
 import copy
 import sys
@@ -52,9 +52,18 @@ class __Model__(CustomUserModule):
         self.__perception_config__.reset_optimisers = False
         #self.__perception_config__.printt = None
         self.__analysis_directory__ = None
+        if '__perception__summary_function' in kwargs.keys():
+            print("Perception Model custom summary function added")
+            self.add_summary = kwargs['__perception__summary_function']
+            del(kwargs['__perception__summary_function'])
+        else:
+            print("No Perception Model custom summary function added")
+            self.add_summary = self.add_summary_
+
         self.__kwargs__ = kwargs # Required for adding module arguments in JSON
 
         self.loss_func = self._loss_func if self.__perception_config__.debug is True else tf.function(self._loss_func)
+        self.__perception_config__.multi_gpu = False
 
     def __get_step__(self):
         return self.__active_vars__.step
@@ -75,7 +84,7 @@ class __Model__(CustomUserModule):
                 models["__training_flag__"][j] = train_flag
         pass
 
-    def add_summary(self, name, data, **kwargs):
+    def add_summary_(self, name, data, **kwargs):
         #tf.summary.trace_off()
         '''
         type: string from 'scalar', 'video', 'image', 'text'
@@ -214,44 +223,45 @@ class __Model__(CustomUserModule):
                 '''
                 self.__optimisers_models__old__ = []
                 self.__TEMP__trainfunctions = []
-                for i, (optimizer, optimizer_models) in enumerate(zip(self.__optimisers__, self.__optimisers_models__)):
-                    optimizer_models__models_old = optimizer_models["models"][:] # Copy in-list references
-                    optimizer_models["models"] = [
-                        self.__model_combiner__(
-                            *optimizer_models["models"],
-                            loss_function=optimizer_models["loss_function"],
-                            validation_flags=optimizer_models["__validation_flag__"],
-                            training_flags=optimizer_models["__training_flag__"]
-                        )
-                    ]
-                    optimizer_models["models"][0].compile(
-                        optimizer=optimizer,
-                        loss=optimizer_models["keras_loss_functions"] if 'keras_loss_functions' in optimizer_models.keys() else None
-                    )
-
-                    if self.__perception_config__.reset_optimisers is True:
-                        self.__reset_optimisers__()
+                with self.__perception_config__.multi_gpu_strategy.scope() if self.__perception_config__._multi_gpu is True else nullcontext():
+                    for i, (optimizer, optimizer_models) in enumerate(zip(self.__optimisers__, self.__optimisers_models__)):
+                        optimizer_models__models_old = optimizer_models["models"][:] # Copy in-list references
+                        optimizer_models["models"] = [
+                            self.__model_combiner__(
+                                *optimizer_models["models"],
+                                loss_function=optimizer_models["loss_function"],
+                                validation_flags=optimizer_models["__validation_flag__"],
+                                training_flags=optimizer_models["__training_flag__"]
+                            )
+                        ]
                         optimizer_models["models"][0].compile(
                             optimizer=optimizer,
                             loss=optimizer_models["keras_loss_functions"] if 'keras_loss_functions' in optimizer_models.keys() else None
                         )
 
-                    optimizer_models["__validation_flag__"] = [True]
-                    optimizer_models["__training_flag__"] = [True]
-                    if tf.__version__[0:5] == '2.2.0':
-                        self.__TEMP__trainfunctions.append(optimizer_models["models"][0].make_train_function())
-                    elif tf.__version__[0:5] == '2.1.0':
-                        _,_,sampleweights_none = optimizer_models["models"][0]._standardize_user_data(
-                            data, None, sample_weight=None, class_weight=None,
-                            extract_tensors_from_dataset=True)
-                        optimizer_models["models"][0]._update_sample_weight_modes(sample_weights=sampleweights_none) # is this needed?
-                        optimizer_models["models"][0]._make_train_function()
-                        self.__TEMP__trainfunctions.append(optimizer_models["models"][0].train_function)
+                        if self.__perception_config__.reset_optimisers is True:
+                            self.__reset_optimisers__()
+                            optimizer_models["models"][0].compile(
+                                optimizer=optimizer,
+                                loss=optimizer_models["keras_loss_functions"] if 'keras_loss_functions' in optimizer_models.keys() else None
+                            )
 
-                    optimizer_models_old = copy.copy(optimizer_models) # Shallow-copy of the dictionary's references
-                    optimizer_models_old["models"] = optimizer_models__models_old
-                    self.__optimisers_models__old__.append(optimizer_models_old)
-                self.__active_vars__.built = True
+                        optimizer_models["__validation_flag__"] = [True]
+                        optimizer_models["__training_flag__"] = [True]
+                        if tf.__version__[0:5] == '2.2.0':
+                            self.__TEMP__trainfunctions.append(optimizer_models["models"][0].make_train_function())
+                        elif tf.__version__[0:5] == '2.1.0':
+                            _,_,sampleweights_none = optimizer_models["models"][0]._standardize_user_data(
+                                data, None, sample_weight=None, class_weight=None,
+                                extract_tensors_from_dataset=True)
+                            optimizer_models["models"][0]._update_sample_weight_modes(sample_weights=sampleweights_none) # is this needed?
+                            optimizer_models["models"][0]._make_train_function()
+                            self.__TEMP__trainfunctions.append(optimizer_models["models"][0].train_function)
+
+                        optimizer_models_old = copy.copy(optimizer_models) # Shallow-copy of the dictionary's references
+                        optimizer_models_old["models"] = optimizer_models__models_old
+                        self.__optimisers_models__old__.append(optimizer_models_old)
+                    self.__active_vars__.built = True
 
             if _no_training_updates == True:
                 return {}
@@ -271,7 +281,13 @@ class __Model__(CustomUserModule):
                     vals = self.__TEMP__trainfunctions[i](data)
                     data = original_data
                 else:
-                    vals = optimizer_models["models"][0].train_on_batch(data)
+                    if self.__perception_config__._multi_gpu is False:
+                        vals = optimizer_models["models"][0].train_on_batch(data)
+                        if not(isinstance(vals, list)):
+                            vals = [vals]
+                    else:
+                        per_replica_losses = self.__perception_config__.multi_gpu_strategy.run(optimizer_models["models"][0].train_on_batch, args=(data,))
+                        vals = self.__perception_config__.multi_gpu_strategy.reduce(tf.distribute.ReduceOp.SUM, per_replica_losses, axis=None)
                 if (summaries or verbose_summaries):
                     self.__forward_pass__(data, summaries=summaries, verbose_summaries=verbose_summaries)
 
