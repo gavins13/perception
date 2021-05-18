@@ -89,17 +89,25 @@ class Execution(object):
         '''
         Handle Model
         '''
-        if 'model' in kwargs.keys() and (issubclass(kwargs['model'], Model) or\
-          inspect.isclass(kwargs['model'])):
+        if 'model' in kwargs.keys():
             model_args = {}
             if 'model_args' in kwargs.keys() and kwargs['model_args'] is not None:
                 model_args = kwargs['model_args']
-            if 'debug' in kwargs.keys() and kwargs['debug'] in [True, False]:
-                debug = kwargs['debug']
-            kwargs['model'] = kwargs['model'](training=exp_type, **model_args)
-            kwargs['model'].__perception_config__.training = exp_type
-            kwargs['model'].__perception_config__.debug = debug
-        if 'model' in kwargs.keys():
+            if inspect.isclass(kwargs['model']) and \
+                issubclass(kwargs['model'], Model):                
+                '''
+                Instantiate Model
+                '''
+                if 'debug' in kwargs.keys() and kwargs['debug'] in [True, False]:
+                    debug = kwargs['debug']
+                kwargs['model'] = kwargs['model'](training=exp_type, **model_args)
+                kwargs['model'].__perception_config__.training = exp_type
+                kwargs['model'].__perception_config__.debug = debug
+            elif not(isinstance(kwargs['model'], Model)):
+                if inspect.isclass(kwargs['model']):
+                    kwargs['model'] = kwargs['model']()
+                if isinstance(kwargs['model'], tf.keras.Model):
+                    kwargs['model'] = Model.from_tf_model(kwargs['model'], **model_args)
             # Use this dataset
             if isinstance(kwargs['model'], Model) is False:
                 printt("Instance check for chosen Model failed.", warning=True)
@@ -121,6 +129,8 @@ class Execution(object):
         Handle directories for saving
         '''
         # Create Perception Experiments Save Directory
+        if 'dir' in kwargs:
+            kwargs['perception_save_path'] = kwargs['dir']
         perception_save_path = Config['save_directory'] if not((
             'perception_save_path' in kwargs.keys() )
              and kwargs['perception_save_path'] is not None
@@ -139,13 +149,12 @@ class Execution(object):
         save_folder = None if not(('save_folder' in kwargs.keys()) and\
             (isinstance(kwargs['save_folder'], str) is True)) else kwargs['save_folder']
         printt("Execution: Save folder: {}".format(save_folder), info=True)
+
+
+
         # Check for reset flag
         if ('reset' in kwargs.keys()) and (kwargs['reset'] is True):
             save_folder = None
-            if 'experiments_manager' in kwargs.keys():
-                ExperimentsManager = kwargs['experiments_manager']
-            else:
-                ExperimentsManager = Experiments()
         # Create the save folder name from the experiment name above
         if(save_folder is None):
             self.save_directory_name = self.experiment_name + '_' + datetimestr
@@ -160,34 +169,28 @@ class Execution(object):
         # Create the save folder
         if not(os.path.exists(self.save_directory)):
             os.makedirs(self.save_directory)
-            if 'experiments_manager' in kwargs.keys():
-                ExperimentsManager = kwargs['experiments_manager']
-            else:
-                ExperimentsManager = Experiments()
 
         # If reset, or new folder created for experiment, update the exp.
         # If custom perception_save_path used, update this as well
-        self.experiment_id = kwargs['experiment_id']
-        if ('experiment_id' in kwargs.keys()) and ('ExperimentsManager' in locals()):
-            ExperimentsManager[kwargs['experiment_id']] = self.save_directory_name
-            if ((
-             'perception_save_path' in kwargs.keys() )\
-             and (kwargs['perception_save_path'] is not None)
-             ):
-                ExperimentsManager.update_experiment(
-                 kwargs['experiment_id'], 'perception_save_path',
-                 kwargs['perception_save_path'])
-
+        self.experiment_id = kwargs['experiment_id'] if ('experiment_id' in kwargs.keys()) else None
+        
         '''
-        [] [check]
-        This block of code for the experiments manager needs to be reviewed.
+        Manage experiment
         '''
-        if 'ExperimentsManager' not in locals():
-            if 'experiments_manager' in kwargs.keys():
-                ExperimentsManager = kwargs['experiments_manager']
-            else:
-                ExperimentsManager = Experiments()
-        self.ExperimentsManager = ExperimentsManager
+        if ('experiments_manager' in kwargs.keys()) and (kwargs['experiments_manager'] is not None):
+            ExperimentsManager = kwargs['experiments_manager']
+        else:
+            ExperimentsManager = Experiments()
+            
+        ExperimentsManager[self.experiment_id] = self.save_directory_name
+        if ((
+            'perception_save_path' in kwargs.keys() )\
+            and (kwargs['perception_save_path'] is not None)
+            ):
+            ExperimentsManager.update_experiment(
+                self.experiment_id, 'perception_save_path',
+                kwargs['perception_save_path'])
+                 
 
         if (exp_type == 'train') and \
           hasattr(ExperimentsManager[self.experiment_id], 'training_finished') and \
@@ -204,6 +207,7 @@ class Execution(object):
           ):
             printt("Experiment has already finished evaluation", stop=True, error=True)
 
+        self.ExperimentsManager = ExperimentsManager
         '''
         Create summary writer
         '''
@@ -417,7 +421,7 @@ class Execution(object):
         #printt("Printing model summary to path: {}".format(full_file_path), debug=True)
         printt(val, full_file_path=full_file_path)
 
-    def training(self):
+    def training(self, ret=False):
         '''
         Training initialisation
         '''
@@ -442,6 +446,11 @@ class Execution(object):
         '''
         self.tensorboard()
         
+        '''
+        Model summary flag
+        '''
+        model_summary_saved = False
+
         '''
         Enter training loop
         '''
@@ -516,12 +525,19 @@ class Execution(object):
 
 
                             # Save summary of the model
-                            if (step == 1): #or ((step+1) == self.Model.__config__.summary_steps):
+                            if model_summary_saved is False: #(step == 1): #or ((step+1) == self.Model.__config__.summary_steps):
                                 self.Model.__forward_pass_model__.summary(print_fn=self.logging)
                                 for optimisers_models in self.Model.__optimisers_models__:
                                     #for model in optimisers_models['models']:
                                         #model.summary(print_fn=self.logging)
+                                    if optimisers_models['models'][0].built is False:
+                                        # The only reason this wouldn't be built at this point is if a custom training loop is created
+                                        # so we can override but set built to True
+                                        #_ = optimisers_models['models'][0](data_record)
+                                        optimisers_models['models'][0].built = True
+                                    # Only get summary if the first model is built
                                     _get_summary(optimisers_models['models'], self.logging, self.save_directory if self.print_model_png is True else None)
+                                    model_summary_saved = True
 
                             # Increment to next step
                             step += 1
@@ -561,7 +577,10 @@ class Execution(object):
          self.experiment_id, 'training_finished',
          True)
         tf.keras.backend.clear_session()
-        self.tensorboard_only()
+        if ret is False:
+            self.tensorboard_only()
+        else:
+            return
 
     def save_only(self):
         '''
