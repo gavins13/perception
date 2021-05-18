@@ -1,6 +1,6 @@
 import tensorflow as tf
 from .misc import printt
-from ._model import __Model__
+from ._model import __Model__, KerasModel
 '''
 Model
 
@@ -64,7 +64,7 @@ class Model(__Model__):
         self.__config__.saved_model_epochs = 1
         self.__config__.print_training_metrics = False
 
-    class CustomModel(tf.keras.Model):
+    class CustomModel(KerasModel):
         '''
         Add decorator below if you want to use SavedModel and TF Serving
         '''

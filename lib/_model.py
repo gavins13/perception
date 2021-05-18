@@ -227,8 +227,12 @@ class __Model__(CustomUserModule):
                 self.__TEMP__trainfunctions = []
                 for i, (optimizer, optimizer_models) in enumerate(zip(self.__optimisers__, self.__optimisers_models__)):
                     optimizer_models__models_old = optimizer_models["models"][:] # Copy in-list references
+                    if optimizer_models["models"][0].__class__.train_step == tf.keras.Model.train_step:
+                        combiner = __model_combiner__
+                    else:
+                        combiner = __custom_model_combiner__
                     optimizer_models["models"] = [
-                        self.__model_combiner__(
+                        combiner(
                             *optimizer_models["models"],
                             loss_function=optimizer_models["loss_function"],
                             validation_flags=optimizer_models["__validation_flag__"],
@@ -291,27 +295,6 @@ class __Model__(CustomUserModule):
 
                 metrics = {key: val for key,val in zip(optimizer_models["models"][0].metrics_names, vals)}
                 return metrics
-
-
-    class __model_combiner__(tf.keras.Model):
-        def __init__(self, *args, **kwargs):
-            super().__init__()
-            self.models = args
-            self.loss_function = kwargs['loss_function']
-            self.validation_flags = kwargs['validation_flags']
-            self.training_flags = kwargs['training_flags']
-
-        def call(self, data, training=False, pass_number=None, validation=False):
-            for model, val_flag, train_flag in zip(self.models, self.validation_flags, self.training_flags):
-                dict_ = {}
-                if train_flag is True:
-                    dict_["training"] = training
-                if val_flag is True:
-                    dict_["validation"] = validation
-                data = model(data, **dict_)
-            loss = self.loss_function(data)
-            self.add_loss(loss, inputs=True)
-            return data
 
 
     def save(self, path, data=None, initialised=True):
@@ -457,17 +440,90 @@ class __Model__(CustomUserModule):
         PerceptionModel.__config__.saved_model_epochs = 1
         PerceptionModel.__config__.print_training_metrics = False
 
-        __keras_model__ = model
+        if isinstance(model, KerasModel):
+            model.set_summary_function(PerceptionModel.add_summary)
+            printt("Summary function set", info=True)
 
+        __keras_model__ = model
+        dummy_loss = lambda *args, **kwargs : 0.
         PerceptionModel.__forward_pass_model__ = __keras_model__
-        PerceptionModel.__optimisers__ = [optimizer(learning_rate)]
+        if inspect.isclass(optimizer):
+            instantiated_optimizer = optimizer(learning_rate)
+        else:
+            instantiated_optimizer = optimizer
+        PerceptionModel.__optimisers__ = [instantiated_optimizer]
         PerceptionModel.__optimisers_models__ = [
             {
                 'models': [__keras_model__],
-                'loss_function': lambda *args, **kwargs : 0.
+                'loss_function': dummy_loss
             }
         ]
+        PerceptionModel.__keras_models__ = [__keras_model__]
+
+        PerceptionModel.create_models = lambda *args, **kwargs : None
+
+        return PerceptionModel
         
     @classmethod
     def from_keras_model(cls, *args, **kwargs):
         return cls.from_tf_model(*args, **kwargs)
+
+
+class KerasModel(tf.keras.Model):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+        self.add_summary = kwargs['summary_function'] if 'summary_function' in kwargs.keys() else lambda *args, **kwargs: None 
+        self.layers_ = []
+
+        self.models = []
+
+    def set_summary_function(self, summary_function=None):
+        func = self.add_summary if summary_function is None else summary_function
+        if func is None:
+            raise ValueError('Summary function not set or supplied')
+
+        self.add_summary = func
+
+        if hasattr(self, 'models'):
+            for model in self.models:
+                if isinstance(model, KerasModel):
+                    model.set_summary_function(summary_function=func)
+
+
+class __model_combiner__(tf.keras.Model):
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self.models = args
+        self.loss_function = kwargs['loss_function']
+        self.validation_flags = kwargs['validation_flags']
+        self.training_flags = kwargs['training_flags']
+
+    def call(self, data, training=False, pass_number=None, validation=False):
+        for model, val_flag, train_flag in zip(self.models, self.validation_flags, self.training_flags):
+            dict_ = {}
+            if train_flag is True:
+                dict_["training"] = training
+            if val_flag is True:
+                dict_["validation"] = validation
+            data = model(data, **dict_)
+        loss = self.loss_function(data)
+        self.add_loss(loss, inputs=True)
+        return data
+
+class __custom_model_combiner__(__model_combiner__):
+    def train_step(self, *args, **kwargs):
+        if len(self.models) == 1:
+            return self.models[0].train_step(*args, **kwargs)
+        else:
+            return super().train_step(*args, **kwargs)
+
+    def compile(self, *args, **kwargs):
+        print("Running compile")
+        if len(self.models) == 1:
+            print("Running specific compile")
+            _ = self.models[0].compile(*args, **kwargs)
+            return super().compile(*args, **kwargs)
+        else:
+            print("Running general compile")
+            return super().compile(*args, **kwargs)
