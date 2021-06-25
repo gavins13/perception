@@ -15,7 +15,7 @@ path = os.path.join(
 exp_ext = '.json'
 json_files = [join(path, f) for f in listdir(path)\
     if isfile(join(path, f)) and f.find(exp_ext)==len(f)-5]
-printt("List of experiment files: " + '\n'.join('{}: {}'.format(*k) for k in enumerate(json_files)), debug=True)
+printt("List of perception experiment files: " + '\n'.join('{}: {}'.format(*k) for k in enumerate(json_files)), debug=True)
 
 
 class Experiments(object):
@@ -27,6 +27,8 @@ class Experiments(object):
         all_json_files= json_files[:]
         if experiments_file is not None:
             all_json_files.append(experiments_file)
+        if len(all_json_files) == 0:
+            printt("No experiments file loaded", info=True)
         for json_file in all_json_files:
             with open(json_file, 'r') as f:
                 this_dict = json.load(f)
