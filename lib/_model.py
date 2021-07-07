@@ -170,7 +170,7 @@ class __Model__(CustomUserModule):
 
     def __build__(self, *args, **kwargs):
         printt("Building model", info=True)
-        kwargs = {**kwargs, _no_training_updates: True}
+        kwargs = {**kwargs, "_no_training_updates": True}
         _ = self.__update_weights__(self, *args, **kwargs)
         return
 
