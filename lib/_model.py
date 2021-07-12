@@ -73,6 +73,10 @@ class __Model__(CustomUserModule):
                 print(i,j,"training flag, validation flag", train_flag, val_flag)
                 models["__validation_flag__"][j] = val_flag
                 models["__training_flag__"][j] = train_flag
+
+                if isinstance(model, KerasModel):
+                    model.set_summary_function(self.add_summary)
+                    printt("Summary function set from model \"{}\"".format(model.name), info=True)
         pass
 
     def add_summary(self, name, data, **kwargs):
@@ -471,9 +475,12 @@ class __Model__(CustomUserModule):
 
 class KerasModel(tf.keras.Model):
     def __init__(self, *args, **kwargs):
+        summary_function = kwargs.get('summary_function')
+        if 'summary_function' in kwargs:
+            del(kwargs['summary_function'])
         super().__init__(*args, **kwargs)
     
-        self.add_summary = kwargs['summary_function'] if 'summary_function' in kwargs.keys() else lambda *args, **kwargs: None 
+        self.add_summary = summary_function if summary_function is not None else lambda *args, **kwargs: None 
         self.layers_ = []
 
         self.models = []
