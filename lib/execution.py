@@ -225,7 +225,8 @@ class Execution(object):
         #self.print = lambda *args, **kwargs : printt(*args, **{**kwargs, 'full_file_path': printt_experiment_log if 'full_file_path' not in kwargs.keys() else kwargs['full_file_path']})
         #globals()['printt'] = self.print
         #self.Model.print = self.print
-        sys.stdout = Logger(printt_experiment_log)
+        if not(kwargs.get('disable_logger')):
+            sys.stdout = Logger(printt_experiment_log)
         self.metrics_enabled = False if not('metrics_enabled' in kwargs.keys()) else kwargs['metrics_enabled']
         self.metrics_printing_enabled = True if not('metrics_printing_enabled' in kwargs.keys()) else kwargs['metrics_printing_enabled']
         self.print_model_png = False if not('print_model_png' in kwargs.keys()) else kwargs['print_model_png'] # [] should be True
@@ -454,6 +455,7 @@ class Execution(object):
         '''
         Enter training loop
         '''
+        end_time = time.time()
         print("Current File: {} \nEpoch: {} \nStep: {} \n".format(int(self.ckpt.current_file), int(self.ckpt.epoch), step))
         with self.summary_writer.as_default():
             with tf.summary.record_if(True):
@@ -505,7 +507,9 @@ class Execution(object):
 
                             # Stop Timing
                             duration = time.time() - start_time
-                            print("time: %.3f" % duration, end=";")
+                            duration_data = start_time - end_time
+                            print("time (network): %.3f" % duration, end=";")
+                            print("time (data): %.3f" % duration_data, end=";")
 
 
                             # Checkpointing
@@ -572,6 +576,7 @@ class Execution(object):
                                 if (epochs >= self.Model.__config__.epochs) and (self.Model.__config__.epochs != -1):
                                     train = False
                                     break
+                            end_time = time.time()
                     # ..
         self.ExperimentsManager.update_experiment(
          self.experiment_id, 'training_finished',

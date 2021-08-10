@@ -18,7 +18,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
   metrics_enabled=False, metrics_printing_enabled=False, save_only=False,
   auto_gpu=False, perception_save_path=None, deterministic=False, set_seed=False,
   seed=None, validation_on_cpu=False, json_injection=None, ignore_json_evaluation_finished=False,
-  tensorboard_port=None, ncpus=None):
+  tensorboard_port=None, ncpus=None, disable_logger=False):
     '''
     experiment_id: (str) experiment_id from the JSON files
     experiment_type: (str) 'train' or 'evaluate'. Default: 'test'
@@ -301,4 +301,4 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         load_weights_folder_name=load_weights_folder_name,
         reset_optimisers=reset_optimisers, validation_on_cpu=validation_on_cpu,
         ignore_json_evaluation_finished=ignore_json_evaluation_finished,
-        tensorboard_port=tensorboard_port)
+        tensorboard_port=tensorboard_port, disable_logger=disable_logger)
