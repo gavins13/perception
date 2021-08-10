@@ -440,6 +440,10 @@ class Execution(object):
         step=int(self.ckpt.step) # Starts on 1
         train = not ( (epochs >= self.Model.__config__.epochs) and (self.Model.__config__.epochs != -1) )
         self.Dataset.skip(step, current_file=int(self.ckpt.current_file), epoch=int(self.ckpt.epoch))
+        terminating_step = None
+        if hasattr(self.Model.__config__, 'terminating_step'):
+            print("Using a terminating step")
+            terminating_step = self.Model.__config__.terminating_step
 
         '''
         Metrics (and printing) enabled?
@@ -585,6 +589,9 @@ class Execution(object):
                                 if (epochs >= self.Model.__config__.epochs) and (self.Model.__config__.epochs != -1):
                                     train = False
                                     break
+                            if (terminating_step is not None) and (step >= terminating_step):
+                                train = False
+                                break
                             end_time = time.time()
                     # ..
         self.ExperimentsManager.update_experiment(
