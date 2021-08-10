@@ -18,7 +18,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
   metrics_enabled=False, metrics_printing_enabled=False, save_only=False,
   auto_gpu=False, perception_save_path=None, deterministic=False, set_seed=False,
   seed=None, validation_on_cpu=False, json_injection=None, ignore_json_evaluation_finished=False,
-  tensorboard_port=None, ncpus=None, disable_logger=False):
+  tensorboard_port=None, ncpus=None, disable_logger=False, exit=False):
     '''
     experiment_id: (str) experiment_id from the JSON files
     experiment_type: (str) 'train' or 'evaluate'. Default: 'test'
@@ -51,6 +51,7 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         tensorboard_only = (tensorboard_only or tensorboard_only_2)
         tensorboard_port = detect_cmd_arg("tensorboard_port", false_val=tensorboard_port, val_dtype=int)
         reset = detect_cmd_arg("reset", retrieve_val=False, false_val=reset)
+        exit = detect_cmd_arg("exit", retrieve_val=False, false_val=reset)
         gradient_taping = detect_cmd_arg("gradient_taping", retrieve_val=False, false_val=gradient_taping)
         debug = detect_cmd_arg("debug", retrieve_val=False, false_val=debug)
         metrics_enabled = detect_cmd_arg("metrics_enabled", retrieve_val=False, false_val=metrics_enabled)
@@ -301,4 +302,4 @@ def Experiment(experiment_id, experiment_type='test', execute=False, gpu=None,
         load_weights_folder_name=load_weights_folder_name,
         reset_optimisers=reset_optimisers, validation_on_cpu=validation_on_cpu,
         ignore_json_evaluation_finished=ignore_json_evaluation_finished,
-        tensorboard_port=tensorboard_port, disable_logger=disable_logger)
+        tensorboard_port=tensorboard_port, disable_logger=disable_logger, exit=exit)

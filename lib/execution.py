@@ -321,6 +321,11 @@ class Execution(object):
             self.__call__func = self.save_only
 
         '''
+        Exit app after training?
+        '''
+        self.exit_after_train = kwargs.get('exit')
+
+        '''
         Start training?
         '''
         self.tb_url = None
@@ -415,7 +420,11 @@ class Execution(object):
     def tensorboard_only(self):
         if self.tb_url is None:
             self.tensorboard()
-        input("Press enter to exit and stop TensorBoard...")
+        
+        if self.exit_after_train:
+            return
+        else:
+            input("Press enter to exit and stop TensorBoard...")
 
     def logging(self, val):
         full_file_path = os.path.join(self.save_directory, "model_summary.txt")
