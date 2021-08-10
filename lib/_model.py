@@ -296,7 +296,8 @@ class __Model__(CustomUserModule):
                     vals = optimizer_models["models"][0].train_on_batch(data)
                 if (summaries or verbose_summaries):
                     self.__forward_pass__(data, summaries=summaries, verbose_summaries=verbose_summaries)
-
+                if not(isinstance(vals, list)):
+                    vals = [vals]
                 metrics = {key: val for key,val in zip(optimizer_models["models"][0].metrics_names, vals)}
                 return metrics
 
