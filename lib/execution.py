@@ -190,16 +190,17 @@ class Execution(object):
             ExperimentsManager.update_experiment(
                 self.experiment_id, 'perception_save_path',
                 kwargs['perception_save_path'])
-                 
+
+        check = lambda x, y : y in x.keys()
 
         if (exp_type == 'train') and \
-          hasattr(ExperimentsManager[self.experiment_id], 'training_finished') and \
+          check(ExperimentsManager[self.experiment_id], 'training_finished') and \
           (ExperimentsManager[self.experiment_id]["training_finished"] == True):
             printt("Experiment has already finished training", stop=True, error=True)
 
         
         if (exp_type == 'evaluate') and \
-          hasattr(ExperimentsManager[self.experiment_id], 'evaluation_finished') and \
+          check(ExperimentsManager[self.experiment_id], 'evaluation_finished') and \
           (ExperimentsManager[self.experiment_id]["evaluation_finished"] == True) and \
           not(
               ("ignore_json_evaluation_finished" in kwargs.keys()) and \
