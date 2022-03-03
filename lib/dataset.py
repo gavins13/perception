@@ -653,3 +653,4 @@ class Dataset(CustomUserModule):
         '''
         self.current.file=0
         self.current.epoch=0
+        self.current.step = None
